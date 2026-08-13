@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>本地模型对话</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🫀</text></svg>" />
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <button class="btn primary block" id="new-chat">+ 新建对话</button>
+    </div>
+    <div class="conv-list" id="conv-list"></div>
+    <div class="sidebar-foot">
+      <div class="status" id="status">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">正在检查模型服务…</span>
+      </div>
+      <button class="btn ghost block" id="open-settings">⚙ 生成参数</button>
+      <button class="btn ghost block" id="toggle-theme">◐ 切换主题</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn only-narrow" id="toggle-sidebar" title="会话列表">☰</button>
+      <div class="title" id="conv-title">新的对话</div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="export-chat" title="导出为 Markdown">⭳</button>
+        <button class="icon-btn" id="clear-chat" title="清空当前对话">🗑</button>
+      </div>
+    </header>
+
+    <div class="messages" id="messages">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🫀</div>
+        <h1 id="empty-title">与本地模型对话</h1>
+        <p>模型完全在本机 GPU 上运行，对话内容不会离开这台机器。</p>
+        <div class="suggestions" id="suggestions"></div>
+        <p class="hint" id="empty-hint"></p>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="attachments" id="attachments"></div>
+      <div class="composer">
+        <button class="icon-btn attach" id="attach-btn" title="上传 ECG 特征或报告">📎</button>
+        <input type="file" id="file-input" accept=".json,.txt,.md,.log,.csv,.tsv,.yaml,.yml" multiple hidden />
+        <textarea id="input" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+        <button class="btn primary send" id="send">发送</button>
+        <button class="btn danger send" id="stop" hidden>■ 停止</button>
+      </div>
+      <div class="composer-foot">
+        <span id="stats"></span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="settings-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>生成参数</h2>
+      <button class="icon-btn" id="close-settings">✕</button>
+    </div>
+    <div class="modal-body">
+      <label class="field">
+        <span>System Prompt</span>
+        <textarea id="set-system" rows="7"></textarea>
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Temperature <b id="val-temp"></b></span>
+          <input type="range" id="set-temp" min="0" max="1.5" step="0.05" />
+        </label>
+        <label class="field">
+          <span>Top-p <b id="val-topp"></b></span>
+          <input type="range" id="set-topp" min="0.1" max="1" step="0.05" />
+        </label>
+      </div>
+      <div class="field-row">
+        <label class="field">
+          <span>Top-k <b id="val-topk"></b></span>
+          <input type="range" id="set-topk" min="0" max="128" step="1" />
+        </label>
+        <label class="field">
+          <span>最大生成 tokens</span>
+          <input type="number" id="set-maxtok" min="64" max="32768" step="64" />
+        </label>
+      </div>
+      <label class="check">
+        <input type="checkbox" id="set-stripdx" />
+        <span>上传报告时移除 <code>Dx</code> 诊断标签（与批量流水线一致，避免答案泄露）</span>
+      </label>
+      <label class="check" id="thinking-field" hidden>
+        <input type="checkbox" id="set-thinking" />
+        <span>启用思考模式（模型先输出推理过程再给答案，更准但更慢）</span>
+      </label>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="reset-settings">恢复默认</button>
+      <button class="btn primary" id="save-settings">完成</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/static/markdown.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

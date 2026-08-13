@@ -1,0 +1,14 @@
+# Project detector
+-e ./feature_extraction
+
+# LUDB reader and detector baselines (versions used for validation)
+wfdb==4.3.1
+neurokit2==0.2.13
+biosppy==2.2.4
+
+# BioSPPy 2.2.4 imports this package but does not install it in every setup.
+peakutils==1.3.5
+
+# Report tables and plots
+pandas>=2.0
+matplotlib>=3.7

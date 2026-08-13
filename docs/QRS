@@ -1,0 +1,984 @@
+# 多导联心电图波形检测（ECG Delineation）技术调研
+
+**主题**：QRS onset/offset、R 波位置与形态、Q 波及 QT 相关特征的高精度提取；多导联可靠性筛选 + 稳健融合；notch/异常形态与导联间不对齐的处理。
+
+**版本**：2026-07 | **定位**：工程实现指南 + 文献综述
+
+---
+
+## 0. 执行摘要
+
+### 0.1 核心结论
+
+1. **"全局点"与"单导联点"必须分开定义、分别存储。** IEC 60601-2-25 附录 FF.2 明确规定：P/QRS/T 的**全局时程由"任一导联中最早的 onset"到"任一导联中最晚的 offset"**定义，因为激动波前在不同导联上的投影时刻本来就不同。CSE 数据库记录 #001 就是典型例子——全局 QRS 时程参考值 127 ms，而导联 I 上目测只有约 100 ms，差异来自 III 导联的 onset 显著更早。**因此"导联间不对齐"在很大程度上是生理事实，不是要消除的误差。**
+
+2. **但朴素的 min/max 全局规则极不稳健**：一条噪声导联就能把全局 onset 拉早 30 ms。工程上必须用「**可靠导联筛选 + 稳健序统计（而非极值）+ 多导联互证**」替代直接取 min/max。
+
+3. **精度天花板由三件事决定**，算法本身反而不是最主要的：
+   - 前处理（高通截止频率、零相位与否、等电位线估计）
+   - 时间分辨率（500 Hz 采样 = 2 ms/样本，而病理性 Q 波阈值就在 30/40 ms 上，必须上采样）
+   - 代表搏（representative / median beat）的构建质量
+
+4. **当前最优实践是混合式**：深度学习分割给出鲁棒的粗定位与波形语义（哪段是 P/QRS/T、是否存在），传统信号处理（小波模极大 / 导数阈值 / 面积法）在粗定位窗口内做**亚采样级边界精修**，多导联稳健统计做最终裁决，规则引擎做合理性校验与置信度输出。纯 DL 的边界方差通常大于精修后的混合法，纯规则法在心律失常与噪声下召回率不足。
+
+5. **多导联融合的两条路线中，"投影/降维后再 delineate"优于"各导联分别 delineate 后再选规则"**。Almeida 等 (IEEE TBME 2009) 的结论：基于小波变换环（WT loop）空间投影得到的最优导出导联，其边界误差离散度低于任何单导联，也优于在单导联标注结果之上做选择规则。呼吸对 T 波终点定位的干扰，选择规则法只能降低约 15% 的误差离散，多导联投影法能降低约 40%。
+
+### 0.2 推荐流水线（一览）
+
+```
+原始 12 导联
+   │
+   ├─[1] 前处理：去工频 → 基线（零相位高通 0.05 Hz 或三次样条/中值）→ 上采样至 1000–2000 Hz
+   │
+   ├─[2] 逐导联 SQI：kSQI / basSQI / pSQI / 饱和 / 平坦 / 电极脱落 → 导联可靠度 w_l ∈ [0,1]
+   │        └─ 导联反接 / 电极错位检测（否则所有形态特征失真）
+   │
+   ├─[3] 心搏检测：各导联单导联检测 + 空间幅值(VCG magnitude)/PCA 通道检测 → 决策级融合投票
+   │        └─ 跨导联事件配对（±50 ms 窗）→ beat table
+   │
+   ├─[4] 心搏聚类（形态模板）→ 选主导型 → 构建"时间相干"代表搏（各导联共用同一对齐基准）
+   │
+   ├─[5] 粗分割：DL 分割网络（逐样本 P/QRS/T/背景 + peak 类）在每个导联上运行
+   │        └─ 单调序约束解码（DP/Viterbi），保证 Pon<Poff<QRSon<QRSoff<Ton<Toff
+   │
+   ├─[6] 边界精修（每导联，在粗窗口内）：
+   │        QRS on/off → 小波模极大阈值法 + 导数/曲率复核
+   │        T end      → 切线法 / 梯形面积法 / 小波，三法交叉验证
+   │
+   ├─[7] QRS 内部成分标注：Q/R/S/R'/S' 命名、notch/slur 检测、幅度（相对等电位线）
+   │
+   ├─[8] 多导联稳健融合：
+   │        全局 onset  = 加权稳健分位数（不是 min）+ ≥N 导联互证
+   │        全局 offset = 同上（不是 max）
+   │        单导联量（Q 幅度/时程、R 幅度）保持逐导联，不融合
+   │
+   └─[9] QC：生理约束校验、导联间离散度 → 置信度分级 → 不可靠则降级/拒答
+```
+
+---
+
+## 1. 问题定义与术语
+
+### 1.1 要测什么（特征清单）
+
+| 类别 | 特征 | 性质 | 备注 |
+|---|---|---|---|
+| 时间基准 | 全局 QRS onset / offset | 全局 | IEC：最早 onset / 最晚 offset |
+| | 逐导联 QRS onset / offset | 逐导联 | 用于 QRS 时程离散度、局部形态 |
+| | 全局 T end | 全局 | QT 的终点 |
+| R 波 | R peak 位置、R 幅度、R 时程 | 逐导联 | 幅度相对等电位线 |
+| | R' 存在与位置、R/S 比 | 逐导联 | rSR' 形态判别 |
+| | notch / slur 位置、深度、时刻 | 逐导联 | fQRS、QRS 终末切迹 |
+| Q 波 | Q peak 位置、Q 幅度（负值）、Q 时程 | 逐导联 | Q onset ≡ 该导联 QRS onset |
+| | Q/R 幅度比、Q 面积 | 逐导联 | 病理性 Q 判据核心 |
+| 段/间期 | QRS 时程（全局/逐导联）、QT、QTc、PR、ST 水平与斜率 | 混合 | QT 用全局定义 |
+| 复极形态 | T 幅度、T peak-T end、T 对称性、T 面积、TMD、TCRT、PCA ratio | 混合 | 见 §10.4 |
+| 空间 | QRS 电轴、QRS-T 夹角、VCG 环参数 | 全局 | 需正交导联变换 |
+
+### 1.2 全局点 vs 单导联点（最容易踩的坑）
+
+- **单导联 onset/offset**：在该导联信号上，波形离开/回到等电位线的时刻。
+- **全局 onset/offset**：所有导联中最早的 onset / 最晚的 offset。**是 QRS 时程、QT 的官方定义基准。**
+- **关键推论**：全局 QRS 时程 ≥ 任一单导联 QRS 时程，且可能显著更长（20–30 ms 的差异并不罕见）。
+- **IEC 的 I 波/K 波规则**：在全局 QRS onset 之后、或全局 QRS offset 之前，某导联上出现的等电位段（分别称为 I 波、K 波）**计入**相邻波的时程测量，不能因为"这里是平的"就把边界往里收。
+- **测什么就报什么**：如果设备只给逐导联间期，IEC 的间期精度限值严格来说不适用；反过来，用全局定义训练的模型不能直接拿逐导联标注去评估（LUDB 是逐导联标注，QTDB 是整合标注，混用会引入系统偏差）。
+
+### 1.3 精度目标
+
+**CSE 工作组基于专家间变异导出的误差标准差容差**（业内事实标准，Martinez 2004 等普遍引用）：
+
+| 基准点 | σ 容差 (ms) |
+|---|---|
+| P onset | 10.2 |
+| P offset | 12.7 |
+| QRS onset | 6.5 |
+| QRS offset | 11.6 |
+| T offset | 30.6 |
+
+**IEC 60601-2-25:2011 表 201.105（全局测量，对 CSE 100 条记录）**：
+
+| 全局测量量 | 可接受平均差 (ms) | 可接受标准差 (ms) |
+|---|---|---|
+| P 时程 | 10 | 15 |
+| PQ 间期 | 10 | 10 |
+| QRS 时程 | 10 | 10 |
+| QT 间期 | 25 | 30 |
+
+**解读**：QRS onset 的容差最紧（σ ≤ 6.5 ms），在 500 Hz 下只有约 3 个样本；T offset 最松（σ ≤ 30.6 ms），但也最难——这是全行业公认的最难点。参考量级：ECGdeli 在 QTDB 上 P/QRS 标记的中位误差 < 4 样本（16 ms @250 Hz），T offset 中位误差 7 样本；较好的小波法可做到 QRS onset SD ≈ 2.8 ms、QRS offset SD ≈ 4.3 ms、T offset SD ≈ 12.9 ms（在 CSE 上）。
+
+---
+
+## 2. 数据与评测
+
+### 2.1 可用数据库
+
+| 数据库 | 规模 | 导联 | 标注类型 | 采样率 | 用途 |
+|---|---|---|---|---|---|
+| **CSE Multilead (DS-3)** | 125 记录（IEC 指定 100 条子集，MO1_ 系列） | 12/15 | 全局，referee 共识 | 500 Hz | **法规级验收基准**，需付费获取 |
+| **QT Database (QTDB)** | 105 记录 | 2 | 整合式，每记录 ≥30 搏手工标注 | 250 Hz | 学术标准基准；11 条有双标注可算观察者间变异 |
+| **LUDB** | 200 受试者 × 10 s | 12 | **逐导联** P/QRS/T 边界 | 500 Hz | DL 训练/评测主力 |
+| **PTB-XL** | 21k+ 记录 | 12 | 无人工边界标注（可用商用算法如 Schiller ETM 生成弱标签） | 500/100 Hz | 大规模弱监督训练 |
+| **INCART (St. Petersburg)** | 75 × 30 min | 12 | 心搏级 | 257 Hz | 检测器鲁棒性 |
+| **ISP / ICDIRS 等新库** | ICDIRS 含 15.6 万 QRS onset 标注 | 12 | 逐导联 | — | 大规模 DL |
+| **SemiSegECG (2025)** | 多库统一 | 混合 | 统一评测协议 | — | 半监督/跨域泛化基准 |
+
+**实务建议**：训练用 LUDB + PTB-XL 弱标签 + 自有标注；调参/选型用 QTDB；最终验收（若做医疗器械）必须用 CSE 并按 IEC 表 201.105 报告。跨库评估是必须的——SemiSegECG 的结论之一是模型在 in-domain 与 cross-domain 下差距明显。
+
+### 2.2 评测指标
+
+**检测层（是否找到这个波）**
+- Se（灵敏度）、P+（阳性预测值）、F1；容差窗需明确声明。文献中容差窗从 10 ms 到 320 ms 不等（!），常见 P 波 80 ms、T 波 160 ms，QRS 检测按 ANSI/AAMI EC57 用 150 ms。**报告时必须写明窗宽，否则数字不可比。**
+
+**定位层（找得准不准）**
+- 有符号误差的均值 m（偏倚）与标准差 σ（离散）——与 CSE/IEC 容差直接对比。
+- 绝对误差的中位数与 IQR——对离群更鲁棒，建议同时报告。
+- 分割任务额外报 IoU / Dice，但**不要只报 IoU**：IoU 对边界几个样本的偏移不敏感，而临床关心的正是这几个样本。
+
+**间期层（最终交付量）**
+- QRS 时程、QT、PR 的 Bland-Altman 分析（偏倚 + 95% 一致性界限）。
+- 重复性：同一受试者相邻心搏/相邻记录的测量离散度（对 QT 研究尤其重要）。
+
+**分层评估（强烈建议）**
+- 按节律分层：窦性 / 房颤 / 房扑 / 室速 / 室早 / 起搏。DL 模型在标准基准上 F1>99%，但在基准中欠代表的心律（如各类心动过速）上可能掉 15 个百分点。
+- 按 QRS 宽度分层：窄 QRS / BBB / 起搏。
+- 按信号质量分层：用 SQI 分箱。
+
+---
+
+## 3. 前处理：精度的真正瓶颈
+
+> 经验法则：**滤波器选错，后面所有算法的努力都白费。** QRS onset 的 σ 容差是 6.5 ms，而一个不当的 0.5 Hz 单极点高通就能在 ST 段引入远大于此的形变。
+
+### 3.1 采样率与插值
+
+- 诊断级 ECG：AHA/ACC/HRS 建议低通至少 150 Hz（儿科 250 Hz），采样率 ≥500 Hz。
+- **500 Hz 下 1 样本 = 2 ms**，而病理性 Q 波判据在 20/30/40 ms 上，QRS 时程 110 vs 120 ms 决定是否报 BBB。量化误差直接跨越临床阈值。
+- **做法**：在边界精修前，把待测窗口（QRS 前后各 ~200 ms）用带限插值（sinc / 三次样条）上采样到 1000–2000 Hz。注意这不增加信息量，但消除量化台阶，使阈值穿越点的估计连续化，实测可显著降低 σ。
+- R 峰位置可用**抛物线三点拟合**做亚采样估计：`δ = 0.5(y[-1]-y[+1]) / (y[-1]-2y[0]+y[+1])`。
+
+### 3.2 基线漂移
+
+| 方法 | 优点 | 风险 |
+|---|---|---|
+| 单极点高通 0.05 Hz | 符合 AHA 1975/1990 传统建议，ST/QT 形变可忽略 | 抑制漂移能力弱 |
+| 线性零相位数字高通，截止可放宽至 ≤0.67 Hz | AHA 1990 / ANSI-AAMI 允许；零相位无群延迟 | 必须**真正零相位**（filtfilt），否则 ST 压低 |
+| 三次样条拟合（以 PQ 段为节点） | 对漂移适应性好 | 依赖 PQ 段定位，鸡生蛋问题（需两遍处理） |
+| 中值滤波级联（200 ms + 600 ms 窗） | 无相位问题，对 QRS 保护好 | 窗长需随心率调整 |
+| 小波多尺度重构（去掉最粗尺度） | 与后续小波 delineation 共用变换 | 边界效应 |
+
+**强烈建议**：两遍处理。第一遍粗滤波 → 检测 QRS → 定位 PQ/TP 段 → 第二遍用样条/中值精细去基线。ECGdeli 就采用了显式的"等电位线（isoline）校正"步骤（直方图众数法估计等电位电平）。
+
+**绝对禁止**：对不同导联使用不同的滤波器或不同的相位特性——这会人为制造导联间时移，直接污染全局 onset/offset。
+
+### 3.3 工频与肌电
+
+- 工频：优先自适应陷波（LMS）或谱线插值，避免固定 IIR 陷波的振铃拖尾污染 QRS 起点。
+- 肌电/宽带噪声：**不要为了好看而把低通拉到 40 Hz**。40 Hz 低通会削掉 QRS 的高频成分，直接影响 notch 的可见性与 Q 波幅度测量。研究显示 40 Hz vs 150 Hz 截止对 Q 波测量与 notch 识别有实质影响。若必须降噪，用小波阈值或非局部均值等保边方法。
+- 尖峰/起搏脉冲：单独检测并做插值替换，不要让它进入导数/小波通道（会产生巨大的伪模极大）。
+
+### 3.4 等电位线（isoelectric level）估计
+
+所有幅度特征（R 幅度、Q 幅度、ST 水平）都是**相对量**，参考电平选错，全盘皆错。
+
+常见方案：
+1. **PQ 段法**：取全局 QRS onset 前 10–30 ms 窗口的均值/中位数（商用算法常用"最早 QRS onset 前 16 ms 的平均电平"）。最常用。
+2. **TP 段法**：T 结束到下一 P 起始之间。心率快时不可用。
+3. **直方图众数法**：对整段信号取幅度直方图峰值。对基线漂移残留敏感，但不依赖其他基准点。
+4. **逐导联 vs 全局**：幅度必须**逐导联**取各自的等电位电平；时间基准可以全局。
+
+---
+
+## 4. 导联可靠性评估与筛选
+
+### 4.1 单导联 SQI 家族
+
+| 指标 | 定义 | 检出的问题 |
+|---|---|---|
+| **kSQI** | 信号峰度 kurtosis | 高斯型噪声污染（干净 ECG 峰度高，噪声使其降低）；对噪声比偏度更鲁棒 |
+| **basSQI** | 基线频带（<1 Hz）功率占比 | 基线漂移/呼吸 |
+| **pSQI / sSQI** | QRS 频带（约 5–15 Hz）功率 / 全带功率 | 肌电、宽带噪声 |
+| **bSQI / qSQI** | 两个不同原理的 QRS 检测器（如 Pan-Tompkins vs wqrs）检出心搏的一致率 | 综合可用性，最强的单一指标之一 |
+| 饱和/削顶率 | 达到 ADC 满量程的样本比例 | 放大器饱和 |
+| 平坦度 | 连续常值样本长度 | 电极脱落、导联断线 |
+| 阶跃/瞬变计数 | 大幅跳变次数 | 接触不良 |
+
+**警告**：固定阈值的统计型 SQI 跨数据集稳定性差（同一阈值在不同库上表现波动很大），且往往偏向"干净信号"。因此：
+- 用**多指标融合**（模糊综合评价 / SVM / 小型 CNN）而非单指标硬阈值；
+- 阈值做**自适应**（以本次记录内各导联的分布做相对排序），而非绝对值；
+- 输出**连续可靠度 w_l ∈ [0,1]**，而非二值好/坏。
+
+### 4.2 跨导联一致性 SQI（多导联特有，价值最高）
+
+单导联 SQI 看不出的问题，跨导联能看出来：
+
+1. **心搏一致性**：以融合后的心搏序列为参照，导联 l 的 R 峰匹配率。
+2. **时刻离散度**：导联 l 的 R 峰时刻相对多导联中位数的偏差（去掉常量偏移后的残差 MAD）。
+3. **边界离群度**：导联 l 的 QRS onset 相对稳健中心的标准化残差 z_l。
+4. **物理一致性校验（12 导联特有的强约束）**：
+   - Einthoven 定律：`II = I + III`（应逐样本近似成立）
+   - 增强导联：`aVR = -(I+II)/2`，`aVL = (I-III)/2`，`aVF = (II+III)/2`
+   - **残差能量异常 → 肢体导联电极接反/接错**。这是必查项：LA/RA 反接会让 I 导联倒置，Q 波、R 波形态全部失真，任何下游特征都不可信。
+   - 胸导联无线性约束，但可用相邻导联相关性（V1–V6 相邻相关应平滑变化）识别 V 电极错位/互换。
+5. **VCG 重构残差**：用 Kors/inverse-Dower 变换求 XYZ，再反投影回 8 个独立导联，残差大的导联可疑（因为 12 导联本质上只有 8 个独立通道，冗余可用于自检）。
+
+### 4.3 从"选一条"到"加权"
+
+多导联 QRS 检测有两条经典路线：(1) 先按质量选一条最好的导联再用单导联算法；(2) 每条导联各自检测再融合。路线 (1) 对噪声分布敏感且导联数变化时策略要重写；路线 (2) 在导联数变化时融合逻辑也需要改。
+
+**推荐做法（避开两者缺点）**：
+- 不做硬选择，而是把 w_l 作为**权重**贯穿全流程；
+- 设一个 w_l 的排除下限（如 w_l < 0.2 直接剔除，防止极差导联通过权重残留影响）；
+- 融合逻辑写成对导联数 L 不敏感的形式（分位数、加权中位数），而非硬编码"12 选 7"。
+
+---
+
+## 5. 心搏检测与跨导联配准
+
+### 5.1 单导联 QRS 检测方法
+
+| 方法族 | 代表 | 特点 |
+|---|---|---|
+| 带通+微分+平方+积分 | Pan-Tompkins (1985), Hamilton-Tompkins | 事实标准，易实现，需良好自适应阈值与不应期逻辑 |
+| 长度/斜率变换 | wqrs (Zong), RS-slope | 对基线漂移鲁棒；对起搏心律表现差 |
+| 小波模极大 | Li 1995, Martinez 2004 (wavedet) | 多尺度抗噪，天然衔接边界定位 |
+| 滤波器组 | Afonso 1999 | 多子带并行判决 |
+| 包络/能量 | Hilbert 包络、Shannon 能量、相量变换 | 对形态变化不敏感 |
+| 经验模态/VMD | EMD/VMD + 阈值 | 自适应但计算重、模态混叠 |
+| 深度学习 | 1D CNN/U-Net/CRNN | 泛化好，需注意时延与算力 |
+
+**实测经验**：在高质量信号上主流算法 F1 均 >99%，差异出现在**低质量信号**（F1 可能跌破 80%）、**起搏心律**（多数算法可保持 >94%，但个别斜率类方法会崩到 79%）。所以选型要看你的目标场景而非平均分。
+
+### 5.2 多导联融合的三个层次
+
+**(a) 信号级融合（先合成一路，再检测）**
+- **空间幅值 / VCG magnitude**：`M(n) = sqrt(x²+y²+z²)`，其中 XYZ 由 Kors/inverse-Dower 变换从 12 导联得到。物理意义清晰，与导联方向无关。
+- **RMS 通道**：`R(n) = sqrt(Σ_l w_l · s_l(n)²)`。多导联 RMS 小波 delineation 在 QTDB 上被证明可达到最佳单导联水平（误差在 CSE 容差的一个样本以内）。
+- **PCA 第一主成分**：数据驱动，SNR 最优，但主成分方向随心搏漂移，且极性/尺度不稳定，需固定符号约定。
+- **加权二次型投影的最优化**：把投影泛函限定为时不变二次型、以"逐搏变异最小"为准则解权重，可进一步降低变异（相比均匀权重，变异在多数病例上进一步下降）。
+- ⚠️ **信号级融合的代价**：合成信号丢失了"哪个导联最早/最晚"的信息，**不能直接用于全局 onset/offset**。它适合做心搏检测和粗定位，不适合替代全局边界裁决。
+
+**(b) 决策级融合（各导联检测后投票）**
+- 简单多数投票：≥L/2 条导联检出即认定。
+- Chair-Varshney 最优融合：按各导联的先验检测率/虚警率加权，理论最优。
+- 可靠度加权投票：用 §4 的 w_l 加权。
+- OR/AND 规则：OR 提高灵敏度、AND 提高精确度，实践中常用"OR 检出 + 后续一致性剪枝"。
+
+**(c) 特征级融合**：见 §11。
+
+**推荐组合**：用 (a) 的空间幅值通道 + (b) 的加权投票做**双通道互证**——空间幅值通道保证不漏（尤其某些导联上 QRS 接近等电位的情形，如电轴垂直于该导联轴），投票通道保证不虚警。
+
+### 5.3 跨导联事件配对
+
+各导联检出的 R 峰数目不同（漏检/虚警），需要建立"同一心搏"的对应关系：
+
+```
+输入：各导联 R 峰时刻列表 {R_l(i)}
+1. 取参考序列 R_ref（空间幅值通道，或票数最多的簇中心）
+2. 对每个参考时刻 t_k，在 [t_k - Δ, t_k + Δ] 内收集各导联的候选（Δ ≈ 40–60 ms）
+3. 一对多冲突 → 取最近；一对零 → 记为该导联在此搏缺失
+4. 未被任何 t_k 吸收的检出 → 候选新心搏，需票数 ≥ N_min 才立案
+5. 输出 beat table：[beat_id, lead, R_time, matched?]
+```
+
+Δ 的选择：要覆盖生理性导联间差异（QRS 内 R 峰时刻在不同导联上可差 10–40 ms，宽 QRS 更大），但不能大到把相邻心搏并进来。建议 Δ = min(60 ms, 0.3·RR)。
+
+### 5.4 导联间"不对齐"：来源辨析与处理（关键）
+
+这是本调研的核心问题之一，必须**先分清来源再决定处理方式**：
+
+| 来源 | 特征 | 处理 |
+|---|---|---|
+| **生理性**（激动波前投影方向不同） | 随心搏形态变化，与电轴相关；宽 QRS/BBB 时更大 | **绝对不能"校正"**——它就是全局 QRS 时程的物理基础 |
+| **ADC 通道时分复用偏斜** | 各通道固定微小延迟（μs~ms 量级），与采集硬件设计有关 | 可校正：常数延迟，用已知硬件参数或标定信号补偿 |
+| **各导联滤波不一致** | 固定群延迟差 | 应从源头避免；已发生则用相同零相位滤波重做 |
+| **异步采集**（如不同设备/不同时段的通道拼接、Holter 分块） | 大且可能漂移的时移 | 必须校正，用互相关对齐 |
+| **导出导联/重构导联** | 由线性变换引入，无额外延迟但形态被平滑 | 标注来源，降低其在融合中的权重 |
+
+**如何判别与估计**：
+
+```python
+# 伪代码：分离常量器械时移与生理性差异
+for lead l:
+    for beat k:
+        # 在带通(5–30Hz)信号上，以空间幅值通道为参照做互相关
+        tau[l,k] = argmax_tau  xcorr(s_l[beat k window], M[beat k window], tau)
+    tau_const[l] = median_k(tau[l,k])       # 常量分量 → 疑似器械/异步
+    tau_var[l]   = MAD_k(tau[l,k])          # 波动分量 → 生理 + 噪声
+
+# 判定规则
+if |tau_const[l]| > 1 sample and tau_var[l] < small:
+    → 常量偏斜，可补偿
+if tau_var[l] large and correlates with morphology/axis:
+    → 生理性，保留
+```
+
+**重要提醒**：即便存在真实的器械偏斜，也要在**去偏斜之后**再计算全局 onset/offset；而生理性差异必须保留。把两者混为一谈去做"全导联对齐"，会系统性低估 QRS 时程（这是很多自研算法在 CSE 上不达标的隐藏原因）。
+
+---
+
+## 6. 代表搏（Representative / Median Beat）构建
+
+### 6.1 为什么需要
+
+商用 12 导联诊断算法（GE 12SL、Glasgow、Schiller ETM 等）**几乎都在代表搏上做全局测量**，原因：
+- SNR 提升约 √N 倍，T end 这类低斜率点的定位方差大幅下降；
+- 消除单搏噪声导致的边界跳变，测量可重复性显著提高；
+- 全局 onset/offset 的"最早/最晚"规则只有在低噪声波形上才有意义。
+
+### 6.2 构建步骤
+
+```
+1. 心搏聚类：以 QRS 模板相关系数 / DTW 距离聚类 → 分出主导型（dominant）、室性早搏、伪差搏
+2. 排除：形态离群搏、RR 显著偏离搏、SQI 差的搏、噪声段所在搏
+3. 对齐：关键——所有导联使用【同一个】对齐时刻
+   - 用空间幅值通道或多导联互相关最大化求各搏的公共对齐点
+   - 亚采样精度对齐（互相关抛物线插值），否则平均会产生低通效应，
+     人为削平 notch、拉长 QRS
+4. 合成：逐样本【中位数】优于均值——中位数天然剔除离群样本，噪声更低
+   （已有大规模研究明确采用逐样本中位数，并报告其优于逐样本平均）
+5. 输出：12 导联时间相干的代表搏（同一时间轴），并叠加到同一等电位基准
+```
+
+**"时间相干"是关键词**：绝不能各导联各自对齐——那会摧毁导联间的生理时差，全局 QRS 时程会被系统性缩短。
+
+### 6.3 逐搏 vs 代表搏
+
+| | 代表搏 | 逐搏 |
+|---|---|---|
+| 精度/重复性 | 高 | 低 |
+| 适用 | 静息 12 导联诊断测量、QT 研究、法规验收 | QT 变异性(QTV)、T 波电交替、逐搏动态、心律失常分析 |
+| 风险 | 掩盖搏间变异；主导型选错则全盘错 | 噪声主导 |
+
+**建议同时输出两套**，并明确标注每个特征基于哪一套算得。
+
+---
+
+## 7. QRS 边界（onset / offset）检测方法
+
+### 7.1 方法总览
+
+| 方法 | 原理 | 优点 | 缺点 |
+|---|---|---|---|
+| **导数阈值法** | 在 QRS 峰前/后搜索 \|dx/dt\| 降到峰值某比例的点 | 简单快 | 阈值需自适应；噪声敏感；缓起始 QRS 偏晚 |
+| **小波模极大法** | 二次样条小波 2^1–2^5；边界 = 首/末显著模极大之外，\|WT\| 降至 ξ·\|WT_peak\| 或出现局部极小 | 抗噪、多尺度自然处理宽/窄 QRS；验证最充分 | ξ 需按尺度与波种整定；宽 QRS 需切尺度 |
+| **面积/梯形法** | 在候选窗内最大化几何量（梯形面积） | 无经验阈值、抗宽带噪声 | 原为 T end 设计，用于 QRS 需改造 |
+| **曲率/多边形近似** | Douglas-Peucker 选顶点，用曲率极值定边界 | 候选点大幅减少、可解释、对形态变化敏感 | 顶点选取参数敏感 |
+| **模板/相关法** | 与已知模板对齐 | 稳定 | 病理形态失配 |
+| **HSMM / 贝叶斯 / 卡尔曼** | 显式建模波段时长分布与状态转移 | 天然给出后验概率与顺序约束 | 训练/推断复杂 |
+| **DL 分割** | 逐样本分类 P/QRS/T/背景 | 泛化好、免调阈值、能处理异常形态 | 边界方差偏大、需后处理、黑盒 |
+
+### 7.2 小波模极大法（wavedet 系）实现要点
+
+目前落地最多的方案，值得详述：
+
+1. **变换**：二次样条小波（近似"平滑后的一阶导"），用 à trous 算法保持各尺度时间分辨率（不抽取）。尺度 2^1…2^5。QRS 能量主要在 2^1–2^4，2^4 以上基本无 QRS；P/T 在 2^4–2^5 上显著。
+2. **QRS 检测**：在 2^2 尺度找成对模极大（正负相邻对，对应陡升/陡降），对之间的过零点即波峰。
+3. **成分识别**：QRS 内多个模极大对 → 多个过零点 → 依次对应 Q、R、S、R'…（见 §8.1 命名规则）。
+4. **onset**：从 QRS 内**第一个**显著模极大 `n_first` 向前搜索，取以下二者中先出现者：
+   - `|WT(n)| < ξ_on · |WT(n_first)|`（阈值穿越）
+   - `|WT(n)|` 的局部极小（斜率转折）
+5. **offset**：从**最后一个**显著模极大 `n_last` 向后，规则对称；ξ_off 通常大于 ξ_on（QRS 终末常伴 J 点抬高/ST 起始）。
+6. **尺度自适应**：噪声大或 QRS 宽 → 用更粗尺度（2^3/2^4）；信号干净且 QRS 窄 → 用 2^1/2^2 以获更好时间分辨率。有嵌入式实现直接固定在 2^4（等效 3 dB 通带约 4–14 Hz），实时性好但精度略降。
+
+**ξ 的整定**：不同实现差异很大（QRS 边界常在 0.05–0.15 量级），必须在目标数据上按 CSE 容差标定，并区分 onset/offset、区分尺度。**不要直接抄论文常数。**
+
+### 7.3 多导联投影法（全局边界的最强单项方案）
+
+Almeida 等（IEEE TBME 2009）的多导联（ML）策略：
+
+```
+1. 从 3 个正交导联出发（12 导联经 Kors / inverse-Dower / PCA / Gram-Schmidt 得到 XYZ）
+2. 在待定界的时间邻域内，计算 WT 域的空间"环"(loop)：WT_x, WT_y, WT_z 构成 3D 轨迹
+3. 用 SVD/PCA 求该邻域内环的主方向 u
+4. 把 WT 投影到 u 上，得到一条【为该边界点量身定制的】导出导联
+5. 在这条导出导联上跑单导联 delineation 规则
+```
+
+**为什么有效**：每个基准点邻域内心电向量有一个主导方向，沿该方向投影可最大化该边界处的信噪比与斜率，使阈值穿越点的定位方差最小。
+
+**实测结论**：
+- 边界误差离散度低于任何单一导联，也**优于"各导联单独 delineate 后再用选择规则"**；
+- 对呼吸引起的 T end 抖动：选择规则法降低约 15% 误差离散，投影法降低约 40%。
+
+**代价与注意**：
+- 需要正交导联；只有 2 个导联时可用向量投影 / Gram-Schmidt / PCA 做近似正交化（已有专门工作研究 2–3 导联下的推广）。
+- **它给出的是"最优导出导联上的"边界，不是"最早导联的"边界**。若目标是 IEC 全局定义，投影法应作为**稳健参考中心**，再结合各导联的相对早晚做全局裁决（见 §11.1c）。
+
+### 7.4 深度学习分割 + 后处理
+
+**主流架构**
+- **U-Net 系**（最常用）：逐样本 4 类（P/QRS/T/背景）。有工作报告 P/T/QRS 的 F1 分别达 97.8% / 99.5% / 99.9%，参数量小、对不同采样率与设备泛化好，且各导联独立处理后再整合可提升整体质量。
+- **Peak Attention U-Net (2026)**：把类别扩到 7 类，**显式增加 P peak / R peak / T peak 三个峰值类**，在 LUDB 上 R peak F1 达 99.72、T peak 97.51、P peak 89.26，相对次优模型有大幅提升。"把峰值当独立类别"这个技巧对本任务价值很高。
+- **CED-Net / CED-Res-Net / CED-LSTM-Net / CED-U-Net (2024)**：在**代表搏**上直接输出 P / QRS / QT 三个区间，用于全局 delineation。在 CSE 上 CED-Net 达到 QRS 时程 −2.4 ± 5.4 ms、QT −0.7 ± 10.3 ms、P 时程 2.6 ± 11.0 ms、PQ 0.9 ± 5.8 ms，**满足 IEC 表 201.105 全部限值**——这是 DL 路线通过法规级验收的重要证据。同一研究还发现纯 U-Net 架构对噪声（高频/低频/工频）的免疫性弱于其他三种。
+- **Transformer / 半监督**：SemiSegECG (2025) 基准显示，在半监督设定下 Transformer 优于卷积网络；该基准同时提供 in-domain 与 cross-domain 两种评测设定。
+- **变分编码-解码（ECGVEDNET）**：专门针对形态变异问题，配套大规模标注库 ICDIRS。
+
+**后处理是必需的，不是可选的**
+1. **形态学清理**：删除过短段（QRS 段 < 40 ms 或 > 250 ms 判伪）、填补小孔洞。
+2. **顺序约束解码**：在类别概率序列上用 DP/Viterbi 求满足合法转移（背景→P→背景→QRS→背景/T→…）的最优路径，天然保证顺序正确。比事后规则修补稳健得多。
+3. **边界精修**：DL 的 argmax 边界在样本级抖动。取概率曲线的**亚采样过零点**（P(QRS) 越过 0.5 的线性插值点），或把 DL 输出**当作搜索窗**，窗内用 §7.2 小波法定最终边界。实践中这一步可把 σ 降低 20–40%。
+4. **心律感知门控**：房颤/房扑时抑制 P 波输出（用一个轻量节律分类头做门控），可显著降低 P 波虚警——已有研究专门用"分类引导策略"解决这个问题。
+
+**混合式分工建议**
+
+| 环节 | 用 DL | 用信号处理 |
+|---|---|---|
+| 有没有这个波（存在性） | ✓ | |
+| 大致在哪（±20 ms） | ✓ | |
+| 精确边界（±3 ms） | | ✓ |
+| 异常形态语义（notch / 融合波） | ✓ | ✓（互证） |
+| 顺序与生理合理性 | ✓（DP 解码） | ✓（规则） |
+
+---
+
+## 8. R 波与 QRS 内部成分
+
+### 8.1 成分命名规则（必须先标准化，否则"R 波位置"无定义）
+
+标准心电图命名法：
+- **Q**：QRS 中第一个负向波，且**前面没有正向波**
+- **R**：第一个正向波；**R'**：第二个正向波（前面隔着负向波）
+- **S**：R 之后的负向波；**S'**：R' 之后的负向波
+- **QS**：整个 QRS 只有一个负向波（无任何正向成分）
+- 大小写按幅度：幅度大用大写（qRs / rSR' 等）。工程上需定阈值（常用 QRS 峰峰值的某比例，或绝对 0.5 mV）
+
+**工程实现**
+```
+1. 在 [QRS_on, QRS_off] 内找所有相对等电位线的极值（一阶导过零 + 显著性筛选）
+2. 显著性阈值：幅度 > max(α · QRS_pp, A_min)，典型 α = 0.05–0.1，A_min = 20–50 μV
+   —— 太低会把噪声当成分，太高会漏掉浅 Q 波（而临床恰恰关心浅 Q）
+3. 按时间顺序 + 极性 应用上述命名规则
+4. 输出形态字符串（"qRs"、"rSR'"、"QS"）与各成分的 (时刻, 幅度, 时程)
+```
+
+**"R 波位置"的歧义（务必在接口层区分）**
+- `R_peak`：命名法意义上的 R 波峰值时刻（**未必**是绝对值最大点，如 rS 形态下 S 更大）
+- `QRS_dominant_peak`：QRS 内绝对幅度最大点（心搏检测器输出的通常是这个）
+- `QRS_fiducial`：用于对齐的基准点（常取能量重心或最大斜率点）
+
+三者在正常搏上重合，在 rS / QS / rSR' 形态上完全不同。**大量 bug 来自混用这三者。**
+
+### 8.2 R 峰的亚采样定位
+
+- 抛物线三点拟合（§3.1）；
+- 或模板互相关 + 亚采样插值（对逐搏 QT/HRV 更稳）；
+- 用于 RR 间期时，**一致性比绝对准确性更重要**（系统偏移会在差分中抵消）。
+
+### 8.3 notch / slur / fQRS 检测（重点）
+
+**临床定义层**
+- Das 等（2006）的 fQRS：窄 QRS（<120 ms）中出现额外 R 波（R'）、R 波顶部或 S 波底部的切迹、或 >1 个 R'，且出现在对应同一冠脉供血区的**≥2 个连续导联**；典型束支阻滞与不完全性右束支阻滞被排除。宽 QRS（>120 ms）另有判据（如 >2 个 R' 或 S 波上 >2 个切迹）；起搏 QRS（f-pQRS）亦另有定义。
+- 该定义**可复现性偏弱**（判读者内/间变异大），后续工作试图细化：按碎裂导联数分层（Torigoe 2012）、自动分类不同 fQRS 模式（Maheshwari 2013）、区分良/恶性变体（Haukilahti）、以及基于形态学的更明确分类提案（Frontiers 2016，指出原判据**未对切迹幅度与位置设条件**，并提出对切迹点/峰/所在波峰三点做幅度差量化）。
+- **工程含义**：不要只输出布尔 `has_fQRS`。应输出**可量化的切迹描述子**（数量、时刻、深度、所在成分、所在导联组），把临床判据留给上层可配置规则。
+
+**信号处理层**
+
+| 类型 | 特征 | 检测方法 |
+|---|---|---|
+| **notch（尖切迹）** | 一阶导**有**符号变化（存在真实的局部极值对） | 一阶导过零检测 + 深度显著性筛选 |
+| **slur（顿挫/斜坡）** | 一阶导**无**符号变化，仅斜率骤减 | 一阶导的局部极小（不过零）；**二阶导极值**；曲率 κ = \|x''\|/(1+x'²)^{3/2} 极值；与直线拟合的最大偏离（Douglas-Peucker 残差） |
+
+**多尺度方法**：CWT 在细尺度上对切迹响应强、对主波响应弱，可作独立通道；把 QRS 区间内细尺度能量峰作为切迹候选，再做形态学量化。
+
+**Glasgow 程序的自动 QRS 终末 notch/slur 规则**（已发表并验证，可直接借鉴）
+- 限定 QRS 最后一个成分是 R 波；
+- R 波时程 > 40 ms；
+- 切迹/顿挫位于 R 波的**下降支**；
+- 切迹/顿挫起点距 QRS 终点 > 10 ms；
+- 幅度判据：切迹峰值 / 顿挫起点幅度 ≥ 0.1 mV；
+- 需在 ≥2 个连续导联出现（导联组合规则明确，如 I 与 aVL 且（V4 与 V5 或 V5 与 V6））。
+- 报告性能：训练集 Se 92.1% / Sp 96.6%，测试集 Se 90.5% / Sp 96.5%，整体准确率 95.7%、精确率 84.9%。
+
+**机器学习路线**：已有多中心验证的 fQRS 自动量化方法（Sci Rep 2022），其流程同样是"先用**多导联信息**做稳健 QRS 分割并自动剔除异常搏，再做切迹量化"——再次印证多导联互证的价值。
+
+**多导联互证在 notch 上的具体用法**
+1. 真切迹在**空间上连续**：相邻导联（V4/V5/V6，或 II/III/aVF）应呈现相近时刻的切迹，因为它们是同一电活动向量在相近方向上的投影。
+2. **VCG 验证**：把切迹时刻映射到 3D 环上，真切迹对应环上的方向突变/顿点，噪声不会。
+3. **去伪**：若切迹只在一条导联出现且该导联 SQI 低 → 判为噪声；若只在一条高 SQI 导联出现，且该导联恰是该向量方向的最佳投影 → 可能为真（"孤立切迹"，标为低置信度而非直接丢弃）。
+
+**相关但不同的概念（值得一并输出）**
+- **RAZ（reduced amplitude zone）/ HF-QRS**：QRS 高频成分（约 150–250 Hz）包络中的幅度凹陷，比目视 notch 更敏感，但需要高采样率与高带宽（这也是不要用 40 Hz 低通的原因之一）。
+- **QRS 碎裂度的连续量**：QRS 内一阶导过零次数、QRS 谱熵、小波细尺度能量占比——比二值 fQRS 更适合统计建模。
+
+### 8.4 幅度与形态特征清单（逐导联）
+
+```
+R_amplitude   = s(R_peak) − isoelectric_level        # 相对等电位线，不是绝对值
+R_duration    = 该 R 成分的起止（相邻过零 / 回到等电位线）
+Q_amplitude   = isoelectric_level − s(Q_peak)        # 报为正的"深度"或保留负号，接口需固定约定
+QRS_pp        = max − min（QRS 区间内）
+R/S、R/Q、Q/R 幅度比
+QRS_area, Q_area = 对 (s − isoelectric) 在对应区间积分   # 比峰值更抗噪
+VAT / intrinsicoid deflection = QRS_onset → R_peak    # 左室激动时间
+notch_count, notch_times, notch_depths
+QRS_slope_upstroke / downstroke                      # 最大上升/下降斜率，缺血标志物
+```
+
+> **建议**：统计建模优先用**面积类**特征而非峰值类特征——面积对噪声与单点异常鲁棒得多。Stanford 的计算机化运动员判据就是用 **Q 波面积**的百分位数而非幅度阈值。
+
+---
+
+## 9. Q 波专项
+
+### 9.1 定义与边界
+
+- **Q onset ≡ 该导联的 QRS onset**（Q 是 QRS 第一个成分，定义上重合）。因此 **Q 时程的精度完全取决于 QRS onset 的精度**——这正是 CSE 对 QRS onset 容差最紧（σ ≤ 6.5 ms）的原因。
+- **Q offset = Q 波回到等电位线并开始上行的时刻**；实现上取 Q 峰之后信号**首次上穿** `isoelectric + ε` 的插值时刻（ε 取噪声 RMS 的 2–3 倍）。
+- **QS 形态**：无 R 波，则 Q offset = QRS offset，Q 时程 = QRS 时程；判据上 QS 与深 Q 通常同等对待。
+- **注意**：残留基线漂移会使"回到等电位线"这个判据系统性偏移，这是 Q 时程测量最大的误差来源，必须先做好 §3.4。
+
+### 9.2 数值实现细节
+
+1. **上采样是必须的**：500 Hz 下 Q 时程只能是 2 ms 的整数倍，而临床阈值是 20 / 30 / 40 ms。在 20 ms 阈值附近，量化误差足以让判别翻转。边界精修前上采样到 ≥1000 Hz。
+2. **幅度参考**：Q 幅度必须相对**该导联自身**的等电位电平，不能用全局或其他导联的。
+3. **浅 Q 的存在性判定**：设最小幅度门限（如 30–50 μV 或 QRS_pp 的 5%），低于门限记为"无 Q 波"而非"Q = 0"。这个门限直接决定病理性 Q 的检出率，需在验证集上标定并做敏感性分析。
+4. **噪声的方向性偏差**：噪声使"首次上穿"提前触发 → Q 时程系统性偏短。用代表搏（§6）能大幅缓解。
+5. **与 notch 的交互**：Q 波内部若有切迹，"首次上穿"可能提前终止 Q 波。需要用 §8.1 的显著性阈值区分"真正的 R 波起始"与"Q 内切迹"。
+
+### 9.3 临床判据（做成可配置项，不要硬编码）
+
+| 判据 | 内容 |
+|---|---|
+| 经典判据 | Q 时程 > 40 ms **且** Q 幅度 > 相应 R 波的 25% |
+| 通用心梗定义（UDMI） | V2–V3 中任何 ≥20 ms 的 Q 波或 QS；或 I、II、aVL、aVF、V4–V6 中 ≥30 ms 且 ≥0.1 mV 深的 Q 波或 QS，需出现在**同一连续导联组的任意两个导联**；后壁：V1–V2 中 R ≥40 ms 且 R/S ≥1 并伴 T 波直立（无传导阻滞时） |
+| 连续导联组 | (I, aVL, V6)、(V4–V6)、(II, III, aVF) |
+| 运动员筛查 | 早期 Seattle：>3 mm 深或 >40 ms，≥2 导联（除 III、aVR）；Seattle-2 改用 **Q/R 幅度比**替代绝对幅度，圈出的阳性人群明显更少 |
+| 正常变异（需排除） | 电轴 30°–0° 时 III 导联 <30 ms 且 <25% R 的 Q；电轴 60°–90° 时 aVL 的 Q；I、aVL、aVF、V4–V6 的间隔性 q 波（<30 ms 且 <25% R） |
+
+**工程建议**：算法只输出**测量层**结果 `(lead, Q_present, Q_duration_ms, Q_amplitude_uV, Q_R_ratio, Q_area, QS_pattern, confidence)`；判据层作为独立、可切换的规则模块。研究表明不同判据会圈出差异很大的人群，把判据硬编码进算法会让系统无法适配不同临床场景。
+
+### 9.4 多导联在 Q 波上的作用
+
+- **"连续导联"要求本身就是多导联互证**：孤立单导联 Q 波多为伪差或正常变异。
+- **aVR 与 III 通常排除**（生理性 Q 常见）。
+- **胸导联电极位置**：V1–V2 的"假性间隔梗死"Q 波常因电极位置偏高。可结合 P 波形态（V1 P 终末负向异常）或与既往 ECG 比对辅助判别——纯算法难以彻底解决，但值得输出预警标志。
+- **导联反接必须先排除**（§4.2）：LA/RA 反接会在 I、aVL 制造出不存在的 Q 波。
+
+---
+
+## 10. QT 与复极相关特征
+
+### 10.1 T 波终点（T end）——全流程最难点
+
+| 方法 | 原理 | 表现 |
+|---|---|---|
+| **阈值法** | T 回到等电位线的点，或一阶导降到峰值某比例 | 最常用；对基线漂移与噪声敏感；阈值经验性强 |
+| **切线法（Lepeschkin）** | 过 T 降支最陡点的切线与基线交点 | 判读者变异小、易教学（教学研究显示学生用切线法的正确率反超部分专家）；但**系统性早于**真实终点，且对不对称 T 波偏差大 |
+| **梯形面积法（trapezium）** | 在降支上搜索使梯形面积最大的点 | **无经验阈值**；宽带噪声下准确性与重复性优于一阶导阈值法 |
+| **小波模极大法** | 与 QRS 同框架，取末模极大之后 \|WT\| < ξ 的点 | QTDB 上属 SOTA 之一，T end 表现尤为突出 |
+| **模型拟合** | 高斯 / Hermite / 多项式拟合后外推 | 平滑抗噪；模型失配时偏差大 |
+| **DL 分割** | 直接输出 T 段 | 鲁棒但边界方差大（多个研究报告 QTDB 上 T offset σ > 30 ms） |
+
+**判读者变异的参考基线**：中心 ECG 实验室研究显示，切线法与阈值法的读者内平均绝对变异约 3.4–6.9 ms（切线）/ 3.5–5.2 ms（阈值），读者内 SD 在 7 ms 量级。**算法做到 σ ≈ 10–15 ms 已属优秀**；宣称 σ < 5 ms 的结果需要审视其评测协议。
+
+**工程建议**：**同时跑 3 种方法（切线 + 梯形 + 小波），取稳健中位数，并把三者的离散度作为置信度指标。** 三法一致 → 高置信；分歧 > 20 ms → 标记不可靠（很可能存在 T-U 融合或双峰 T 波）。
+
+### 10.2 全局 QT
+
+```
+QT_global = latest_T_offset(over reliable leads) − earliest_QRS_onset(over reliable leads)
+```
+同样不能用朴素 max/min（见 §11.1）。ICH E14 类研究中通常还会指定主导联（II 或 V5）供人工复核。
+
+### 10.3 QTc 与 RR 修正
+
+| 公式 | 表达式 | 备注 |
+|---|---|---|
+| Bazett | QT/√RR | 最常用；快心率下过度修正 |
+| Fridericia | QT/∛RR | 药物研究首选之一 |
+| Framingham | QT + 0.154(1−RR) | 线性 |
+| Hodges | QT + 1.75(HR−60) | |
+| 个体化 | 拟合个体 QT–RR 关系 | TQT 研究用，需大量数据 |
+
+**滞后效应（QT hysteresis）**：QT 对 RR 变化的适应有分钟级时间常数。**不能只用当前 RR**，应使用指数加权的历史 RR（时间常数约 30–120 s）。这是动态记录中 QTc 波动的主要人为来源。
+
+### 10.4 T 波形态特征
+
+| 特征 | 定义 | 说明 |
+|---|---|---|
+| T 幅度、T 面积 | 相对等电位线 | 逐导联 |
+| **Tpeak–Tend (Tp-e)** | T 峰到 T 终点 | 跨壁复极离散度代理 |
+| T 对称性 | 上升支/下降支斜率比或面积比 | 缺血敏感 |
+| **TMD** | 各导联 T 波形态向量间夹角的均值（SVD 基） | 需多导联 |
+| **TCRT** | QRS 主向量与 T 主向量夹角余弦 | 需 VCG / 正交导联 |
+| **PCA ratio** | T 波矩阵 SVD 第二/第一奇异值之比 | 复极非二维性度量 |
+| **QRS-T 夹角** | 空间/额面 | 预后价值强 |
+| **TWA** | 逐搏交替幅度（谱法/MMA） | 对齐精度要求极高 |
+| **QT 离散度 (QTD)** | 各导联 QT 的极差/SD | ⚠️ 学界对其价值存疑，很大程度反映测量误差与 T 环投影效应，不建议作主要指标 |
+
+### 10.5 U 波与 T-U 融合
+
+- U 波会让阈值法把 T end 推后，切线法则可能忽略它 → 两法差异本身就是 U 波存在的信号。
+- 检测：T end 之后约 200 ms 内的次级正向偏转；低钾、长 QT、心动过缓时显著。
+- **处理**：显式输出 `TU_fusion_flag`；融合时降低相关导联在 T end 裁决中的权重，或优先使用 U 波不显著的导联（U 波在 V2–V4 最明显，肢体导联相对干净）。
+
+---
+
+## 11. 多导联稳健融合的方法学
+
+### 11.1 为什么不能直接 min/max（核心问题）
+
+IEC 定义是 min/max，但**定义针对的是"正确标注"**。一旦某导联 onset 被噪声提前触发，min 就被污染。稳健化方案：
+
+**(a) 加权稳健分位数**
+```
+1. 剔除 w_l < w_min 的导联
+2. 稳健中心 c = weighted_median(onset_l)，尺度 s = 1.4826 · MAD
+3. 剔除 |onset_l − c| > k·s 的离群导联（k ≈ 3）
+4. 在剩余导联中取 min（或第 5–10 百分位）作为全局 onset
+```
+既尊重 IEC 的"最早"语义，又不被单点离群支配。
+
+**(b) 互证约束（corroboration）**
+```
+全局 onset := 满足"至少有 N_min 条可靠导联的 onset 落在 [t, t+δ] 内"的最小 t
+典型 N_min = 2，δ = 6–10 ms
+```
+物理依据：真实的早期激动会同时投影到多条导联上（哪怕幅度很小），而噪声不会跨导联同步。
+
+**(c) 投影法作参考中心（推荐组合）**
+```
+1. 用 §7.3 的 WT-loop 投影法得到高稳健性参考边界 t_ML（低方差，但不是"最早"）
+2. 只在 [t_ML − 40 ms, t_ML + 40 ms] 内接受各导联的 onset 候选
+3. 在此约束下应用 (a) + (b) 得到全局 onset
+```
+把"稳健但可能偏晚"与"符合定义但脆弱"的优点结合。
+
+**(d) M-估计 / RANSAC**：把各导联边界视为带离群的观测，用 Huber 或 Tukey 损失做 M-估计；或 RANSAC 采样一致集。适合导联数多、离群比例高的场景。
+
+### 11.2 融合层次对比
+
+| 层次 | 做法 | 适用 | 不适用 |
+|---|---|---|---|
+| 信号级 | RMS / 空间幅值 / PCA / WT-loop 投影 | 心搏检测、粗定位、T end 稳健估计、逐搏变异 | 全局 onset/offset 的"最早/最晚"语义 |
+| 特征级 | 各导联边界的稳健统计 | 全局边界裁决、QRS 时程 | 所有导联信噪比都极低时 |
+| 决策级 | 投票 / Chair-Varshney 最优融合 / D-S 证据理论 | 存在性判定（有无 Q 波、有无 notch、有无 P 波） | 连续量估计 |
+| 学习级 | 12 通道联合输入 / 导联注意力 / 图网络 | 端到端；导联缺失鲁棒性 | 可解释性、法规论证 |
+
+**再次强调 Almeida 的结论**：在边界定位这个具体任务上，**信号级投影 > 特征级选择规则 > 单导联**。但由于全局定义的特殊性，最终系统需两者并用。
+
+### 11.3 顺序与生理约束
+
+做成硬约束（DP 解码中的不可行转移）或软惩罚：
+
+```
+P_on < P_off ≤ QRS_on < QRS_off ≤ T_on < T_off < 下一个 P_on
+40 ms  ≤ QRS 时程 ≤ 200 ms（起搏/BBB 放宽到 250 ms）
+80 ms  ≤ PR ≤ 400 ms（一度 AVB 可更长，需可配置）
+200 ms ≤ QT ≤ 700 ms
+Q 时程 ≤ QRS 时程
+QRS_on(global) ≤ min_l QRS_on(l)     # 自洽性检查
+QRS_off(global) ≥ max_l QRS_off(l)   # 自洽性检查
+```
+违反约束时**不要静默修正**，应记录 `constraint_violation` 并降低置信度。
+
+### 11.4 置信度与不确定度
+
+必须输出（下游模型与临床用户都需要）：
+
+1. **导联间离散度** `σ_inter = MAD(onset_l over reliable leads)` —— 最直接、最便宜的不确定度代理。
+2. **方法间离散度**：同一导联上不同算法（小波/导数/切线/DL）结果的离散度。
+3. **搏间离散度**：同一导联跨心搏的离散度（逐搏模式下）。
+4. **模型不确定度**：DL 用深度集成或 MC dropout；已有工作把 MC dropout 的不确定度做成"可靠性热图"用于可解释性。
+5. **综合置信分级**
+   ```
+   A 级：三类离散度均小 + SQI 高 + 无约束违反 → 可直接用于诊断测量
+   B 级：中等 → 可用于趋势/统计，需人工抽检
+   C 级：任一项超限 → 拒绝输出数值，只报"不可测"
+   ```
+   **宁可拒答也不要给错数** —— 这是医疗测量系统与一般 ML 系统最重要的差别。
+
+
+---
+
+## 12. 困难情形处理清单
+
+| 情形 | 现象 | 对策 |
+|---|---|---|
+| **宽 QRS / BBB** | QRS 200 ms+，多切迹，QRS 与 T 难分 | 小波尺度切到 2^3/2^4；放宽时程约束；fQRS 判据切到宽 QRS 版本；T end 用切线法为主（阈值法易被 QRS 终末拖尾干扰） |
+| **起搏心律** | 起搏钉幅度大、上升沿极陡 | 先做起搏脉冲检测（需高采样率，理想 ≥2 kHz）并做插值移除；QRS onset 应定在**心室除极起始**而非钉子；某些检测器（斜率类）在起搏下崩溃，需换用能量/包络类 |
+| **PVC / 融合搏** | 形态与主导型完全不同 | 聚类后单独处理，**不要**混进代表搏；对 PVC 单独输出形态特征 |
+| **房颤 / 房扑** | P 波不存在 / f 波被误判为 P | 节律分类头门控 P 波输出；DL 模型在 AF/AFL 上 P 波虚警显著（有研究报告 F1 掉 15 个百分点） |
+| **低幅 QRS（<0.5 mV）** | SNR 低，边界不可靠 | 提高 SQI 门限；优先使用空间幅值通道；置信度自动降级 |
+| **V1 的 rSr'（正常变异）** | 易被误判为 fQRS | 加 r' 幅度与时程条件；要求 ≥2 连续导联；结合 QRS 时程判断是否为不完全性 RBBB |
+| **T-U 融合、双峰 T** | T end 三法分歧大 | 见 §10.5；输出 flag 并降级 |
+| **T 波倒置/双向** | 峰值极性判断错误 | DL 分割 + 峰值类别（Peak Attention U-Net 思路）比规则法稳；小波法本身对极性不敏感（用 \|WT\|） |
+| **噪声导联 / 电极脱落** | 单导联完全不可用 | SQI 剔除；确保融合逻辑对 L 变化不敏感 |
+| **肢体导联反接** | I 倒置、假 Q 波 | Einthoven/aVR 一致性校验（§4.2），检出后拒绝输出形态特征并报警 |
+| **胸导联互换/错位** | R 波递增异常 | 相邻导联相关性平滑性检验；VCG 重构残差 |
+| **心率极快（>150 bpm）** | P 埋在 T 里，T end 被下一个 QRS 截断 | 明确输出"不可测"；不要强行外推 |
+| **导出/重构导联** | 由线性变换得到，形态被平滑 | 标注来源，降权，不作为 notch 检测的唯一依据 |
+
+---
+
+## 13. 推荐工程实现方案
+
+### 13.1 分阶段落地路线
+
+**阶段 1（2–4 周）：可用基线**
+- 前处理（零相位滤波 + 中值去基线 + 上采样）
+- Pan-Tompkins + 空间幅值通道双检测，投票融合
+- 小波模极大法做 QRS 边界 + 切线法做 T end
+- 基础 SQI（kSQI + basSQI + 平坦度）
+- 在 QTDB 上评估，对齐 CSE 容差
+
+**阶段 2（4–8 周）：稳健化**
+- 心搏聚类 + 时间相干代表搏
+- 加权稳健分位数融合 + 互证约束
+- 导联反接/错位检测
+- Q/R/S 命名与 notch/slur 检测
+- 完整置信度体系
+
+**阶段 3（8–16 周）：DL 增强**
+- U-Net（含峰值类别）在 LUDB + 自有标注上训练
+- DP/Viterbi 顺序约束解码
+- DL 粗定位 + 信号处理精修的混合管线
+- 跨库泛化评估（LUDB → QTDB → 自有数据）
+
+**阶段 4：多导联投影法**
+- Kors/PCA 正交化 → WT-loop 投影 → 导出导联 delineation
+- 作为稳健参考中心接入 §11.1(c)
+
+### 13.2 关键参数默认值（起点，需在自有数据上标定）
+
+```yaml
+preprocessing:
+  powerline_notch: adaptive           # 50/60 Hz
+  highpass: {type: zero_phase_butter, fc: 0.5, order: 2}  # 或 median cascade
+  baseline: {method: median_cascade, windows_ms: [200, 600]}
+  lowpass: {fc: 150}                  # 不要用 40！
+  upsample_to_hz: 1000                # 边界精修前
+
+sqi:
+  window_s: 2.0
+  weights: {kSQI: 0.25, basSQI: 0.25, pSQI: 0.25, bSQI: 0.25}
+  lead_reject_below: 0.20
+
+beat:
+  match_window_ms: 50                 # min(60, 0.3*RR)
+  min_votes: 3                        # 12 导联下
+  cluster_corr_threshold: 0.90
+
+delineation:
+  wavelet: quadratic_spline
+  scales: [1, 2, 3, 4, 5]
+  qrs_scale_default: 2                # 噪声大时切到 3
+  xi_qrs_onset: 0.06                  # 必须标定
+  xi_qrs_offset: 0.12                 # 必须标定
+  component_min_amp_uv: 30
+  component_min_ratio: 0.05
+
+fusion:
+  outlier_k_mad: 3.0
+  corroboration_n: 2
+  corroboration_delta_ms: 8
+  global_percentile: 0.05             # 用 5% 分位替代 min
+
+qc:
+  qrs_duration_ms: [40, 250]
+  pr_ms: [80, 400]
+  qt_ms: [200, 700]
+  inter_lead_mad_warn_ms: 8
+  inter_lead_mad_reject_ms: 15
+```
+
+### 13.3 输出数据结构建议
+
+```json
+{
+  "record_id": "...",
+  "quality": {
+    "lead_sqi": {"I": 0.92, "II": 0.95, "...": 0.0},
+    "lead_reversal_suspected": false,
+    "excluded_leads": ["V3"]
+  },
+  "beats": [{"id": 0, "r_time_ms": 412.0, "cluster": "dominant"}],
+  "representative_beat": {
+    "n_beats_used": 8,
+    "global": {
+      "qrs_onset_ms": 120.4, "qrs_offset_ms": 218.6,
+      "t_offset_ms": 512.0,
+      "qrs_duration_ms": 98.2, "qt_ms": 391.6, "qtcf_ms": 402.1,
+      "confidence": "A",
+      "inter_lead_mad_onset_ms": 3.2
+    },
+    "per_lead": {
+      "V2": {
+        "qrs_onset_ms": 124.0, "qrs_offset_ms": 216.0,
+        "morphology": "qRs",
+        "components": [
+          {"type": "q", "peak_ms": 130.0, "amp_uv": -85, "duration_ms": 24.0},
+          {"type": "R", "peak_ms": 148.0, "amp_uv": 1420, "duration_ms": 48.0},
+          {"type": "s", "peak_ms": 200.0, "amp_uv": -310, "duration_ms": 30.0}
+        ],
+        "notches": [{"time_ms": 156.0, "depth_uv": 120, "type": "slur", "on": "R_downstroke"}],
+        "isoelectric_uv": 12,
+        "t_offset_ms": {"tangent": 508.0, "trapezium": 514.0, "wavelet": 512.0,
+                        "consensus": 512.0, "spread_ms": 6.0}
+      }
+    }
+  },
+  "flags": ["TU_fusion_V3"],
+  "measurement_derived": {
+    "pathological_q_leads": ["V2", "V3"],
+    "fqrs_leads": [],
+    "criteria_version": "UDMI-3rd"
+  }
+}
+```
+
+**设计要点**：测量层与判据层分离；全局量与逐导联量分离；每个数值都带不确定度或一致性指标。
+
+---
+
+## 14. 验证与质控
+
+### 14.1 验证矩阵
+
+| 维度 | 分层 |
+|---|---|
+| 数据库 | QTDB / LUDB / CSE / 自有 |
+| 节律 | 窦性 / AF / AFL / 心动过速 / 起搏 / PVC |
+| QRS 宽度 | <100 / 100–120 / >120 ms |
+| 信号质量 | SQI 三分位 |
+| 采样率 | 250 / 500 / 1000 Hz（下采样鲁棒性测试） |
+| 噪声注入 | 高频 / 低频 / 工频 / 运动伪差（用 NSTDB 噪声库） |
+
+**噪声注入测试很重要**：CED 系列研究发现不同架构对噪声的免疫性差异明显（多数架构在噪声下平均时程误差 < 2.5 ms，而纯 U-Net 明显更差）。这是纸面 F1 看不出来的。
+
+### 14.2 必做的健全性检查
+
+```
+□ 全局 QRS 时程 ≥ 所有单导联 QRS 时程（自洽）
+□ 同一记录内相邻心搏的测量离散度合理（不应有跳变）
+□ 上采样前后结果一致（差异应 < 1 原始样本）
+□ 导联顺序打乱后结果不变（融合逻辑无导联顺序依赖）
+□ 随机剔除 1–3 条导联后全局量的变化幅度可接受（鲁棒性）
+□ 反转信号极性后成分命名正确翻转（Q↔R 逻辑正确）
+□ 时间反转的合成信号上算法不产生"合理"输出（防过拟合到统计先验）
+```
+
+### 14.3 标注策略（若要自建数据集）
+
+- **双人独立标注 + 第三人仲裁**，并保留双标注以量化观察者间变异（这是算法性能的天花板）。
+- 标注工具应显示**所有导联叠加**，并允许标注者在全局与单导联视图间切换——单导联标注会系统性低估全局时程。
+- 标注 T end 时**统一方法**（切线 or 阈值），并在文档中写死；混用会引入 10–20 ms 的系统偏差。
+- 优先标注**代表搏**而非随机单搏，性价比更高。
+
+---
+
+## 15. 开源工具与代码资源
+
+| 工具 | 语言 | 内容 | 备注 |
+|---|---|---|---|
+| **ECGdeli** (KIT-IBT) | MATLAB, GPLv3 | 完整 12 导联滤波 + delineation，含显式等电位线校正、多导联同步标注（`Annotate_ECG_Multi.m`） | QTDB 上 P/QRS 中位误差 <4 样本；**多导联支持最完整的开源方案**，可作 baseline |
+| **ecg-kit** (Demski & Llamedo) | MATLAB | 集成 **wavedet**（Laguna/Martinez/Almeida 组的原版 delineator） | 想复现小波法的首选 |
+| **ecgpuwave** | C (PhysioNet) | 经典 delineator | 老牌基线，检出率低于前两者 |
+| **NeuroKit2** | Python | `ecg_delineate()` 支持 dwt/cwt/peak 三种方法 | 上手最快；精度一般，适合探索 |
+| **BioSPPy / py-ecg-detectors / wfdb-python** | Python | QRS 检测器集合、WFDB 读写 | 检测层 |
+| **Moskalenko et al. U-Net** | Python | LUDB 上的 DL 分割参考实现 | DL baseline |
+| **SemiSegECG** | Python | 多库统一 + 半监督评测框架 (2025) | 跨域泛化评估 |
+| **LUDB / QTDB / PTB-XL / INCART** | — | PhysioNet 公开数据 | CSE 需付费 |
+
+**注**：CSE 数据库有扩展标注与新版软件测试建议（Smíšek 等, MBEC 2017），做法规验收前值得查阅。
+
+---
+
+## 16. 常见踩坑清单（速查）
+
+1. ❌ 用 40 Hz 低通做"美化" → notch 消失、Q 幅度低估
+2. ❌ 用非零相位的 0.5 Hz 高通 → ST 压低、T end 偏移
+3. ❌ 不同导联用不同滤波参数 → 人为制造导联间时移
+4. ❌ 直接对 500 Hz 信号量 Q 时程 → 2 ms 量化跨越 20/30/40 ms 阈值
+5. ❌ 全局 onset 直接取 min → 一条噪声导联毁掉全部
+6. ❌ 各导联独立对齐后再合成代表搏 → 全局 QRS 时程系统性偏短
+7. ❌ 把"QRS 内绝对最大点"当作 R 峰 → rS/QS 形态下全错
+8. ❌ 幅度用绝对值而非相对等电位线 → 基线漂移全部计入
+9. ❌ 只输出布尔 `has_fQRS` → 无法适配不同判据版本，也无法做统计建模
+10. ❌ 把临床判据阈值硬编码进算法 → 判据一改就要重写
+11. ❌ 只用 IoU/Dice 评估分割 → 掩盖了临床关心的几个样本的边界误差
+12. ❌ 评测时不声明容差窗宽 → 数字不可比（文献中窗宽从 10 ms 到 320 ms 都有）
+13. ❌ 在 LUDB（逐导联标注）上训练后直接用 CSE（全局标注）评估 → 系统性偏差
+14. ❌ QTc 只用当前 RR → 忽略 QT 滞后，动态记录中 QTc 剧烈波动
+15. ❌ 没有"拒答"通路 → 在不可测的信号上输出看似合理的错误数值
+
+---
+
+## 17. 主要参考文献
+
+**基础方法**
+1. Li C, Zheng C, Tai C. Detection of ECG characteristic points using wavelet transforms. *IEEE TBME* 1995;42(1):21–28.
+2. Martínez JP, Almeida R, Olmos S, Rocha AP, Laguna P. A wavelet-based ECG delineator: evaluation on standard databases. *IEEE TBME* 2004;51(4):570–581. （wavedet 原文）
+3. Almeida R, Martínez JP, Rocha AP, Laguna P. Multilead ECG delineation using spatially projected leads from wavelet transform loops. *IEEE TBME* 2009;56(8):1996–2005. （多导联投影法）
+4. Pan J, Tompkins WJ. A real-time QRS detection algorithm. *IEEE TBME* 1985;32(3):230–236.
+5. Rincón F, Recas J, Khaled N, Atienza D. Development and evaluation of multilead wavelet-based ECG delineation algorithms for embedded wireless sensor nodes. *IEEE TITB* 2011;15(6):854–863.
+6. Vázquez-Seisdedos CR, et al. New approach for T-wave end detection on electrocardiogram: performance in noisy conditions. *BioMedical Engineering OnLine* 2011;10:77. （梯形面积法）
+7. Bosnjak A, Ledezma F, et al. Automated T wave end detection methods: comparison of four different methods. *BIOSIGNALS* 2017. （切线/梯形/面积/模板对比）
+8. Panicker GK, et al. Intra- and interreader variability in QT interval measurement by tangent and threshold methods. *J Electrocardiol* 2009. （人工读数变异基线）
+
+**深度学习**
+9. Moskalenko V, Zolotykh N, Osipov G. Deep learning for ECG segmentation. 2019. （LUDB U-Net）
+10. Kalyakulina AI, et al. LUDB: a new open-access validation tool for ECG delineation algorithms. *IEEE Access* 2020;8:186181.
+11. Jimenez-Perez G, et al. Delineation of the electrocardiogram with a mixed-quality-annotations dataset using CNNs. 
+12. Aziz S, et al. / Chen et al. Deep learning based ECG segmentation for delineation of diverse arrhythmias. *PLOS ONE* 2024;19(6):e0303178. （心律失常下的性能退化与对策）
+13. Jekova I, Krasteva V, et al. Delineation of 12-lead ECG representative beats using convolutional encoder–decoders with residual and recurrent connections. *Sensors* 2024;24(14):4645. （代表搏 + IEC 合规）
+14. Peak Attention U-Net: enhancing ECG delineation with attention. *Biomed Signal Process Control* 2026. （显式峰值类别）
+15. Park M, Yu T, et al. SemiSegECG: a multi-dataset benchmark for semi-supervised semantic segmentation in ECG delineation. arXiv:2507.18323, 2025.
+16. ECGVEDNET / ICDIRS：大规模 12 导联 delineation 数据集与变分编码-解码模型，2025.
+
+**多导联融合与质量**
+17. Chauhan C, Agrawal M, Sabherwal P. A multi-lead fusion method for the accurate delineation of QRS complex location in 12-lead ECG. arXiv:2107.05469, 2021; 及 *Measurement* 2023 的扩展版。
+18. Mondelo V, et al. Combining 12-lead ECG information for a beat detection algorithm. 2017.
+19. Li Q, Mark RG, Clifford GD. Robust heart rate estimation from multiple asynchronous noisy sources using signal quality indices and a Kalman filter. *Physiol Meas* 2008. （bSQI/sSQI/kSQI）
+20. Zhao Z, Zhang Y. SQI quality evaluation mechanism of single-lead ECG signal based on simple heuristic fusion and fuzzy comprehensive evaluation. *Front Physiol* 2018;9:727.
+21. Robustness of electrocardiogram signal quality indices. *J R Soc Interface* / PMC9006023, 2022. （固定阈值 SQI 的局限）
+
+**notch / fQRS**
+22. Das MK, et al. Significance of a fragmented QRS complex versus a Q wave in patients with coronary artery disease. *Circulation* 2006;113:2495–2501.
+23. Macfarlane PW, et al. Automatic detection of end QRS notching or slurring. *J Electrocardiol* 2013;46(6):782–786. （Glasgow 程序规则与性能）
+24. Haukilahti MA, et al. QRS fragmentation patterns representing myocardial scar need to be separated from benign normal variants. *Front Physiol* 2016;7:653.
+25. A machine learning algorithm for electrocardiographic fQRS quantification validated on multi-center data. *Sci Rep* 2022;12:6863.
+
+**标准与临床判据**
+26. IEC 60601-2-25:2011 — Medical electrical equipment, Part 2-25: Particular requirements for electrocardiographs. （表 201.105 全局测量限值；附录 FF.2 全局时程定义）
+27. Kligfield P, et al. Recommendations for the standardization and interpretation of the electrocardiogram, Part I. *Circulation* 2007;115:1306–1324. （AHA/ACC/HRS 带宽与采样率）
+28. Willems JL, et al. CSE working party — assessment of the performance of ECG computer programs. （CSE 容差来源）
+29. Smíšek R, et al. CSE database: extended annotations and new recommendations for ECG software testing. *Med Biol Eng Comput* 2017;55(8):1473–1482.
+30. Thygesen K, et al. Universal definition of myocardial infarction（第 3/4 版）. （病理性 Q 波判据）
+31. Drezner JA, et al. International criteria for ECG interpretation in athletes (Seattle / Seattle-2). 
+32. ANSI/AAMI EC57 — Testing and reporting performance results of cardiac rhythm and ST segment measurement algorithms.
+
+**开源工具**
+33. Pilia N, Nagel C, Lenis G, Becker S, Dössel O, Loewe A. ECGdeli — an open source ECG delineation toolbox for MATLAB. *SoftwareX* 2021;13:100639. （https://github.com/KIT-IBT/ECGdeli）
+34. Demski A, Llamedo Soria M. ecg-kit: a MATLAB toolbox for cardiovascular signal processing. *J Open Res Softw* 2016;4:e8. （含 wavedet）
+35. Makowski D, et al. NeuroKit2: a Python toolbox for neurophysiological signal processing. *Behav Res Methods* 2021.
+
+---
+
+## 附录 A：全局 vs 单导联的数值示例
+
+CSE 记录 #001 是理解这个问题的最佳教材：
+- 参考的**全局** QRS 时程：**127 ms**
+- 导联 I 上目测 QRS 时程：约 **100 ms**
+- 原因：导联 III 的 QRS onset 显著早于导联 I
+
+**若你的算法在导联 I 上测得 100 ms 并作为最终输出，即使这个测量本身完全正确，按 IEC 也是错的**（误差 27 ms，远超 10 ms 均值限）。这就是为什么"多导联互参照"不是可选优化，而是全局测量的定义要求。
+
+## 附录 B：快速自检问题
+
+回答这 10 个问题，能定位大部分系统的短板：
+
+1. 你的 QRS onset 是全局的还是某一导联的？文档里写清楚了吗？
+2. 你的高通滤波是零相位的吗？各导联一致吗？
+3. Q 时程的时间分辨率是多少 ms？够分辨 20/30/40 ms 阈值吗？
+4. 一条导联被噪声污染时，全局 QRS 时程会变化多少？
+5. 你能区分"生理性导联间时差"和"设备时间偏斜"吗？
+6. `R_peak` 在 rS 形态的导联上返回的是什么？
+7. 幅度是相对什么基准算的？这个基准怎么估计的？
+8. 检出 notch 时，你有没有用相邻导联做互证？
+9. 系统有"拒答"通路吗？触发条件是什么？
+10. 你在 QTDB / LUDB / CSE 上的 σ 分别是多少？跨库掉多少？
+
+---
+
+*本文档基于公开文献综述与工程实践整理。涉及医疗器械的实现须遵循 IEC 60601-2-25 等适用标准并完成相应验证。*

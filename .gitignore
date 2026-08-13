@@ -1,0 +1,68 @@
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Local editor/agent state and secrets
+.agents/
+.claude/
+.codex/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+
+# Files uploaded through the chat web UI
+webchat/.uploads/
+
+# Local logs and coverage output
+*.log
+.coverage
+htmlcov/
+.ecgagent_knowledge/
+
+# Local datasets, third-party reference material, and record manifests
+/data/
+/dataset
+/document/
+/diagnosis_manifest.json
+/record_manifest.json
+*.hea
+*.dat
+*.mat
+*.edf
+
+# Local model weights and inference outputs
+/medgemma-27b/
+/qwen3.6-27b/
+/qwen_agent_output/
+/deepseek_v4pro_05490_v12/
+*.safetensors
+*.ckpt
+*.pth
+*.onnx
+
+# Generated root-level demo artifacts
+/*_features.json
+/*_report.txt
+/*_ecg.png
+/*_ecg_annotated.png
+/*_ecg_report.png
+
+# Common generated evaluation directories
+/ludb_*comparison*/
+/ludb_*evaluation*/
+/ptbxl_*validation*/
+/physionet_st_analysis/
+/ecgfeat_target_diagnosis_*/
+/ecgfeat_validation_*/
+/ptbxl_*_ecgfeat/
+/ludb_delineation_plots/
+/p_wave_failure_plots/

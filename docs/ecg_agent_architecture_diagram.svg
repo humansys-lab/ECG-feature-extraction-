@@ -1,0 +1,284 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080" role="img" aria-labelledby="title desc">
+  <title id="title">ECGAgent v38 Dual-Channel Architecture</title>
+  <desc id="desc">Complete architecture from ECG input, ecgfeat extraction, evidence isolation, and tool orchestration to dual-channel adjudication, deterministic verification, reporting, auditing, and release evaluation.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="modelGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f5f3ff"/>
+      <stop offset="1" stop-color="#ede9fe"/>
+    </linearGradient>
+    <linearGradient id="programGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecfdf5"/>
+      <stop offset="1" stop-color="#d1fae5"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/>
+    </marker>
+    <style>
+      text { font-family: Inter, "DejaVu Sans", Arial, sans-serif; fill: #0f172a; }
+      text[fill="#ffffff"] { fill: #ffffff; }
+      text[fill="#cbd5e1"] { fill: #cbd5e1; }
+      .title { font-size: 34px; font-weight: 750; }
+      .subtitle { font-size: 16px; fill: #475569; }
+      .stage-title { font-size: 17px; font-weight: 700; }
+      .stage-sub { font-size: 11.5px; fill: #64748b; }
+      .box-title { font-size: 14.2px; font-weight: 700; }
+      .box-title-sm { font-size: 12.8px; font-weight: 700; }
+      .box-sub { font-size: 11.3px; fill: #475569; }
+      .box-sub-tight { font-size: 10.1px; fill: #475569; }
+      .tiny { font-size: 9.8px; fill: #64748b; }
+      .label { font-size: 9.5px; font-weight: 650; fill: #475569; }
+      .gov-sub { font-size: 10.5px; fill: #cbd5e1; }
+      .arrow { fill: none; stroke: #475569; stroke-width: 2.2; marker-end: url(#arrow); }
+      .arrow-blue { fill: none; stroke: #2563eb; stroke-width: 2.4; marker-end: url(#arrowBlue); }
+      .arrow-purple { fill: none; stroke: #7c3aed; stroke-width: 2.4; marker-end: url(#arrowPurple); }
+      .arrow-green { fill: none; stroke: #059669; stroke-width: 2.4; marker-end: url(#arrowGreen); }
+      .dashed { stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1080" fill="url(#bg)"/>
+  <circle cx="1510" cy="80" r="115" fill="#dbeafe" opacity="0.55"/>
+  <circle cx="90" cy="1020" r="150" fill="#ede9fe" opacity="0.55"/>
+
+  <text x="54" y="54" class="title">ECGAgent v38 Dual-Channel Architecture</text>
+  <text x="54" y="82" class="subtitle">The model proposes candidates and open judgments; the program owns evidence, computation, state, verification, and release.</text>
+  <rect x="1330" y="34" width="214" height="42" rx="21" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="1437" y="60" text-anchor="middle" class="box-title">ecgagent.diagnostic.v38</text>
+
+  <!-- Stage containers -->
+  <g>
+    <rect x="35" y="120" width="245" height="690" rx="20" fill="#ffffff" stroke="#bfdbfe" stroke-width="2"/>
+    <rect x="305" y="120" width="300" height="690" rx="20" fill="#ffffff" stroke="#a5b4fc" stroke-width="2"/>
+    <rect x="630" y="120" width="325" height="690" rx="20" fill="#ffffff" stroke="#c4b5fd" stroke-width="2"/>
+    <rect x="980" y="120" width="295" height="690" rx="20" fill="#ffffff" stroke="#86efac" stroke-width="2"/>
+    <rect x="1300" y="120" width="265" height="690" rx="20" fill="#ffffff" stroke="#fdba74" stroke-width="2"/>
+
+    <text x="55" y="153" class="stage-title">① Input &amp; Measurement</text>
+    <text x="55" y="174" class="stage-sub">Deterministic signal processing</text>
+    <text x="325" y="153" class="stage-title">② Evidence &amp; Tools</text>
+    <text x="325" y="174" class="stage-sub">Isolation, atomization, traceability</text>
+    <text x="650" y="153" class="stage-title">③ Agent Orchestration</text>
+    <text x="650" y="174" class="stage-sub">Compact plan, candidates, paths, budgets</text>
+    <text x="1000" y="153" class="stage-title">④ Dual-Channel Decision</text>
+    <text x="1000" y="174" class="stage-sub">LLM judgment + deterministic program logic</text>
+    <text x="1320" y="153" class="stage-title">⑤ Verification &amp; Output</text>
+    <text x="1320" y="174" class="stage-sub">Fail-closed verification, audit, release</text>
+  </g>
+
+  <!-- Input layer -->
+  <g filter="url(#shadow)">
+    <rect x="60" y="205" width="195" height="70" rx="12" fill="#eff6ff" stroke="#60a5fa"/>
+    <text x="158" y="234" text-anchor="middle" class="box-title">Standard 12-Lead ECG</text>
+    <text x="158" y="256" text-anchor="middle" class="box-sub">WFDB / MAT / patient metadata</text>
+
+    <rect x="60" y="320" width="195" height="82" rx="12" fill="#eff6ff" stroke="#60a5fa"/>
+    <text x="158" y="344" text-anchor="middle" class="box-title">ecgfeat Deterministic</text>
+    <text x="158" y="361" text-anchor="middle" class="box-title">Feature Extraction</text>
+    <text x="158" y="380" text-anchor="middle" class="tiny">Preprocess · delineate · lead / beat</text>
+    <text x="158" y="395" text-anchor="middle" class="tiny">Quality · rhythm modalities · morphology</text>
+
+    <rect x="60" y="452" width="195" height="76" rx="12" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+    <text x="158" y="482" text-anchor="middle" class="box-title">Full features.json</text>
+    <text x="158" y="502" text-anchor="middle" class="tiny">2–4 MB measurements</text>
+    <text x="158" y="518" text-anchor="middle" class="tiny">+ upstream artifacts</text>
+
+    <rect x="60" y="620" width="195" height="104" rx="12" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="158" y="649" text-anchor="middle" class="box-title">Rule Second-Opinion</text>
+    <text x="158" y="667" text-anchor="middle" class="box-title">Snapshot</text>
+    <text x="158" y="690" text-anchor="middle" class="tiny">Injected only after blind planning</text>
+    <text x="158" y="708" text-anchor="middle" class="tiny">No patient values · thresholds · citations</text>
+  </g>
+
+  <path d="M158 275 V320" class="arrow-blue"/>
+  <path d="M158 402 V452" class="arrow-blue"/>
+  <path d="M158 528 V620" class="arrow dashed"/>
+
+  <!-- Evidence layer -->
+  <g filter="url(#shadow)">
+    <rect x="330" y="205" width="250" height="82" rx="12" fill="#eef2ff" stroke="#818cf8"/>
+    <text x="455" y="234" text-anchor="middle" class="box-title-sm">Diagnosis Evidence Allowlist DTO</text>
+    <text x="455" y="256" text-anchor="middle" class="box-sub">diagnosis-evidence.v2</text>
+    <text x="455" y="274" text-anchor="middle" class="tiny">Removes rule outputs, labels &amp; diagnostic derivatives</text>
+
+    <rect x="330" y="330" width="250" height="82" rx="12" fill="#eef2ff" stroke="#818cf8"/>
+    <text x="455" y="359" text-anchor="middle" class="box-title">Immutable EvidenceStore</text>
+    <text x="455" y="381" text-anchor="middle" class="box-sub">JSON Pointer · units · caveats · fingerprints</text>
+    <text x="455" y="399" text-anchor="middle" class="tiny">Single source of patient facts</text>
+
+    <rect x="330" y="455" width="250" height="95" rx="12" fill="#eef2ff" stroke="#818cf8"/>
+    <text x="455" y="484" text-anchor="middle" class="box-title">Tool Registry (14 Tools)</text>
+    <text x="455" y="506" text-anchor="middle" class="box-sub">Global · lead · beat · rhythm · morphology</text>
+    <text x="455" y="526" text-anchor="middle" class="tiny">Schema checks · budgets · dedup · full call audit</text>
+    <text x="455" y="542" text-anchor="middle" class="tiny">Only successful calls spend budget</text>
+
+    <rect x="330" y="598" width="250" height="100" rx="12" fill="#e0e7ff" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="455" y="627" text-anchor="middle" class="box-title">Atomic Model Evidence View</text>
+    <text x="455" y="649" text-anchor="middle" class="box-sub">model-evidence.v3 · Q1/Q2/…</text>
+    <text x="455" y="670" text-anchor="middle" class="tiny">Value · unit · lead · caveat · citation stay atomic</text>
+    <text x="455" y="687" text-anchor="middle" class="tiny">touched ≠ model-visible ≠ program-authorized</text>
+  </g>
+
+  <path d="M255 490 H305 V246 H330" class="arrow-blue"/>
+  <path d="M455 287 V330" class="arrow-blue"/>
+  <path d="M455 412 V455" class="arrow-blue"/>
+  <path d="M455 550 V598" class="arrow-blue"/>
+
+  <!-- Orchestration -->
+  <g filter="url(#shadow)">
+    <rect x="655" y="205" width="275" height="78" rx="12" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="793" y="229" text-anchor="middle" class="box-title">Quality Gate + Urgent Review</text>
+    <text x="793" y="246" text-anchor="middle" class="box-title">Routing</text>
+    <text x="793" y="263" text-anchor="middle" class="box-sub-tight">pass / partial / stop</text>
+    <text x="793" y="277" text-anchor="middle" class="tiny">stop skips the diagnostic model</text>
+
+    <rect x="655" y="325" width="275" height="86" rx="12" fill="#f5f3ff" stroke="#a78bfa"/>
+    <text x="793" y="353" text-anchor="middle" class="box-title">Compact Plan</text>
+    <text x="793" y="375" text-anchor="middle" class="box-sub">Neutral overview → up to 3 blind candidates</text>
+    <text x="793" y="396" text-anchor="middle" class="tiny">Support/refute checks · ≥1 active falsification</text>
+
+    <rect x="655" y="455" width="275" height="90" rx="12" fill="#f5f3ff" stroke="#a78bfa"/>
+    <text x="793" y="483" text-anchor="middle" class="box-title-sm">Program-Validated Candidate Merge</text>
+    <text x="793" y="505" text-anchor="middle" class="box-sub">Dedup · semantic families · rule second opinion</text>
+    <text x="793" y="526" text-anchor="middle" class="tiny">Up to 5; rule hints need independent evidence</text>
+
+    <rect x="655" y="598" width="275" height="102" rx="12" fill="#ede9fe" stroke="#8b5cf6" stroke-width="1.5"/>
+    <text x="793" y="626" text-anchor="middle" class="box-title-sm">Fixed Diagnostic Pathway Compiler</text>
+    <text x="793" y="648" text-anchor="middle" class="box-sub">required / supporting / invalidator</text>
+    <text x="793" y="669" text-anchor="middle" class="tiny">Exact tool + arguments prefetch / coverage</text>
+    <text x="793" y="687" text-anchor="middle" class="tiny">Up to 13 views · up to 6 nodes per path</text>
+  </g>
+
+  <path d="M580 371 H655 V244" class="arrow-blue"/>
+  <path d="M580 648 H618 V368 H655" class="arrow-blue"/>
+  <path d="M793 283 V325" class="arrow"/>
+  <path d="M793 411 V455" class="arrow-purple"/>
+  <path d="M793 545 V598" class="arrow-purple"/>
+  <path d="M255 671 H300 V770 H615 V500 H655" class="arrow dashed"/>
+  <text x="425" y="786" class="label">Injected after the blind Plan; used for routing only</text>
+
+  <!-- Dual channel -->
+  <g filter="url(#shadow)">
+    <rect x="1005" y="205" width="245" height="210" rx="16" fill="url(#modelGrad)" stroke="#8b5cf6" stroke-width="1.8"/>
+    <rect x="1022" y="220" width="108" height="26" rx="13" fill="#7c3aed"/>
+    <text x="1076" y="238" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">Model Channel</text>
+    <text x="1025" y="274" class="box-title">LLM Clinical Reasoning</text>
+    <text x="1025" y="300" class="box-sub-tight">— Candidates + discriminating checks</text>
+    <text x="1025" y="323" class="box-sub-tight">— Fills owner=model nodes only</text>
+    <text x="1025" y="346" class="box-sub-tight">— pass / fail / unknown</text>
+    <text x="1025" y="369" class="box-sub-tight">— Uses fresh, visible Qn atoms only</text>
+    <text x="1025" y="395" class="tiny">No thresholds · values · placement decisions</text>
+
+    <rect x="1005" y="458" width="245" height="210" rx="16" fill="url(#programGrad)" stroke="#10b981" stroke-width="1.8"/>
+    <rect x="1022" y="473" width="118" height="26" rx="13" fill="#059669"/>
+    <text x="1081" y="491" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">Program Channel</text>
+    <text x="1025" y="527" class="box-title">Deterministic Pathway Facts</text>
+    <text x="1025" y="553" class="box-sub-tight">— Thresholds · counts · ratios · sequences</text>
+    <text x="1025" y="576" class="box-sub-tight">— Three-state owner=program nodes</text>
+    <text x="1025" y="599" class="box-sub-tight">— Auditable use of complete tool results</text>
+    <text x="1025" y="622" class="box-sub-tight">— Versioned policy + shadow mode</text>
+    <text x="1025" y="649" class="tiny">Program nodes adjudicate selected candidates only</text>
+
+    <rect x="1005" y="712" width="245" height="70" rx="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+    <text x="1128" y="740" text-anchor="middle" class="box-title-sm">Program Owns Final Placement</text>
+    <text x="1128" y="762" text-anchor="middle" class="box-sub">confirmed / unresolved / rejected</text>
+  </g>
+
+  <path d="M930 368 H970 V280 H1005" class="arrow-purple"/>
+  <text x="963" y="265" text-anchor="end" class="label">candidate plan</text>
+  <path d="M1005 315 H970 V500 H930" class="arrow-purple"/>
+  <text x="963" y="485" text-anchor="end" class="label">blind candidates</text>
+  <path d="M930 649 H970 V350 H1005" class="arrow-purple"/>
+  <path d="M930 649 H970 V563 H1005" class="arrow-green"/>
+  <path d="M1128 415 V440 H1260 V747 H1250" class="arrow-purple"/>
+  <path d="M1128 668 V712" class="arrow-green"/>
+
+  <!-- Output -->
+  <g filter="url(#shadow)">
+    <rect x="1325" y="230" width="215" height="86" rx="12" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="1433" y="259" text-anchor="middle" class="box-title-sm">Expanded Structured Verdict</text>
+    <text x="1433" y="281" text-anchor="middle" class="box-sub-tight">Program materializes values + caveats</text>
+    <text x="1433" y="301" text-anchor="middle" class="tiny">diagnoses / differential / abstentions</text>
+
+    <rect x="1325" y="365" width="215" height="116" rx="12" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="1433" y="394" text-anchor="middle" class="box-title-sm">Deterministic Verification</text>
+    <text x="1433" y="417" text-anchor="middle" class="box-sub-tight">Schema · provenance · numeric consistency</text>
+    <text x="1433" y="440" text-anchor="middle" class="box-sub-tight">Reliability qualifiers · semantic fit</text>
+    <text x="1433" y="462" text-anchor="middle" class="tiny">Fail closed: unknown · diff · abstain · error</text>
+
+    <rect x="1325" y="530" width="215" height="90" rx="12" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="1433" y="554" text-anchor="middle" class="box-title">Optional Isolated</text>
+    <text x="1433" y="571" text-anchor="middle" class="box-title">Knowledge Check</text>
+    <text x="1433" y="592" text-anchor="middle" class="tiny">Neutral evidence-review questions only</text>
+    <text x="1433" y="608" text-anchor="middle" class="tiny">Reread evidence + reverify before revision</text>
+
+    <rect x="1325" y="675" width="215" height="105" rx="12" fill="#fff7ed" stroke="#fb923c"/>
+    <text x="1433" y="704" text-anchor="middle" class="box-title-sm">Deterministic Output &amp; Audit</text>
+    <text x="1433" y="727" text-anchor="middle" class="box-sub-tight">JSON · clinical report · Markdown trace</text>
+    <text x="1433" y="750" text-anchor="middle" class="box-sub-tight">checkpoints · batch · analytics</text>
+    <text x="1433" y="769" text-anchor="middle" class="tiny">human_review.required = true</text>
+  </g>
+
+  <path d="M1250 747 H1284 V273 H1325" class="arrow-green"/>
+  <path d="M1433 316 V365" class="arrow"/>
+  <path d="M1433 481 V530" class="arrow dashed"/>
+  <path d="M1433 620 V820 H610 V503 H580" class="arrow-blue dashed"/>
+  <text x="875" y="833" text-anchor="middle" class="label">Review questions return to Tool Registry; knowledge text never becomes patient evidence</text>
+  <path d="M1433 481 V675" class="arrow"/>
+  <path d="M930 244 H965 V102 H1285 V273 H1325" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+  <text x="1110" y="115" text-anchor="middle" class="label">quality=stop: program emits a non-diagnostic verdict</text>
+
+  <!-- Governance bar -->
+  <rect x="35" y="840" width="1530" height="178" rx="20" fill="#0f172a" opacity="0.96"/>
+  <text x="60" y="875" font-size="18" font-weight="700" fill="#ffffff">Cross-Cutting Governance &amp; Runtime Controls</text>
+
+  <g>
+    <rect x="60" y="895" width="345" height="92" rx="12" fill="#1e293b" stroke="#475569"/>
+    <text x="80" y="922" font-size="14" font-weight="700" fill="#ffffff">Versioned Contracts &amp; Policies</text>
+    <text x="80" y="946" class="gov-sub">Protocol v38 · evidence DTO v2 · pathways v5</text>
+    <text x="80" y="968" class="gov-sub">Deterministic facts v1 · safety v2 · prompt fingerprint</text>
+
+    <rect x="430" y="895" width="345" height="92" rx="12" fill="#1e293b" stroke="#475569"/>
+    <text x="450" y="922" font-size="14" font-weight="700" fill="#ffffff">Backend Capability Abstraction</text>
+    <text x="450" y="946" class="gov-sub">Anthropic · DeepSeek · Qwen local · MedGemma</text>
+    <text x="450" y="968" class="gov-sub">Structured output · tools · Qn aliases · compaction</text>
+
+    <rect x="800" y="895" width="345" height="92" rx="12" fill="#1e293b" stroke="#475569"/>
+    <text x="820" y="922" font-size="14" font-weight="700" fill="#ffffff">Budgets, Circuit Breakers &amp; Recovery</text>
+    <text x="820" y="946" class="gov-sub">Model turns · tokens · wall time · duplicate-call fuse</text>
+    <text x="820" y="968" class="gov-sub">Atomic writes · checkpoints · input/execution fingerprints</text>
+
+    <rect x="1170" y="895" width="370" height="92" rx="12" fill="#1e293b" stroke="#475569"/>
+    <text x="1190" y="922" font-size="14" font-weight="700" fill="#ffffff">Evaluation &amp; Release Gate</text>
+    <text x="1190" y="946" class="gov-sub">rules / single-turn / Agent three-arm patient-level blind review</text>
+    <text x="1190" y="968" class="gov-sub">success · verified · P90 · serious misses · clinical review</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(54,1045)">
+    <line x1="0" y1="0" x2="34" y2="0" stroke="#2563eb" stroke-width="3"/>
+    <text x="43" y="4" class="tiny">Patient evidence</text>
+    <line x1="150" y1="0" x2="184" y2="0" stroke="#7c3aed" stroke-width="3"/>
+    <text x="193" y="4" class="tiny">Model reasoning</text>
+    <line x1="310" y1="0" x2="344" y2="0" stroke="#059669" stroke-width="3"/>
+    <text x="353" y="4" class="tiny">Program decisions</text>
+    <line x1="480" y1="0" x2="514" y2="0" stroke="#475569" stroke-width="3" stroke-dasharray="7 6"/>
+    <text x="523" y="4" class="tiny">Non-patient / optional / bypass</text>
+    <text x="1490" y="4" text-anchor="end" class="tiny">Research support only · all outputs require human review</text>
+  </g>
+</svg>
