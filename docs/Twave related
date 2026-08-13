@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](Twave%20related) | [English](Twave%20related.en.md) | [日本語](Twave%20related.ja.md)
+<!-- /i18n-nav -->
+
 # 多导联心电 T 波定界与 ST 段特征提取技术规范
 
 **方法范围：纯确定性信号处理（小波、微分、面积、几何、曲线拟合、稳健统计）。不含任何机器学习／深度学习／HMM 方法。**

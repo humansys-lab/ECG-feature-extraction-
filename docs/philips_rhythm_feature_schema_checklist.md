@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](philips_rhythm_feature_schema_checklist.md) | [English](philips_rhythm_feature_schema_checklist.en.md) | [日本語](philips_rhythm_feature_schema_checklist.ja.md)
+<!-- /i18n-nav -->
+
 # Philips Rhythm Feature Schema Checklist
 
 ## 结论先行

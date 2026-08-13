@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<!-- /i18n-nav -->
+
 # 本地模型对话前端
 
 一个直接与本地权重对话的网页界面，同一套代码可以跑多个模型。全部推理在本机 GPU

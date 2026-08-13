@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](WFDBRecords_03_030_per_record_label_match_audit.md) | [English](WFDBRecords_03_030_per_record_label_match_audit.en.md) | [日本語](WFDBRecords_03_030_per_record_label_match_audit.ja.md)
+<!-- /i18n-nav -->
+
 # WFDBRecords/03/030 逐记录标签—检测匹配审计
 
 - 数据范围：100 条记录（JS02082–JS02185，按实际存在文件列出）

@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecg_agent_architecture.md) | [English](ecg_agent_architecture.en.md) | [日本語](ecg_agent_architecture.ja.md)
+<!-- /i18n-nav -->
+
 # ECG 推理智能体系统架构设计
 
 > 目标：以 `feature_extraction/ecgfeat` 为确定性 toolkit，在其上构建一个**可推理、可审计、可弃权**的

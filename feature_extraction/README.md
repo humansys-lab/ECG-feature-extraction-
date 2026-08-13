@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<!-- /i18n-nav -->
+
 # ecgfeat_dxl_inspired
 
 一个 **DXL 风格但不是 DXL 私有实现** 的 12-lead ECG 特征提取库骨架。它按公开手册中的主流程组织：

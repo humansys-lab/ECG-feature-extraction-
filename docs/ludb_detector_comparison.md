@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ludb_detector_comparison.md) | [English](ludb_detector_comparison.en.md) | [日本語](ludb_detector_comparison.ja.md)
+<!-- /i18n-nav -->
+
 # LUDB 三种 ECG 检测方法对比
 
 本工具在 LUDB 1.0.1 专家标注上比较以下方法：

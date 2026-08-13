@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](philips_adult_morphology_feature_schema_checklist.md) | [English](philips_adult_morphology_feature_schema_checklist.en.md) | [日本語](philips_adult_morphology_feature_schema_checklist.ja.md)
+<!-- /i18n-nav -->
+
 # Philips Adult Morphology Feature Schema Checklist
 
 ## 结论先行

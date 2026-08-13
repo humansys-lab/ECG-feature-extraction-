@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](2026-07-12-clinical-diagnosis-usability-redesign.md) | [English](2026-07-12-clinical-diagnosis-usability-redesign.en.md) | [日本語](2026-07-12-clinical-diagnosis-usability-redesign.ja.md)
+<!-- /i18n-nav -->
+
 # ECG Clinical Diagnosis Usability Redesign
 
 **Date:** 2026-07-12  

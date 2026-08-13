@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](lead_beat_representative_consensus_audit.md) | [English](lead_beat_representative_consensus_audit.en.md) | [日本語](lead_beat_representative_consensus_audit.ja.md)
+<!-- /i18n-nav -->
+
 # Per-Lead/Per-Beat、代表波形与多导联共识利用审计
 
 分析对象：

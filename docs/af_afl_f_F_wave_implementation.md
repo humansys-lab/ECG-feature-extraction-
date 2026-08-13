@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](af_afl_f_F_wave_implementation.md) | [English](af_afl_f_F_wave_implementation.en.md) | [日本語](af_afl_f_F_wave_implementation.ja.md)
+<!-- /i18n-nav -->
+
 # AF/AFL f 波与 F 波识别实现说明
 
 Ruleset：`clinical_rules.v2 / 2026.07.9`

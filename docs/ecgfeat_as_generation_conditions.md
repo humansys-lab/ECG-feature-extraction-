@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecgfeat_as_generation_conditions.md) | [English](ecgfeat_as_generation_conditions.en.md) | [日本語](ecgfeat_as_generation_conditions.ja.md)
+<!-- /i18n-nav -->
+
 # ecgfeat 作为条件生成的特征源 —— 可用性说明
 
 面向的用途：把 ecgfeat 当作特征提取器，为 **conditional ECG generation** 提供条件量，

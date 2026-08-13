@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<!-- /i18n-nav -->
+
 # ECG General-Knowledge Layer
 
 This local medical-knowledge layer is strictly separated from ecgfeat patient-measurement tools. It is not registered in `build_default_registry`, cannot use `ev:/...` citations, and can never become patient evidence.

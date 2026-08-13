@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](2026-07-12-clinical-diagnosis-p0-p1.md) | [English](2026-07-12-clinical-diagnosis-p0-p1.en.md) | [日本語](2026-07-12-clinical-diagnosis-p0-p1.ja.md)
+<!-- /i18n-nav -->
+
 # Clinical Diagnosis P0/P1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

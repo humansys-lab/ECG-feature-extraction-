@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](p_wave_robust_engine_implementation.md) | [English](p_wave_robust_engine_implementation.en.md) | [日本語](p_wave_robust_engine_implementation.ja.md)
+<!-- /i18n-nav -->
+
 # P 波稳健定界引擎实施与验证审计
 
 生成时间：2026-07-28

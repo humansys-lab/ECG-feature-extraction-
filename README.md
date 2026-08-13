@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<!-- /i18n-nav -->
+
 # ECG Gemma：12 导联 ECG 特征提取与临床证据工程
 
 本项目提供一套可解释的 12 导联 ECG 特征提取流水线，并将测量结果组织成可供规则引擎、报告程序和 MedGemma 使用的结构化证据。

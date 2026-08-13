@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](wfdb_030_batch_label_comparison.md) | [English](wfdb_030_batch_label_comparison.en.md) | [日本語](wfdb_030_batch_label_comparison.ja.md)
+<!-- /i18n-nav -->
+
 # WFDBRecords/03/030 批次 —— 逐条诊断对照（最新一轮重新生成）
 
 - 数据：`data/WFDBRecords_03_030_ecgfeat_out/`，2026-07-12 17:4x 重新生成（manifest: processed=100, failed=0）

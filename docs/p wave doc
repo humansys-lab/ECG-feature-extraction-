@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](p%20wave%20doc) | [English](p%20wave%20doc.en.md) | [日本語](p%20wave%20doc.ja.md)
+<!-- /i18n-nav -->
+
 # 多导联 ECG P 波定界：代码修改重点指南
 
 > 适用范围：不使用机器学习，通过确定性信号处理实现多导联 P 波 onset/offset 定界。  

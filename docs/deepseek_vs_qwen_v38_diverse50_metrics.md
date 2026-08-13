@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](deepseek_vs_qwen_v38_diverse50_metrics.md) | [English](deepseek_vs_qwen_v38_diverse50_metrics.en.md) | [日本語](deepseek_vs_qwen_v38_diverse50_metrics.ja.md)
+<!-- /i18n-nav -->
+
 # DeepSeek vs. Qwen（v38 diverse50）指标计算方法与结果全记录
 
 记录 2026-08-03 分析中用到的每一个指标的**精确定义、计算公式、以及在本次实验数据上的完整结果**，供后续复算、复核、或写入汇报材料时引用，避免重新推导。

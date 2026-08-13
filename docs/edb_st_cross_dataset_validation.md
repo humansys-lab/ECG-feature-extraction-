@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](edb_st_cross_dataset_validation.md) | [English](edb_st_cross_dataset_validation.en.md) | [日本語](edb_st_cross_dataset_validation.ja.md)
+<!-- /i18n-nav -->
+
 # ecgfeat 在 EDB 上的 ST 测量验证（LUDB 之外，第二个数据集）
 
 配套文档：[QTDB 描记验证](qtdb_cross_dataset_validation.md)。两者验证的是不同能力轴 ——

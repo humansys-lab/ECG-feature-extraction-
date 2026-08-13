@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecg_agent_architecture_diagram.md) | [English](ecg_agent_architecture_diagram.en.md) | [日本語](ecg_agent_architecture_diagram.ja.md)
+<!-- /i18n-nav -->
+
 # ECGAgent v38 Architecture Diagram
 
 ![ECGAgent v38 dual-channel architecture](ecg_agent_architecture_diagram.svg)

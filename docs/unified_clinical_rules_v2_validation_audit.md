@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](unified_clinical_rules_v2_validation_audit.md) | [English](unified_clinical_rules_v2_validation_audit.en.md) | [日本語](unified_clinical_rules_v2_validation_audit.ja.md)
+<!-- /i18n-nav -->
+
 # Unified Clinical Rules v2 Validation Audit
 
 Date: 2026-07-12

@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](codebase_guide.md) | [English](codebase_guide.en.md) | [日本語](codebase_guide.ja.md)
+<!-- /i18n-nav -->
+
 # 代码库导航与维护约定
 
 本仓库同时包含算法库、命令行入口、模型推理、数据集和实验产物。为保持

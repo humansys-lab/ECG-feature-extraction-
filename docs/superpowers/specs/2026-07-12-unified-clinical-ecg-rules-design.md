@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](2026-07-12-unified-clinical-ecg-rules-design.md) | [English](2026-07-12-unified-clinical-ecg-rules-design.en.md) | [日本語](2026-07-12-unified-clinical-ecg-rules-design.ja.md)
+<!-- /i18n-nav -->
+
 # Unified Clinical ECG Rules Design
 
 Date: 2026-07-12

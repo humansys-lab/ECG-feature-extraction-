@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](p_wave_onset_offset_consensus_analysis.md) | [English](p_wave_onset_offset_consensus_analysis.en.md) | [日本語](p_wave_onset_offset_consensus_analysis.ja.md)
+<!-- /i18n-nav -->
+
 # P 波 onset/offset 检测问题与共识增强分析
 
 本文聚焦当前 P 波相关检测，尤其是 `P onset` 和 `P offset` 偏差较大的原因，以及如何用“每个 lead 每个 beat -> 代表波形 -> 多 lead 共识”的方式增强稳定性。

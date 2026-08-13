@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecg_feature_extraction_algorithm.md) | [English](ecg_feature_extraction_algorithm.en.md) | [日本語](ecg_feature_extraction_algorithm.ja.md)
+<!-- /i18n-nav -->
+
 # ECG 特征提取算法逻辑与流程说明
 
 本文档基于当前仓库代码整理，日期为 2026-07-06。核心实现是

@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](philips_child_morphology_feature_schema_checklist.md) | [English](philips_child_morphology_feature_schema_checklist.en.md) | [日本語](philips_child_morphology_feature_schema_checklist.ja.md)
+<!-- /i18n-nav -->
+
 # Philips Pediatric Morphology Feature Schema Checklist
 
 ## 结论先行

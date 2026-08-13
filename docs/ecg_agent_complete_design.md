@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecg_agent_complete_design.md) | [English](ecg_agent_complete_design.en.md) | [日本語](ecg_agent_complete_design.ja.md)
+<!-- /i18n-nav -->
+
 # ECGAgent 完整设计文档
 
 > 文档状态：当前实现总览  

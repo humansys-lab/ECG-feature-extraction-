@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](deepseek_vs_qwen_v38_diverse50_results_tables.md) | [English](deepseek_vs_qwen_v38_diverse50_results_tables.en.md) | [日本語](deepseek_vs_qwen_v38_diverse50_results_tables.ja.md)
+<!-- /i18n-nav -->
+
 # DeepSeek vs Qwen（v38 diverse50）结果表格
 
 纯表格版，无正文说明；公式定义与逐条案例分析见 [`deepseek_vs_qwen_v38_diverse50_metrics.md`](deepseek_vs_qwen_v38_diverse50_metrics.md)；同一份数据的 Excel 多工作表版见 [`deepseek_vs_qwen_v38_diverse50_results.xlsx`](deepseek_vs_qwen_v38_diverse50_results.xlsx)。

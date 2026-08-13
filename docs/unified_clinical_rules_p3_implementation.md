@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](unified_clinical_rules_p3_implementation.md) | [English](unified_clinical_rules_p3_implementation.en.md) | [日本語](unified_clinical_rules_p3_implementation.ja.md)
+<!-- /i18n-nav -->
+
 # Unified Clinical Rules P3 Engineering Implementation
 
 Date: 2026-07-12

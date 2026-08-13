@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ludb_full_compare_result_analysis.md) | [English](ludb_full_compare_result_analysis.en.md) | [日本語](ludb_full_compare_result_analysis.ja.md)
+<!-- /i18n-nav -->
+
 # LUDB Full Compare 结果分析与改进建议
 
 分析对象：`/home/chtmedgemma/projects/ecg_gemma/ludb_full_compare`

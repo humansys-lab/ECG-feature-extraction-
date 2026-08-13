@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecg_agent_architecture_simple.md) | [English](ecg_agent_architecture_simple.en.md) | [日本語](ecg_agent_architecture_simple.ja.md)
+<!-- /i18n-nav -->
+
 # ECGAgent Simplified Architecture
 
 ![ECGAgent simplified architecture](ecg_agent_architecture_simple.svg)

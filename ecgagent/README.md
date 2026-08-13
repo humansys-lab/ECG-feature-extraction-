@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](README.md) | [English](README.en.md) | [日本語](README.ja.md)
+<!-- /i18n-nav -->
+
 # ECGAgent
 
 ECGAgent is a measurement-grounded diagnostic Agent for standard 12-lead ECG feature artifacts produced by ecgfeat. It is a research system, not a medical device.

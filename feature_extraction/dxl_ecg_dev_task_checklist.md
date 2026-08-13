@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](dxl_ecg_dev_task_checklist.md) | [English](dxl_ecg_dev_task_checklist.en.md) | [日本語](dxl_ecg_dev_task_checklist.ja.md)
+<!-- /i18n-nav -->
+
 # DXL-inspired ECG 边界定位开发任务清单
 
 > 目标：把当前库中的逐搏逐导联 P/QRS/T 边界定位模块，从“启发式第一版”升级为 **多导联 + 分组 + representative beat + 几何 T-end + 可靠性评分** 的完整测量内核。  

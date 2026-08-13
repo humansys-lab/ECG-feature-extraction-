@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](english_diagnostic_reference.md) | [English](english_diagnostic_reference.en.md) | [日本語](english_diagnostic_reference.ja.md)
+<!-- /i18n-nav -->
+
 # Concise 12-Lead ECG Diagnostic Reference
 
 This reference supports hypothesis planning only. Patient-specific conclusions must be established from ecgfeat measurements acquired in the current run.

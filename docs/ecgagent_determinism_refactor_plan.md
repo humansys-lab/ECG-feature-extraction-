@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecgagent_determinism_refactor_plan.md) | [English](ecgagent_determinism_refactor_plan.en.md) | [日本語](ecgagent_determinism_refactor_plan.ja.md)
+<!-- /i18n-nav -->
+
 # ECGAgent 确定性重构方案
 
 分析日期：2026-08-03

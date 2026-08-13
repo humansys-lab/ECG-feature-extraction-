@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecgfeat_diagnostic_contract_v10.md) | [English](ecgfeat_diagnostic_contract_v10.en.md) | [日本語](ecgfeat_diagnostic_contract_v10.ja.md)
+<!-- /i18n-nav -->
+
 # ecgfeat 诊断契约 v2026.07.10
 
 本版本将 `docs/流程` 中的“测量”和“诊断”分开实现：即使诊断门控失败，

@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](ecgfeat_neurokit_hybrid_improvement.md) | [English](ecgfeat_neurokit_hybrid_improvement.en.md) | [日本語](ecgfeat_neurokit_hybrid_improvement.ja.md)
+<!-- /i18n-nav -->
+
 # ecgfeat 吸收 NeuroKit2 优点的波形检测改进方案
 
 > 状态：R/P/T/S 定位与稳健 ST/J 测量旁路已实现，原测量与解释层保持不变  

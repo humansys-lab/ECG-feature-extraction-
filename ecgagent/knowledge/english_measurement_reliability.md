@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](english_measurement_reliability.md) | [English](english_measurement_reliability.en.md) | [日本語](english_measurement_reliability.ja.md)
+<!-- /i18n-nav -->
+
 # ECG Measurement Reliability Reference
 
 This reference describes how to weight ecgfeat observations; it is not patient evidence.

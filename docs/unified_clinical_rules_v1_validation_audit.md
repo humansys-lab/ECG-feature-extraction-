@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](unified_clinical_rules_v1_validation_audit.md) | [English](unified_clinical_rules_v1_validation_audit.en.md) | [日本語](unified_clinical_rules_v1_validation_audit.ja.md)
+<!-- /i18n-nav -->
+
 # 统一临床规则层 v1 —— 局限性与验收审计
 
 分析对象：

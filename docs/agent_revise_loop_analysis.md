@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](agent_revise_loop_analysis.md) | [English](agent_revise_loop_analysis.en.md) | [日本語](agent_revise_loop_analysis.ja.md)
+<!-- /i18n-nav -->
+
 # Agent 修订循环（revise）问题分析与改进清单
 
 分析日期：2026-08-01

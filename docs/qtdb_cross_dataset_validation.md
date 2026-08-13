@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](qtdb_cross_dataset_validation.md) | [English](qtdb_cross_dataset_validation.en.md) | [日本語](qtdb_cross_dataset_validation.ja.md)
+<!-- /i18n-nav -->
+
 # ecgfeat 跨数据集性能验证：QT Database（LUDB 之外）
 
 ## 1. 目的

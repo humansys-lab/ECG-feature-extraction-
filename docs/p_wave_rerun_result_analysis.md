@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](p_wave_rerun_result_analysis.md) | [English](p_wave_rerun_result_analysis.en.md) | [日本語](p_wave_rerun_result_analysis.ja.md)
+<!-- /i18n-nav -->
+
 # P 波相关重跑结果分析
 
 分析对象：`ludb_full_compare` 当前重跑结果。

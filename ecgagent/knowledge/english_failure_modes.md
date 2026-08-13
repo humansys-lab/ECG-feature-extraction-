@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](english_failure_modes.md) | [English](english_failure_modes.en.md) | [日本語](english_failure_modes.ja.md)
+<!-- /i18n-nav -->
+
 # ECG Agent Failure Modes
 
 This reference lists common reasoning failures that should trigger targeted falsification.

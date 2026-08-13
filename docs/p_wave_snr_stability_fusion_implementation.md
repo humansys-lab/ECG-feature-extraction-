@@ -1,3 +1,7 @@
+<!-- i18n-nav -->
+[中文](p_wave_snr_stability_fusion_implementation.md) | [English](p_wave_snr_stability_fusion_implementation.en.md) | [日本語](p_wave_snr_stability_fusion_implementation.ja.md)
+<!-- /i18n-nav -->
+
 # P 波局部 SNR、边界稳定度与稳健融合改造
 
 生成时间：2026-07-28
