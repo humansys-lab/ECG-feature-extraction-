@@ -3,7 +3,7 @@
 # start_model.sh may still be loading; the UI shows that state.
 #
 #   ./webchat/start_ui.sh            # medgemma → :7860
-#   ./webchat/start_ui.sh qwen3.6    # qwen3.6  → :7861
+#   ./webchat/start_ui.sh qwen3.8    # qwen3.8  → :7861
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

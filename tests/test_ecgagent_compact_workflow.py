@@ -405,13 +405,24 @@ def test_candidate_specific_morphology_views_are_not_collapsed_by_tool_name():
     decision_schema = runtime.response_schema["properties"]["decisions"]
     assert decision_schema["minItems"] == 2
     assert decision_schema["maxItems"] == 2
-    decision_options = decision_schema["items"]["oneOf"]
+    assert "uniqueItems" not in decision_schema
+    assert decision_schema["items"] is False
+    decision_options = decision_schema["prefixItems"]
     assert {
         option["properties"]["id"]["enum"][0]
         for option in decision_options
     } == {"h1", "h2"}
     assert all(
         option["properties"]["pathway_steps"]["minItems"] >= 1
+        for option in decision_options
+    )
+    assert all(
+        "uniqueItems" not in option["properties"]["pathway_steps"]
+        for option in decision_options
+    )
+    assert all(
+        option["properties"]["pathway_steps"]["items"] is False
+        and option["properties"]["pathway_steps"]["prefixItems"]
         for option in decision_options
     )
 

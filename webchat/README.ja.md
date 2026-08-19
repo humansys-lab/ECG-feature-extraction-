@@ -22,7 +22,7 @@
 | プロファイル | モデル | UIポート | モデルポート | GPU | 特徴 |
 | --- | --- | --- | --- | --- | --- |
 | `medgemma` | MedGemma-27B | 7860 | 8000 | 0 | テキスト専用、医療/ECG 特化 |
-| `qwen3.6` | Qwen3.6-27B | 7861 | 8001 | 3 | マルチモーダル（画像認識可能）+ 思考モード |
+| `qwen3.8` | Qwen3.8-27B | 7861 | 8001 | 3 | マルチモーダル（画像認識可能）+ 思考モード |
 
 2つのプロファイルのポートは競合せず、同時に起動できます。すべてのパラメータは [models.json](models.json) にあり、
 新しいモデルを追加するにはそこにセクションを追加するだけです。
@@ -32,7 +32,7 @@
 
 ```bash
 ./webchat/start_all.sh              # MedGemma（默认档案）→ http://localhost:7860
-./webchat/start_all.sh qwen3.6      # Qwen3.6            → http://localhost:7861
+./webchat/start_all.sh qwen3.8      # Qwen3.8            → http://localhost:7861
 ```
 
 スクリプトはまずモデルサービスを開始し、重みの読み込みが完了してからUIを起動します。Ctrl+Cで両方を同時に停止します。初回読み込みでは、約50 GBの重みには通常数分かかります。
@@ -40,8 +40,8 @@
 日常的なフロントエンドの修正では、別々に起動することをお勧めします。これにより、UIを再起動してもモデルを再読み込みする必要がなくなります：
 
 ```bash
-./webchat/start_model.sh qwen3.6    # 终端 1：模型服务，一直开着
-./webchat/start_ui.sh    qwen3.6    # 终端 2：网页界面，随便重启
+./webchat/start_model.sh qwen3.8    # 终端 1：模型服务，一直开着
+./webchat/start_ui.sh    qwen3.8    # 终端 2：网页界面，随便重启
 ```
 
 <a id="远程访问"></a>
@@ -66,13 +66,13 @@ ssh -L 7860:<容器IP>:7860 <user>@<host>
 | `CHAT_PROFILE` | 使用するプロファイル（スクリプトの最初の引数として直接指定することも可能） |
 | `CHAT_GPUS` | 使用するGPUカード、`CUDA_VISIBLE_DEVICES` と同等 |
 | `CHAT_TP` | テンソル並列度、マルチカード時は `CHAT_GPUS` のカード数と一致させる必要があります |
-| `CHAT_MAX_LEN` | コンテキスト長の上限（MedGemma 重みは128kまで、Qwen3.6は256kまでサポート） |
+| `CHAT_MAX_LEN` | コンテキスト長の上限（MedGemma 重みは128kまで、Qwen3.8は256kまでサポート） |
 | `CHAT_GPU_UTIL` | 単一カードのVRAM使用率 |
 | `CHAT_PORT` / `CHAT_UI_PORT` | モデルサービス / Web UIのポート |
 | `CHAT_BASE_URL` | UIが接続するモデルサービスのアドレス |
 | `CHAT_UI_HOST` | UIのリスニングアドレス、デフォルトは `0.0.0.0` |
 
-デュアルカードの例：`CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_all.sh qwen3.6`
+デュアルカードの例：`CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_all.sh qwen3.8`
 
 <a id="界面功能"></a>
 ## UI機能
@@ -94,7 +94,7 @@ ssh -L 7860:<容器IP>:7860 <user>@<host>
 
 - モデルサービスは `127.0.0.1` のみをリスニングしますが、Web UIはデフォルトで `0.0.0.0` をリスニングし、他のマシンからのアクセスを容易にします。
   このマシンが共有ネットワーク内にある場合は、`CHAT_UI_HOST=127.0.0.1` に変更しポートフォワーディングを使用してください。UI自体には認証機能がないためです。
-- MedGemma のチェックポイントは `Gemma3ForCausalLM`（純粋なテキスト）であり、画像を読み込めません；ECG として提供できるのは特徴量 JSON またはテキストレポートのみです。Qwen3.6 は `Qwen3_5ForConditionalGeneration` であり、画像を読み込めます。
+- MedGemma のチェックポイントは `Gemma3ForCausalLM`（純粋なテキスト）であり、画像を読み込めません；ECG として提供できるのは特徴量 JSON またはテキストレポートのみです。Qwen3.8 は `Qwen3_5ForConditionalGeneration` であり、画像を読み込めます。
 - Gemmaのチャットテンプレートは user/assistant の厳格な交互性を要求しますが、`server.py` は同じ役割の隣接メッセージを自動的にマージするため、フロントエンドは連続して2つのメッセージを送信してもエラーになりません。
 - 添付ファイルの本文はサービスプロセスのメモリに保存され、UIプロセスを再起動すると古い添付ファイルは無効になります（テキスト履歴は保持されます）。
 - これは汎用チャットエントリポイントであり、生モデルを使用します；ツール呼び出しと証拠検証を伴う診断ワークフローは依然として `ecgagent/` 内にあります。

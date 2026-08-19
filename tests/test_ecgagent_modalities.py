@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ecgagent.agent.diagnostic import DIAGNOSTIC_TOOLS, ECGDiagnosticAgent
 from ecgagent.backends.mock import ScriptedBackend
+from ecgagent.evidence.model_view import build_model_evidence_view
 from ecgagent.evidence.store import EvidenceStore
 from ecgagent.tools.registry import build_default_registry
 from tests.test_ecgagent_tools import _payload
@@ -402,6 +403,21 @@ def test_qt_failure_context_keeps_residual_t_wave_evidence_visible():
     assert "/representative_leads/I/params/t_amp_mv" in result.citations
     assert "/beat_features/0/flags" in result.citations
 
+    # Dense adjudication phases can retain only two atoms from this otherwise
+    # wide view.  Those two must still make the required interval context
+    # possible: one interval-status atom and one residual T-wave atom.
+    view = build_model_evidence_view(
+        store,
+        tool="get_interval_waveform_context",
+        arguments={"interval": "qt"},
+        rendered_text=rendered,
+        citations=result.citations,
+        max_atoms=2,
+    )
+    assert len(view.citations) == 2
+    assert "/global_features/qt_reliability" in view.citations
+    assert any("/params/t_" in pointer for pointer in view.citations)
+
 
 def test_pr_failure_context_separates_p_visibility_from_p_qrs_association():
     payload = _modality_payload()
@@ -421,6 +437,18 @@ def test_pr_failure_context_separates_p_visibility_from_p_qrs_association():
     assert "does not prove that P waves are absent" in rendered
     assert "/rhythm_inputs/record/availability/pr_available" in result.citations
     assert "/representative_leads/I/params/p_amp_mv" in result.citations
+
+    view = build_model_evidence_view(
+        store,
+        tool="get_interval_waveform_context",
+        arguments={"interval": "pr"},
+        rendered_text=rendered,
+        citations=result.citations,
+        max_atoms=2,
+    )
+    assert len(view.citations) == 2
+    assert "/global_features/pr_ms" in view.citations
+    assert any("/params/p_" in pointer for pointer in view.citations)
 
 
 def test_diagnostic_tool_set_contains_modalities_but_no_knowledge_or_rule_tools():

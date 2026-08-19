@@ -15,11 +15,11 @@
     "default_max_tokens": 2048,
     "system_prompt": "你是 MedGemma，一个心电图（ECG）与临床医学助手。回答遵循以下要求：\n- 用清晰的中文作答，专业术语可保留英文缩写（如 LBBB、QTc）。\n- 基于用户提供的测量值和上下文推理；证据不足时明确说明不确定性，不要编造数值。\n- 涉及诊断时，给出主要考虑、支持证据、反证与鉴别诊断。\n- 结论仅供研究与教学参考，不能替代执业医师的判断。"
   },
-  "qwen3.6": {
-    "label": "Qwen3.6-27B",
+  "qwen3.8": {
+    "label": "Qwen3.8-27B",
     "icon": "🧠",
-    "path": "/workspace/ecg_gemma/qwen3.6-27b",
-    "served_name": "qwen3.6-27b",
+    "path": "/workspace/ecg_gemma/qwen3.8-27b",
+    "served_name": "qwen3.8-27b",
     "port": 8001,
     "ui_port": 7861,
     "gpus": "3",

@@ -2248,7 +2248,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "provider model id or local checkpoint path. Defaults to "
-            "deepseek-v4-pro, qwen3.6-27b for qwen-local, or "
+            "deepseek-v4-pro, qwen3.8-27b for qwen-local, or "
             "/workspace/ecg_gemma/medgemma-27b for medgemma-local"
         ),
     )
@@ -2385,7 +2385,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         model = args.model or (
             "/workspace/ecg_gemma/medgemma-27b"
             if backend_name == "medgemma-local"
-            else "qwen3.6-27b"
+            else "qwen3.8-27b"
             if backend_name == "qwen-local"
             else "deepseek-v4-pro"
         )

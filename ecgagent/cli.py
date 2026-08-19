@@ -166,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help=(
             "model id or local checkpoint path (qwen-local default served "
-            "model: qwen3.6-27b; in-process local default: "
+            "model: qwen3.8-27b; in-process local default: "
             "/workspace/ecg_gemma/medgemma-27b)"
         ),
     )

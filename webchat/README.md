@@ -19,7 +19,7 @@
 | 档案 | 模型 | 界面端口 | 模型端口 | GPU | 特点 |
 | --- | --- | --- | --- | --- | --- |
 | `medgemma` | MedGemma-27B | 7860 | 8000 | 0 | 纯文本，医学/ECG 专用 |
-| `qwen3.6` | Qwen3.6-27B | 7861 | 8001 | 3 | 多模态（能读图）+ 思考模式 |
+| `qwen3.8` | Qwen3.8-27B | 7861 | 8001 | 3 | 多模态（能读图）+ 思考模式 |
 
 两个档案端口不冲突，可以同时开着。全部参数在 [models.json](models.json) 里，
 加一个新模型就是往里面加一段。
@@ -28,7 +28,7 @@
 
 ```bash
 ./webchat/start_all.sh              # MedGemma（默认档案）→ http://localhost:7860
-./webchat/start_all.sh qwen3.6      # Qwen3.6            → http://localhost:7861
+./webchat/start_all.sh qwen3.8      # Qwen3.8            → http://localhost:7861
 ```
 
 脚本会先起模型服务、等权重加载完，再拉起界面；Ctrl+C 同时停掉两个。首次加载
@@ -37,8 +37,8 @@
 日常改前端建议分开起，这样重启界面不用重载模型：
 
 ```bash
-./webchat/start_model.sh qwen3.6    # 终端 1：模型服务，一直开着
-./webchat/start_ui.sh    qwen3.6    # 终端 2：网页界面，随便重启
+./webchat/start_model.sh qwen3.8    # 终端 1：模型服务，一直开着
+./webchat/start_ui.sh    qwen3.8    # 终端 2：网页界面，随便重启
 ```
 
 ## 远程访问
@@ -61,13 +61,13 @@ ssh -L 7860:<容器IP>:7860 <user>@<host>
 | `CHAT_PROFILE` | 用哪个档案（也可以直接作为脚本的第一个参数） |
 | `CHAT_GPUS` | 用哪几张卡，等价于 `CUDA_VISIBLE_DEVICES` |
 | `CHAT_TP` | 张量并行度，多卡时要和 `CHAT_GPUS` 的卡数一致 |
-| `CHAT_MAX_LEN` | 上下文长度上限（MedGemma 权重支持到 128k，Qwen3.6 到 256k） |
+| `CHAT_MAX_LEN` | 上下文长度上限（MedGemma 权重支持到 128k，Qwen3.8 到 256k） |
 | `CHAT_GPU_UTIL` | 单卡显存占用比例 |
 | `CHAT_PORT` / `CHAT_UI_PORT` | 模型服务 / 网页界面端口 |
 | `CHAT_BASE_URL` | 界面连接的模型服务地址 |
 | `CHAT_UI_HOST` | 界面监听地址，默认 `0.0.0.0` |
 
-双卡示例：`CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_all.sh qwen3.6`
+双卡示例：`CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_all.sh qwen3.8`
 
 ## 界面功能
 
@@ -91,7 +91,7 @@ ssh -L 7860:<容器IP>:7860 <user>@<host>
   如果这台机器在共享网络里，改成 `CHAT_UI_HOST=127.0.0.1` 并用端口转发，因为界面
   本身没有任何鉴权。
 - MedGemma 的 checkpoint 是 `Gemma3ForCausalLM`（纯文本），不能读图；给它的 ECG
-  只能是特征 JSON 或文本报告。Qwen3.6 是 `Qwen3_5ForConditionalGeneration`，可以读图。
+  只能是特征 JSON 或文本报告。Qwen3.8 是 `Qwen3_5ForConditionalGeneration`，可以读图。
 - Gemma 的对话模板要求 user/assistant 严格交替，`server.py` 会自动合并同角色的
   相邻消息，所以前端不会因为连发两条而报错。
 - 附件正文存在服务进程内存里，重启界面进程后旧附件失效（历史文字记录仍在）。

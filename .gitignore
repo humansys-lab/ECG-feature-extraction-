@@ -42,7 +42,7 @@ htmlcov/
 
 # Local model weights and inference outputs
 /medgemma-27b/
-/qwen3.6-27b/
+/qwen3.8-27b/
 /qwen_agent_output/
 /deepseek_v4pro_05490_v12/
 *.safetensors

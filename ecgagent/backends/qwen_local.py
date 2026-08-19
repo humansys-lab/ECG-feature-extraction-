@@ -25,7 +25,7 @@ from .base import BackendCapabilities, LLMResponse, ToolCall, ToolOutcome
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
-DEFAULT_MODEL = "qwen3.6-27b"
+DEFAULT_MODEL = "qwen3.8-27b"
 DEFAULT_MAX_TOKENS = 8192
 DEFAULT_TIMEOUT_S = 600.0
 # Qwen 27B can address a much larger physical context window, but exact

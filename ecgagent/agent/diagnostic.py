@@ -343,6 +343,7 @@ def diagnostic_phases(store: EvidenceStore) -> tuple[PhaseSpec, ...]:
 
 def _diagnostic_prompt_fingerprint() -> str:
     from ..tools import modalities, query, survey
+    from ..evidence.model_view import MODEL_EVIDENCE_VIEW_VERSION
     from ..knowledge.challenger import (
         CHALLENGE_VERSION,
         KNOWLEDGE_CHALLENGE_SCHEMA,
@@ -413,6 +414,7 @@ def _diagnostic_prompt_fingerprint() -> str:
             json.dumps(RUNTIME_CATEGORIES),
             NAVIGATION_VERSION,
             RULE_SECOND_OPINION_VERSION,
+            MODEL_EVIDENCE_VIEW_VERSION,
         ]
     )
     return hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
@@ -2664,23 +2666,18 @@ class ECGDiagnosticAgent(ECGAgent):
                 step_options.append(step_schema)
             pathway_steps["minItems"] = len(step_options)
             pathway_steps["maxItems"] = len(step_options)
-            pathway_steps["uniqueItems"] = True
-            pathway_steps["items"] = (
-                step_options[0]
-                if len(step_options) == 1
-                else {"oneOf": step_options}
-            )
+            # vLLM's structured-output grammar rejects ``uniqueItems``.  A
+            # positional tuple is both supported and stronger here: every
+            # planned step must occur exactly once and in plan order.
+            pathway_steps["prefixItems"] = step_options
+            pathway_steps["items"] = False
             decision_options.append(candidate_schema)
 
         decisions_schema["minItems"] = len(decision_options)
         decisions_schema["maxItems"] = len(decision_options)
-        decisions_schema["uniqueItems"] = True
         if decision_options:
-            decisions_schema["items"] = (
-                decision_options[0]
-                if len(decision_options) == 1
-                else {"oneOf": decision_options}
-            )
+            decisions_schema["prefixItems"] = decision_options
+            decisions_schema["items"] = False
         return schema
 
     def _compact_candidate_pathway_calls(

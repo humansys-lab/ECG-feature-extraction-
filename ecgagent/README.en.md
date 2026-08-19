@@ -100,7 +100,7 @@ cd /workspace/ecg_gemma
   --record-id 09025_hr \
   --agent \
   --backend qwen-local \
-  --model qwen3.6-27b \
+  --model qwen3.8-27b \
   --qwen-base-url http://127.0.0.1:8000/v1 \
   --diagnostic-workflow compact
 ```
@@ -115,7 +115,7 @@ cd /workspace/ecg_gemma
 .venv/bin/python -m ecgagent.batch diagnose \
   --output-dir /workspace/ecg_gemma/qwen_agent_output/qwen_english_run \
   --backend qwen-local \
-  --model qwen3.6-27b \
+  --model qwen3.8-27b \
   --qwen-base-url http://127.0.0.1:8000/v1 \
   --diagnostic-workflow compact \
   --agent-workers 2 \

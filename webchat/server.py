@@ -9,9 +9,9 @@ One instance serves one model, selected by ``CHAT_PROFILE`` against
 ``webchat/models.json``.  Run several instances on different ports to keep
 several models available at once.
 
-    CHAT_PROFILE=qwen3.6 .venv/bin/python -m uvicorn webchat.server:app --port 7861
+    CHAT_PROFILE=qwen3.8 .venv/bin/python -m uvicorn webchat.server:app --port 7861
 
-or just ``webchat/start_all.sh qwen3.6``.
+or just ``webchat/start_all.sh qwen3.8``.
 """
 from __future__ import annotations
 

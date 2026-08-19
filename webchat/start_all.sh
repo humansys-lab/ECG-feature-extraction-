@@ -4,7 +4,7 @@
 # foreground. Ctrl+C stops both.
 #
 #   ./webchat/start_all.sh            # medgemma → UI :7860, model :8000
-#   ./webchat/start_all.sh qwen3.6    # qwen3.6  → UI :7861, model :8001
+#   ./webchat/start_all.sh qwen3.8    # qwen3.8  → UI :7861, model :8001
 #
 # Different profiles use different ports, so several models can run at once.
 set -euo pipefail

@@ -21,7 +21,7 @@ from .ledger import visible_citations
 from .store import EvidenceStore, EvidenceValue
 
 
-MODEL_EVIDENCE_VIEW_VERSION = "ecgagent.model-evidence.v3"
+MODEL_EVIDENCE_VIEW_VERSION = "ecgagent.model-evidence.v4"
 DEFAULT_VIEW_CHAR_LIMIT = 6_000
 OVERVIEW_VIEW_CHAR_LIMIT = 14_000
 DEFAULT_MAX_ATOMS = 48
@@ -253,6 +253,48 @@ def _field_priority(tool: str, arguments: Mapping[str, Any]) -> tuple[str, ...]:
     return _TOOL_FIELD_PRIORITY.get(tool, ())
 
 
+def _interval_contract_prefix(
+    values: list[EvidenceValue], arguments: Mapping[str, Any]
+) -> list[EvidenceValue]:
+    """Put interval status and one residual waveform atom before wide tables.
+
+    The rolling backend budget commonly retains only the first two atoms from
+    each tool when many disease-specific views share a phase.  A limited
+    interval must still expose both why the interval is limited and one P- or
+    T-wave component; otherwise the required interval-context contract is
+    impossible to complete even though the raw tool result contains the data.
+    """
+
+    interval = str(arguments.get("interval") or "").lower()
+    field_groups = (
+        (
+            ("qt_reliability", "qt_reportable", "qt_ms"),
+            ("t_amp_mv", "t_polarity", "reliable_for_t"),
+        )
+        if interval in {"qt", "qtc", "qt_qtc"}
+        else (
+            ("pr_ms", "pr_available", "pr_reliability"),
+            ("p_amp_mv", "p_dur_ms", "reliable_for_p"),
+        )
+    )
+    prefix: list[EvidenceValue] = []
+    used: set[str] = set()
+    for fields in field_groups:
+        match = next(
+            (
+                value
+                for field in fields
+                for value in values
+                if value.pointer not in used and _field_name(value) == field
+            ),
+            None,
+        )
+        if match is not None:
+            prefix.append(match)
+            used.add(match.pointer)
+    return [*prefix, *(value for value in values if value.pointer not in used)]
+
+
 def _fair_evidence_order(
     values: list[EvidenceValue],
     *,
@@ -321,6 +363,8 @@ def _fair_evidence_order(
         for group in remaining:
             if index < len(group):
                 ordered.append(group[index])
+    if tool == "get_interval_waveform_context":
+        return _interval_contract_prefix(ordered, arguments)
     return ordered
 
 

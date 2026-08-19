@@ -21,7 +21,7 @@ Splitting into two processes is intentional: the model is loaded once and remain
 | Profile | Model | UI Port | Model Port | GPU | Features |
 | --- | --- | --- | --- | --- | --- |
 | `medgemma` | MedGemma-27B | 7860 | 8000 | 0 | Text-only, specialized for medicine/ECG |
-| `qwen3.6` | Qwen3.6-27B | 7861 | 8001 | 3 | Multimodal (can read images) + thinking mode |
+| `qwen3.8` | Qwen3.8-27B | 7861 | 8001 | 3 | Multimodal (can read images) + thinking mode |
 
 The ports for the two profiles do not conflict, so they can be run simultaneously. All parameters are in [models.json](models.json), and adding a new model simply involves adding a new entry there.
 
@@ -30,7 +30,7 @@ The ports for the two profiles do not conflict, so they can be run simultaneousl
 
 ```bash
 ./webchat/start_all.sh              # MedGemma（默认档案）→ http://localhost:7860
-./webchat/start_all.sh qwen3.6      # Qwen3.6            → http://localhost:7861
+./webchat/start_all.sh qwen3.8      # Qwen3.8            → http://localhost:7861
 ```
 
 The script first starts the model service, waits for the weights to finish loading, and then launches the interface; pressing Ctrl+C stops both simultaneously. The initial loading of weights, which are typically around 50 GB, usually takes a few minutes.
@@ -38,8 +38,8 @@ The script first starts the model service, waits for the weights to finish loadi
 For routine frontend modifications, it is recommended to start them separately so that restarting the interface does not require reloading the model:
 
 ```bash
-./webchat/start_model.sh qwen3.6    # 终端 1：模型服务，一直开着
-./webchat/start_ui.sh    qwen3.6    # 终端 2：网页界面，随便重启
+./webchat/start_model.sh qwen3.8    # 终端 1：模型服务，一直开着
+./webchat/start_ui.sh    qwen3.8    # 终端 2：网页界面，随便重启
 ```
 
 <a id="远程访问"></a>
@@ -64,13 +64,13 @@ Any `CHAT_*` variable will override the settings in the models.json profile:
 | `CHAT_PROFILE` | Which profile to use (can also be passed directly as the first argument to the script) |
 | `CHAT_GPUS` | Which GPUs to use, equivalent to `CUDA_VISIBLE_DEVICES` |
 | `CHAT_TP` | Tensor parallelism; when using multiple GPUs, this must match the number of GPUs in `CHAT_GPUS` |
-| `CHAT_MAX_LEN` | Maximum context length (MedGemma weights support up to 128k, Qwen3.6 up to 256k) |
+| `CHAT_MAX_LEN` | Maximum context length (MedGemma weights support up to 128k, Qwen3.8 up to 256k) |
 | `CHAT_GPU_UTIL` | Proportion of VRAM used per GPU |
 | `CHAT_PORT` / `CHAT_UI_PORT` | Model service / Web UI port |
 | `CHAT_BASE_URL` | Model service address for the UI to connect to |
 | `CHAT_UI_HOST` | UI listening address, default is `0.0.0.0` |
 
-Dual-GPU example: `CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_all.sh qwen3.6`
+Dual-GPU example: `CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_all.sh qwen3.8`
 
 <a id="界面功能"></a>
 ## UI Features
@@ -95,7 +95,7 @@ Dual-GPU example: `CHAT_GPUS=0,3 CHAT_TP=2 CHAT_MAX_LEN=131072 ./webchat/start_a
   If this machine is on a shared network, change it to `CHAT_UI_HOST=127.0.0.1` and use port forwarding, as the UI
   has no authentication.
 - The checkpoint for MedGemma is `Gemma3ForCausalLM` (text-only) and cannot read images; the ECG
-  provided to it must be feature JSON or text reports. Qwen3.6 is `Qwen3_5ForConditionalGeneration` and can read images.
+  provided to it must be feature JSON or text reports. Qwen3.8 is `Qwen3_5ForConditionalGeneration` and can read images.
 - Gemma's chat template requires strict alternation between user/assistant; `server.py` automatically merges adjacent messages from the same role, so the frontend won't error out if two messages are sent consecutively.
 - Attachment content is stored in the service process's memory; old attachments become invalid after restarting the UI process (though historical text records remain).
 - This is a general chat entry point using the raw model; the diagnostic workflow with tool calls and evidence verification remains in

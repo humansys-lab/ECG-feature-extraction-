@@ -2,8 +2,8 @@
 # Serve one local checkpoint over an OpenAI-compatible HTTP API.
 #
 #   ./webchat/start_model.sh                 # medgemma (default profile)
-#   ./webchat/start_model.sh qwen3.6
-#   CHAT_GPUS=1,2 CHAT_TP=2 ./webchat/start_model.sh qwen3.6
+#   ./webchat/start_model.sh qwen3.8
+#   CHAT_GPUS=1,2 CHAT_TP=2 ./webchat/start_model.sh qwen3.8
 #
 # Per-model defaults (path, port, GPU, context length) live in models.json;
 # any CHAT_* environment variable overrides the profile.

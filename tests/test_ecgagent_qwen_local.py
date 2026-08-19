@@ -45,7 +45,7 @@ def _completion(*, tool: bool = True, content: str | None = None):
         refusal=None,
     )
     return SimpleNamespace(
-        model="qwen3.6-27b",
+        model="qwen3.8-27b",
         choices=[SimpleNamespace(finish_reason=finish_reason, message=message)],
         usage=SimpleNamespace(
             prompt_tokens=20,

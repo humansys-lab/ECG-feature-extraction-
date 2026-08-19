@@ -32,7 +32,7 @@ LOCAL_TRANSLATE_URLS = tuple(
     for item in os.getenv("DOC_TRANSLATE_LOCAL_URL", "").split(",")
     if item.strip()
 )
-LOCAL_TRANSLATE_MODEL = os.getenv("DOC_TRANSLATE_LOCAL_MODEL", "qwen3.6-27b-docs")
+LOCAL_TRANSLATE_MODEL = os.getenv("DOC_TRANSLATE_LOCAL_MODEL", "qwen3.8-27b-docs")
 LOCAL_URL_LOCK = threading.Lock()
 LOCAL_URL_INDEX = 0
 NAV_START = "<!-- i18n-nav -->"

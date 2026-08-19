@@ -15,7 +15,7 @@ from .runtime import (
 )
 from .safety_policy import CLINICAL_SAFETY_POLICY_VERSION
 
-DIAGNOSTIC_AGENT_PROTOCOL_VERSION = "ecgagent.diagnostic.v39"
+DIAGNOSTIC_AGENT_PROTOCOL_VERSION = "ecgagent.diagnostic.v40"
 
 DIAGNOSTIC_DOMAINS: tuple[str, ...] = (
     "quality",
@@ -100,16 +100,19 @@ class RuntimeLimits:
 
 @dataclass(frozen=True)
 class PhasePolicy:
-    # Default v38 deterministic-fact/pathway-gated small-model workflow. Legacy five-stage
+    # Default v40 deterministic-fact/pathway-gated small-model workflow. Legacy five-stage
     # ceilings remain
     # below for reproducibility with older traces.
     # Disease-dense records can legitimately fill all six plan candidates.
     # In the 200-record enriched replay, two plans were cut in the final JSON
     # field at 1,200 tokens and one adjudication was cut at 2,200.  The extra
     # headroom is cheaper than repeating the complete record after a
-    # deterministic tail truncation.
+    # deterministic tail truncation. A later disease-dense trace still hit
+    # the 2,800-token adjudication ceiling twice on the same record after the
+    # exact per-plan schema made every model-owned step mandatory, so v40
+    # raises only that terminal structured-output budget.
     compact_plan_max_tokens: int = 1600
-    compact_adjudicate_max_tokens: int = 2800
+    compact_adjudicate_max_tokens: int = 4096
     # This is an absolute ceiling, not a call target. The compact runtime
     # derives the effective budget from the named candidate checks, so simple
     # records may stop after only a few high-information views while complex
