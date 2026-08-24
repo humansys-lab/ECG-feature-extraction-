@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import warnings
 from unittest.mock import patch
 
 import numpy as np
@@ -16,6 +17,7 @@ from feature_extraction.ecgfeat.interpret import (
 from feature_extraction.ecgfeat.models import LeadBeatFeatures, LeadQuality, STANDARD_12_LEADS, WaveBounds
 from feature_extraction.ecgfeat.quality import (
     compute_adjacent_precordial_correlations,
+    detect_limb_lead_reversal,
     detect_precordial_reversal,
 )
 
@@ -88,6 +90,17 @@ def _make_beat_feature(lead: str, beat_id: int, r_amp_mv: float) -> LeadBeatFeat
 
 
 class LeadReversalTests(unittest.TestCase):
+    def test_flat_limb_leads_do_not_emit_correlation_warnings(self) -> None:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result = detect_limb_lead_reversal(
+                np.zeros((12, 1000), dtype=float)
+            )
+
+        self.assertFalse(result["probable_ra_la"])
+        self.assertFalse(result["probable_ra_ll"])
+        self.assertFalse(result["probable_la_ll"])
+
     def test_detect_precordial_reversal_returns_structured_payload(self) -> None:
         result = detect_precordial_reversal(
             _r_metrics({"V1": 0.2, "V2": 0.9, "V3": 0.3, "V4": 1.0, "V5": 0.4, "V6": 0.8})

@@ -139,6 +139,29 @@ def test_quality_stop_bypasses_the_model_with_non_diagnostic_output():
     assert result.verdict["quality_assessment"]["interpretability"] == "non_diagnostic"
 
 
+def test_missing_or_incomplete_quality_gate_fails_closed_without_model_calls():
+    for invalid_gate in (None, "pass", {"state": "pass"}):
+        payload = _payload()
+        if invalid_gate is None:
+            payload["metadata"].pop("diagnostic_gate", None)
+        else:
+            payload["metadata"]["diagnostic_gate"] = invalid_gate
+        backend = ScriptedBackend(script=[])
+
+        result = ECGDiagnosticAgent(
+            store=EvidenceStore.from_dict(payload, record_id="INVALID-GATE"),
+            backend=backend,
+            knowledge_guidance=False,
+        ).run()
+
+        assert result.ok and result.verified
+        assert result.phases[0].turns == 0
+        assert result.verdict["diagnoses"] == []
+        assert result.audit["diagnostic_gate_validation"]["source"] == (
+            "fail_closed_validation"
+        )
+
+
 def test_urgent_review_is_a_versioned_routing_flag_not_a_diagnosis():
     payload = _payload()
     payload["global_features"]["heart_rate_bpm"] = 35.0
@@ -150,6 +173,35 @@ def test_urgent_review_is_a_versioned_routing_flag_not_a_diagnosis():
     assert assessment["do_not_delay_human_review"] is True
     assert assessment["triggers"][0]["code"] == "extreme_bradycardia_measurement"
     assert assessment["unassessed_categories"]
+
+
+def test_pediatric_age_days_disables_adult_urgent_rate_thresholds():
+    payload = _payload()
+    payload["metadata"]["patient_meta"].update({"age": 40, "age_days": 30})
+    payload["global_features"]["heart_rate_bpm"] = 160.0
+
+    assessment = assess_urgent_review(
+        EvidenceStore.from_dict(payload, record_id="INFANT-ROUTE").diagnostic_view()
+    )
+
+    assert assessment["adult_thresholds_applicable"] is False
+    assert not any(
+        row["code"] == "extreme_tachycardia_measurement"
+        for row in assessment["triggers"]
+    )
+    assert "pediatric_or_unknown_age_rate_qrs_qtc_thresholds" in assessment[
+        "unassessed_categories"
+    ]
+
+
+def test_nonadult_pathways_leave_adjudication_steps_model_owned():
+    path = build_diagnostic_pathway(
+        "right_ventricular_hypertrophy",
+        program_owned=False,
+    )
+
+    assert path["steps"]
+    assert {step["owner"] for step in path["steps"]} == {"model"}
 
 
 def test_phase_contracts_are_compact_and_phase_specific():

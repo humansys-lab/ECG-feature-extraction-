@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import hashlib
 import json
 import math
 import os
@@ -25,6 +26,7 @@ import traceback
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -42,6 +44,7 @@ from ecgfeat.models import PatientMeta, STANDARD_12_LEADS
 
 DATASET_PTBXL = "00000"
 DATASET_LOCAL = "010"
+TARGET_EXTRACTION_ARTIFACT_VERSION = "ecgfeat.target-evaluation-artifact.v1"
 
 PTBXL_T_WAVE_CODES = frozenset({"NDT", "LOWT", "NT_", "INVT", "TAB_"})
 PTBXL_ISCHEMIA_ST_CODES = frozenset(
@@ -776,6 +779,65 @@ def _compact_clinical(clinical: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _hash_file(path: Path, digest: Any) -> None:
+    digest.update(path.name.encode("utf-8"))
+    digest.update(b"\0")
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+
+@lru_cache(maxsize=1)
+def _extractor_code_fingerprint() -> str:
+    digest = hashlib.sha256()
+    source_root = FEATURE_ROOT / "ecgfeat"
+    for path in sorted(source_root.rglob("*.py")):
+        digest.update(str(path.relative_to(source_root)).encode("utf-8"))
+        digest.update(b"\0")
+        _hash_file(path, digest)
+    return "sha256:" + digest.hexdigest()
+
+
+def _target_extraction_contract(
+    manifest_row: Mapping[str, Any],
+    *,
+    fs_internal: int,
+    enable_pacing: bool,
+) -> dict[str, Any] | None:
+    base = Path(str(manifest_row.get("record_path") or ""))
+    source_files = sorted(
+        path for path in base.parent.glob(base.name + ".*") if path.is_file()
+    )
+    if not source_files:
+        return None
+    digest = hashlib.sha256()
+    for path in source_files:
+        _hash_file(path, digest)
+    digest.update(
+        json.dumps(
+            {
+                "record": manifest_row.get("record"),
+                "age": manifest_row.get("age"),
+                "age_days": manifest_row.get("age_days"),
+                "sex": manifest_row.get("sex"),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    return {
+        "schema_version": TARGET_EXTRACTION_ARTIFACT_VERSION,
+        "source_fingerprint": "sha256:" + digest.hexdigest(),
+        "extractor_code_fingerprint": _extractor_code_fingerprint(),
+        "config": {
+            "fs_internal": int(fs_internal),
+            "mains_freq": 50,
+            "enable_pacing": bool(enable_pacing),
+        },
+    }
+
+
 def _extract_one(
     task: tuple[dict[str, Any], int, bool],
 ) -> dict[str, Any]:
@@ -797,6 +859,12 @@ def _extract_one(
             "reference_policy",
         )
     }
+    base["age_days"] = manifest_row.get("age_days")
+    extraction_contract = _target_extraction_contract(
+        manifest_row,
+        fs_internal=fs_internal,
+        enable_pacing=enable_pacing,
+    )
     try:
         ecg, fs = _load_record(Path(manifest_row["record_path"]))
         extractor = ECGFeatureExtractor(
@@ -809,6 +877,7 @@ def _extract_one(
             fs=fs,
             meta=PatientMeta(
                 age=manifest_row.get("age"),
+                age_days=manifest_row.get("age_days"),
                 sex=manifest_row.get("sex"),
             ),
         )
@@ -834,6 +903,7 @@ def _extract_one(
             "pacing_state": metadata.get("pacing_state"),
             "global": _global_summary(result),
             "clinical": _compact_clinical(clinical),
+            "extraction_contract": extraction_contract,
         }
     except Exception as exc:
         return {
@@ -851,6 +921,7 @@ def _extract_one(
             "pacing_state": None,
             "global": {},
             "clinical": {},
+            "extraction_contract": extraction_contract,
         }
 
 
@@ -888,7 +959,20 @@ def _extract_all(
             except (OSError, json.JSONDecodeError):
                 selected.append(row)
             else:
-                results.append(existing)
+                expected_contract = _target_extraction_contract(
+                    row,
+                    fs_internal=fs_internal,
+                    enable_pacing=enable_pacing,
+                )
+                if (
+                    isinstance(existing, Mapping)
+                    and existing.get("extraction_status") == "ok"
+                    and expected_contract is not None
+                    and existing.get("extraction_contract") == expected_contract
+                ):
+                    results.append(existing)
+                else:
+                    selected.append(row)
         else:
             selected.append(row)
 
@@ -1628,6 +1712,14 @@ def _run_analysis(
         ),
         "reference_level": "record-level labels",
         "datasets": summaries,
+        "release_gate": {
+            "operational_coverage_complete": all(
+                int(summary["extraction_failed"]) == 0 for summary in summaries
+            ),
+            "failed_records": sum(
+                int(summary["extraction_failed"]) for summary in summaries
+            ),
+        },
         "category_mapping": [
             {
                 "category": spec.key,
@@ -1749,7 +1841,11 @@ def main() -> int:
         f"{payload['wall_runtime_seconds']:.1f}s; output={out_dir}",
         flush=True,
     )
-    return 0
+    return (
+        0
+        if payload["release_gate"]["operational_coverage_complete"]
+        else 1
+    )
 
 
 if __name__ == "__main__":

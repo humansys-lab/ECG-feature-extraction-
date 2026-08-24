@@ -1,4 +1,4 @@
-"""Blinded patient-level ablation evaluation for ECG interpretation arms.
+"""Blinded record-level ablation evaluation for ECG interpretation arms.
 
 Inputs are JSONL. Ground truth rows require ``record_id``, ``patient_id`` and
 ``labels``; each prediction arm requires ``record_id`` and ``labels``. The
@@ -11,12 +11,14 @@ import argparse
 import hashlib
 import hmac
 import json
+import os
 import secrets
+import stat
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 
-EVALUATION_PROTOCOL_VERSION = "ecgagent.blind-ablation.v2"
+EVALUATION_PROTOCOL_VERSION = "ecgagent.blind-ablation.v3"
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -44,6 +46,17 @@ def _canonical_sha256(payload: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def _record_ids_sha256(record_ids: Sequence[str]) -> str:
+    """Commit to a cohort without exposing labels or arm identities."""
+
+    encoded = json.dumps(
+        sorted(str(record_id) for record_id in record_ids),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
 def _arm_alias(key: str, role: str) -> str:
     digest = hmac.new(
         key.encode("utf-8"),
@@ -61,6 +74,7 @@ def evaluate_arms(
     unblind: bool = False,
     blinding_key: str | None = None,
     reviewed_report: Mapping[str, Any] | None = None,
+    record_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     truth_rows = _read_jsonl(truth_path)
     truth = {str(row["record_id"]): row for row in truth_rows}
@@ -73,9 +87,12 @@ def evaluate_arms(
             raise ValueError(f"truth record {record_id} has no patient_id")
         patients[record_id] = patient_id
     serious = set(serious_labels or ())
+    record_truth = {
+        record_id: _labels(row) for record_id, row in truth.items()
+    }
     patient_truth: dict[str, set[str]] = {}
-    for record_id, row in truth.items():
-        patient_truth.setdefault(patients[record_id], set()).update(_labels(row))
+    for record_id, expected in record_truth.items():
+        patient_truth.setdefault(patients[record_id], set()).update(expected)
     key = str(blinding_key or secrets.token_hex(32))
     report_arms: dict[str, Any] = {}
     blind_map: dict[str, str] = {}
@@ -99,14 +116,9 @@ def evaluate_arms(
                 f"prediction arm {name!r} does not match the locked truth cohort "
                 f"(missing={len(missing)}, extra={len(extra)})"
             )
-        patient_predictions: dict[str, set[str]] = {
-            patient_id: set() for patient_id in patient_truth
-        }
-        for record_id, predicted in predictions.items():
-            patient_predictions[patients[record_id]].update(predicted)
         tp = fp = fn = exact = serious_cases = serious_misses = 0
-        for patient_id, expected in patient_truth.items():
-            predicted = patient_predictions[patient_id]
+        for record_id, expected in record_truth.items():
+            predicted = predictions[record_id]
             tp += len(expected & predicted)
             fp += len(predicted - expected)
             fn += len(expected - predicted)
@@ -118,35 +130,92 @@ def evaluate_arms(
         precision = tp / (tp + fp) if tp + fp else 0.0
         recall = tp / (tp + fn) if tp + fn else 0.0
         f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+
+        # Retain the historical patient-level union only as an explicitly
+        # labelled secondary analysis. It must never replace the record-level
+        # primary endpoint because doing so makes predictions swapped between
+        # two ECGs from the same patient appear perfect.
+        patient_predictions: dict[str, set[str]] = {
+            patient_id: set() for patient_id in patient_truth
+        }
+        for record_id, predicted in predictions.items():
+            patient_predictions[patients[record_id]].update(predicted)
+        patient_tp = patient_fp = patient_fn = patient_exact = 0
+        for patient_id, expected in patient_truth.items():
+            predicted = patient_predictions[patient_id]
+            patient_tp += len(expected & predicted)
+            patient_fp += len(predicted - expected)
+            patient_fn += len(expected - predicted)
+            patient_exact += int(expected == predicted)
+        patient_precision = (
+            patient_tp / (patient_tp + patient_fp)
+            if patient_tp + patient_fp
+            else 0.0
+        )
+        patient_recall = (
+            patient_tp / (patient_tp + patient_fn)
+            if patient_tp + patient_fn
+            else 0.0
+        )
+        patient_f1 = (
+            2 * patient_precision * patient_recall
+            / (patient_precision + patient_recall)
+            if patient_precision + patient_recall
+            else 0.0
+        )
         report_arms[alias] = {
             "records": len(truth),
             "patients": len(patient_truth),
             "micro_precision": precision,
             "micro_recall": recall,
             "micro_f1": f1,
-            "exact_match_rate": (
-                exact / len(patient_truth) if patient_truth else 0.0
-            ),
+            "exact_match_rate": exact / len(record_truth) if record_truth else 0.0,
             "serious_miss_rate": (
                 serious_misses / serious_cases if serious_cases else 0.0
             ),
             "serious_cases": serious_cases,
             "prediction_source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "patient_aggregate_secondary": {
+                "evaluation_unit": "patient_id_union",
+                "micro_precision": patient_precision,
+                "micro_recall": patient_recall,
+                "micro_f1": patient_f1,
+                "exact_match_rate": (
+                    patient_exact / len(patient_truth) if patient_truth else 0.0
+                ),
+            },
         }
     report = {
         "protocol_version": EVALUATION_PROTOCOL_VERSION,
-        "patient_level": True,
-        "evaluation_unit": "patient_id",
+        "patient_level": False,
+        "evaluation_unit": "record_id",
         "blinded": not unblind,
         "blinding_commitment": "sha256:" + hashlib.sha256(
             key.encode("utf-8")
         ).hexdigest(),
         "truth_source_sha256": hashlib.sha256(truth_path.read_bytes()).hexdigest(),
+        "record_ids_sha256": _record_ids_sha256(list(truth)),
         "record_count": len(truth),
         "patient_count": len(set(patients.values())),
         "serious_labels": sorted(serious),
         "arms": report_arms,
     }
+    if record_manifest is not None:
+        manifest_rows = record_manifest.get("records")
+        if not isinstance(manifest_rows, list):
+            raise ValueError("record manifest has no records list")
+        manifest_ids = [
+            str(row.get("record_id") or row.get("record") or "")
+            for row in manifest_rows
+            if isinstance(row, Mapping)
+        ]
+        if (
+            len(manifest_ids) != len(manifest_rows)
+            or len(set(manifest_ids)) != len(manifest_ids)
+            or set(manifest_ids) != set(truth)
+        ):
+            raise ValueError("record manifest does not match the locked truth cohort")
+        report["record_manifest_sha256"] = _canonical_sha256(record_manifest)
     if unblind:
         # Release gating happens only after review.  The role map is therefore
         # opt-in and absent from the default evaluator-facing artifact.
@@ -159,6 +228,8 @@ def evaluate_arms(
             for field in (
                 "protocol_version",
                 "truth_source_sha256",
+                "record_ids_sha256",
+                "record_manifest_sha256",
                 "record_count",
                 "patient_count",
                 "serious_labels",
@@ -173,17 +244,69 @@ def evaluate_arms(
     return report
 
 
+def _read_blinding_key(path: Path) -> str:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError("blinding key path is not a regular file")
+        mode = stat.S_IMODE(info.st_mode)
+        if mode & 0o077:
+            raise ValueError(
+                "blinding key file must not be accessible by group/other "
+                f"(found mode {mode:04o})"
+            )
+        raw_key = os.read(descriptor, 4097)
+        if len(raw_key) > 4096:
+            raise ValueError("blinding key file is unexpectedly large")
+        try:
+            key = raw_key.decode("utf-8").strip()
+        except UnicodeDecodeError as exc:
+            raise ValueError("blinding key file is not valid UTF-8") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if not key:
+        raise ValueError("blinding key file is empty")
+    return key
+
+
 def _load_or_create_blinding_key(path: Path, *, unblind: bool) -> str:
-    if path.exists():
-        key = path.read_text(encoding="utf-8").strip()
-        if not key:
-            raise ValueError("blinding key file is empty")
-        return key
-    if unblind:
-        raise ValueError("unblind requires the existing blinding key file")
+    try:
+        return _read_blinding_key(path)
+    except FileNotFoundError:
+        if unblind:
+            raise ValueError("unblind requires the existing blinding key file")
+
     key = secrets.token_hex(32)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(key + "\n", encoding="utf-8")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except FileExistsError:
+        # Another process won the atomic create race; trust it only after the
+        # same permission and regular-file checks used on normal reads.
+        return _read_blinding_key(path)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = -1
+            handle.write(key + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        raise
     return key
 
 
@@ -208,6 +331,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--reviewed-report",
         type=Path,
         help="exact blinded report reviewed by clinicians; required with --unblind",
+    )
+    parser.add_argument(
+        "--record-manifest",
+        type=Path,
+        required=True,
+        help="locked record_manifest.json whose exact cohort is being evaluated",
     )
     parser.add_argument(
         "--unblind",
@@ -237,6 +366,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.reviewed_report is not None
             else None
         )
+        record_manifest = (
+            json.loads(args.record_manifest.read_text(encoding="utf-8"))
+            if args.record_manifest is not None
+            else None
+        )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         parser.error(str(exc))
     report = evaluate_arms(
@@ -246,6 +380,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         unblind=args.unblind,
         blinding_key=blinding_key,
         reviewed_report=reviewed_report,
+        record_manifest=record_manifest,
     )
     args.output.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n",

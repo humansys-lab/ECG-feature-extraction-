@@ -36,7 +36,12 @@ from .features import (
 from .grouping import build_beat_annotations, cluster_beats
 from .clinical_rules.engine import analyze_clinical
 from .interpret import interpret
-from .models import ECGFeatures, PatientMeta, STANDARD_12_LEADS
+from .models import (
+    ECGFeatures,
+    PatientMeta,
+    STANDARD_12_LEADS,
+    resolve_patient_age,
+)
 from .preprocess import analysis_signal, lowpass_filter, resample_ecg
 from .p_wave_engine import (
     backfill_missing_p_from_robust_engine,
@@ -52,6 +57,7 @@ from .quality import (
     compute_quality,
     detect_limb_lead_reversal,
     detect_pacing_spikes,
+    prepare_pacing_detection_cache,
     remove_pacing_spikes,
     summarize_record_quality,
     validate_pacing_spikes_against_qrs,
@@ -1394,6 +1400,7 @@ def _try_attenuated_pacing_rescue(
     current_ecg_detect: np.ndarray,
     current_qrs_result: Any,
     current_r_locs: np.ndarray,
+    pacing_detection_cache: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Dict[str, Any], np.ndarray, np.ndarray, Any, np.ndarray]:
     """Recover attenuated pacer spikes only when QRS-validated capture is present."""
     if (
@@ -1441,6 +1448,7 @@ def _try_attenuated_pacing_rescue(
             ecg_rs,
             fs_run,
             min_prominence_uv=float(prominence_uv),
+            detection_cache=pacing_detection_cache,
         )
         raw_spike_times = [int(s) for s in candidate.get("spike_times", []) or []]
         if len(raw_spike_times) < 3 or raw_spike_times == existing_spikes:
@@ -1817,7 +1825,16 @@ class ECGFeatureExtractor:
         )
         record_quality = summarize_record_quality(quality)
         lead_reversal = detect_limb_lead_reversal(ecg_an) if self.enable_lead_reversal else {}
-        pacing_result = detect_pacing_spikes(ecg_rs, fs_run) if self.enable_pacing else {
+        pacing_detection_cache = (
+            prepare_pacing_detection_cache(ecg_rs, fs_run)
+            if self.enable_pacing
+            else None
+        )
+        pacing_result = detect_pacing_spikes(
+            ecg_rs,
+            fs_run,
+            detection_cache=pacing_detection_cache,
+        ) if self.enable_pacing else {
             "spike_times": [],
             "paced": False,
             "state": "off",
@@ -1906,6 +1923,7 @@ class ECGFeatureExtractor:
                 current_ecg_detect=ecg_detect,
                 current_qrs_result=qrs_result,
                 current_r_locs=r_locs,
+                pacing_detection_cache=pacing_detection_cache,
             )
         acquisition_qc = assess_acquisition_chain(
             ecg_rs,
@@ -2707,14 +2725,7 @@ class ECGFeatureExtractor:
             qrs_detector_agreement=qrs_detector_agreement,
             amplitude_calibration=input_contract.get("amplitude_calibration"),
         )
-        patient_age = getattr(meta, "age", None) if meta is not None else None
-        if patient_age is None and meta is not None:
-            age_days = getattr(meta, "age_days", None)
-            patient_age = (
-                float(age_days) / 365.25
-                if age_days is not None
-                else None
-            )
+        patient_age = resolve_patient_age(meta).age_years
         patient_sex = (
             str(getattr(meta, "sex", "") or "").strip().lower()
             if meta is not None

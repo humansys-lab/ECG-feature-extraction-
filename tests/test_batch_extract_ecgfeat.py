@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import gzip
 import io
 import json
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
@@ -57,6 +59,88 @@ class BatchExtractECGFeatTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             batch_script.normalize_batch_ecg([[[[0.0]]]], Path("bad.pt"))
 
+    def test_record_id_is_stable_and_does_not_reveal_disease_label(self) -> None:
+        job = batch_script.BatchJob(
+            disease_label="atrial_fibrillation",
+            source_name="real",
+            input_path=Path("/private/input/atrial_fibrillation/real.pt"),
+            output_dir=Path("/tmp/output"),
+        )
+
+        first = batch_script.opaque_record_id(job, 0)
+
+        self.assertEqual(first, batch_script.opaque_record_id(job, 0))
+        self.assertNotIn("atrial", first)
+        self.assertNotIn("fibrillation", first)
+        self.assertRegex(first, r"^ecg_[0-9a-f]{20}$")
+
+    def test_age_days_overrides_conflicting_year_age_in_batch_metadata(self) -> None:
+        header = batch_script.build_sample_header(
+            disease_label="normal",
+            record_id="opaque",
+            source_name="real",
+            sampling_rate=500,
+            n_points=5000,
+            metadata={"age": 40, "age_days": 30, "sex": "female"},
+        )
+
+        self.assertEqual(30.0, header["age_days"])
+        self.assertAlmostEqual(30.0 / 365.25, header["age"])
+
+    def test_invalid_explicit_age_days_does_not_fall_back_to_year_age(self) -> None:
+        header = batch_script.build_sample_header(
+            disease_label="normal",
+            record_id="opaque",
+            source_name="real",
+            sampling_rate=500,
+            n_points=5000,
+            metadata={"age": 70, "age_days": "invalid", "sex": "female"},
+        )
+
+        self.assertIsNone(header["age_days"])
+        self.assertIsNone(header["age"])
+
+    def test_load_pt_requests_weights_only_deserialization(self) -> None:
+        fake_torch = mock.Mock()
+        fake_torch.load.return_value = [1.0, 2.0]
+        fake_torch.is_tensor.return_value = False
+
+        with mock.patch.dict(sys.modules, {"torch": fake_torch}):
+            payload = batch_script.load_pt(Path("input.pt"))
+
+        self.assertEqual([1.0, 2.0], payload)
+        fake_torch.load.assert_called_once_with(
+            Path("input.pt"),
+            map_location="cpu",
+            weights_only=True,
+        )
+
+    def test_write_json_supports_gzip_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "features.json.gz"
+
+            batch_script._write_json(path, {"value": 1.25})
+
+            with gzip.open(path, "rt", encoding="utf-8") as handle:
+                self.assertEqual({"value": 1.25}, json.load(handle))
+
+    def test_parser_exposes_performance_and_export_controls(self) -> None:
+        args = batch_script.build_arg_parser().parse_args(
+            [
+                "--workers", "3",
+                "--blas-threads", "1",
+                "--export-profile", "audit",
+                "--no-pt",
+                "--gzip-json",
+            ]
+        )
+
+        self.assertEqual(3, args.workers)
+        self.assertEqual(1, args.blas_threads)
+        self.assertEqual("audit", args.export_profile)
+        self.assertTrue(args.no_pt)
+        self.assertTrue(args.gzip_json)
+
     def test_process_job_writes_expected_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -85,7 +169,11 @@ class BatchExtractECGFeatTests(unittest.TestCase):
                     return {
                         "shape": batch_script.infer_shape(ecg),
                         "fs": fs,
-                        "meta": None if meta is None else {"age": meta.age, "sex": meta.sex},
+                        "meta": None if meta is None else {
+                            "age": meta.age,
+                            "age_days": meta.age_days,
+                            "sex": meta.sex,
+                        },
                     }
 
             def fake_to_dict(result):
@@ -95,7 +183,12 @@ class BatchExtractECGFeatTests(unittest.TestCase):
                 if path == batch_path:
                     return self.make_batch(2)
                 if path == metadata_path:
-                    return {"label": "AMI", "dataset": "ptbxl"}
+                    return {
+                        "label": "AMI",
+                        "dataset": "ptbxl",
+                        "age": 40,
+                        "age_days": 30,
+                    }
                 raise AssertionError(f"unexpected load path: {path}")
 
             def fake_save_pt(path: Path, payload) -> None:
@@ -131,6 +224,11 @@ class BatchExtractECGFeatTests(unittest.TestCase):
             self.assertTrue((job.output_dir / "001_features.json").exists())
             self.assertTrue((job.output_dir / "001_features.pt").exists())
             self.assertTrue((job.output_dir / "001_report.txt").exists())
+            feature_payload = json.loads(
+                (job.output_dir / "000_features.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(30.0, feature_payload["meta"]["age_days"])
+            self.assertAlmostEqual(30.0 / 365.25, feature_payload["meta"]["age"])
 
             manifest = json.loads((job.output_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual("ami", manifest["disease_label"])
@@ -208,6 +306,15 @@ class BatchExtractECGFeatTests(unittest.TestCase):
 
         self.assertEqual(1, exit_code)
         self.assertIn("missing module: numpy", stderr.getvalue())
+
+    def test_storage_option_help_describes_actual_artifacts(self) -> None:
+        help_text = " ".join(
+            batch_script.build_arg_parser().format_help().split()
+        )
+
+        self.assertIn("artifacts enabled by the current options", help_text)
+        self.assertIn("when enabled, keeps the full detail", help_text)
+        self.assertIn("MedGemma batch diagnostics discover", help_text)
 
 
 if __name__ == "__main__":

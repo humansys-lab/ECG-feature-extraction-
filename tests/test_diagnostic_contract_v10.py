@@ -116,3 +116,48 @@ def test_serial_comparison_detects_rhythm_and_qrs_change() -> None:
     assert result.priority == "P1"
     assert result.evidence["rhythm_changed"] is True
     assert result.evidence["significant_metric_changes"]["qrs_ms"]["delta"] == 35.0
+
+
+def test_serial_axis_comparison_uses_shortest_angular_distance() -> None:
+    prior = _serial_features(qrs=90.0)
+    current = _serial_features(qrs=90.0)
+    prior.global_features.qrs_axis_deg = 179.0
+    current.global_features.qrs_axis_deg = -179.0
+
+    result = evaluate_serial_comparison(current, prior)[0]
+
+    assert result.status == "not_matched"
+    assert "qrs_axis_deg" not in result.evidence["significant_metric_changes"]
+
+
+def test_serial_comparison_detects_focal_st_change_by_territory() -> None:
+    prior = _serial_features(qrs=90.0)
+    current = _serial_features(qrs=90.0)
+    leads = ("I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6")
+    prior.representative_leads = {
+        lead: SimpleNamespace(params={"st_on_mv": 0.0}) for lead in leads
+    }
+    current.representative_leads = {
+        lead: SimpleNamespace(
+            params={"st_on_mv": 0.12 if lead in {"II", "III"} else 0.0}
+        )
+        for lead in leads
+    }
+
+    result = evaluate_serial_comparison(current, prior)[0]
+
+    assert result.status == "matched"
+    regional = result.evidence["significant_metric_changes"]["regional_st_j_mv"]
+    assert regional["territories"] == {"inferior": ["II", "III"]}
+
+
+def test_serial_comparison_rejects_known_patient_mismatch() -> None:
+    prior = _serial_features(qrs=90.0)
+    current = _serial_features(qrs=125.0)
+    prior.metadata["patient_id"] = "patient-a"
+    current.metadata["patient_id"] = "patient-b"
+
+    result = evaluate_serial_comparison(current, prior)[0]
+
+    assert result.status == "unavailable"
+    assert result.missing_inputs == ["patient_id_mismatch"]

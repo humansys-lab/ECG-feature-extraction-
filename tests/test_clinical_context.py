@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from feature_extraction.ecgfeat.clinical_rules.context import build_context
+from feature_extraction.ecgfeat.models import PatientMeta
 from tests.test_clinical_export_consumers import _features
 
 
@@ -41,3 +42,21 @@ def test_legacy_boolean_reversal_is_advisory_not_confirmed() -> None:
 
     assert context.precordial_reversal_state == "possible"
     assert not context.excluded_leads
+
+
+def test_clinical_context_uses_authoritative_exact_day_age() -> None:
+    features = _features(qt_ms=400.0)
+    features.metadata["patient_meta"] = PatientMeta(age=50.0, age_days=30.0)
+
+    context = build_context(features)
+
+    assert context.age_years == 30.0 / 365.25
+
+
+def test_clinical_context_does_not_fallback_from_invalid_exact_day_age() -> None:
+    features = _features(qt_ms=400.0)
+    features.metadata["patient_meta"] = PatientMeta(age=50.0, age_days=-1.0)
+
+    context = build_context(features)
+
+    assert context.age_years is None

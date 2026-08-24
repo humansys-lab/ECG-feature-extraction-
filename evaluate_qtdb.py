@@ -1011,6 +1011,10 @@ def run(args: argparse.Namespace) -> int:
         )
         row["source_channel"] = source
     cse_rows = cse_conformance(summary_rows)
+    numeric_pass = bool(cse_rows) and all(
+        row.get("within_cse_limit") is True for row in cse_rows
+    )
+    operational_complete = bool(records) and not failure_rows
 
     out_dir = args.out.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -1047,6 +1051,11 @@ def run(args: argparse.Namespace) -> int:
         "mains_freq": config.mains_freq,
         "wall_clock_seconds": elapsed,
         "failures": len(failure_rows),
+        "release_gate": {
+            "numeric_pass": numeric_pass,
+            "operational_coverage_complete": operational_complete,
+            "passed": numeric_pass and operational_complete,
+        },
         "package_versions": {
             name: _package_version(name)
             for name in ("wfdb", "neurokit2", "numpy", "scipy")
@@ -1079,7 +1088,7 @@ def run(args: argparse.Namespace) -> int:
     if failure_rows:
         print(f"  {len(failure_rows)} failures written to failures.csv")
     print(f"  wall clock: {elapsed:.1f}s   outputs: {out_dir}")
-    return 0
+    return 0 if numeric_pass and operational_complete else 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:

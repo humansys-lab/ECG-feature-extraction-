@@ -21,6 +21,7 @@ from typing import Any, Mapping, Sequence
 
 from ..evidence.ledger import visible_citations
 from ..evidence.model_view import MODEL_EVIDENCE_VIEW_VERSION
+from ..privacy import endpoint_is_literal_loopback, resolve_backend_privacy
 from .base import BackendCapabilities, LLMResponse, ToolCall, ToolOutcome
 
 
@@ -108,6 +109,7 @@ class QwenLocalBackend:
         init=False,
     )
     turns: list[dict[str, Any]] = field(default_factory=list, repr=False)
+    _owns_client: bool = field(default=False, init=False, repr=False)
     reasoning: list[str] = field(default_factory=list, repr=False)
     _inflight_evidence: dict[str, dict[str, dict[str, Any]]] = field(
         default_factory=dict,
@@ -161,12 +163,26 @@ class QwenLocalBackend:
         # non-empty value. A real key can still be supplied for a protected
         # reverse proxy through QWEN_API_KEY or the constructor.
         key = self.api_key or os.getenv("QWEN_API_KEY") or "EMPTY"
+        client_kwargs: dict[str, Any] = {}
+        if endpoint_is_literal_loopback(self.base_url):
+            try:
+                import httpx
+            except ImportError as exc:  # pragma: no cover - OpenAI depends on it
+                raise RuntimeError(
+                    "the `httpx` package is required to create a proxy-isolated "
+                    f"loopback Qwen client ({exc})"
+                ) from exc
+            # A loopback endpoint is exempt from external-egress authorization
+            # only when the request cannot silently traverse HTTP(S)_PROXY.
+            client_kwargs["http_client"] = httpx.Client(trust_env=False)
         self.client = OpenAI(
             api_key=key,
             base_url=self.base_url,
             timeout=self.timeout,
             max_retries=self.max_retries,
+            **client_kwargs,
         )
+        self._owns_client = True
 
     def complete(
         self,
@@ -414,6 +430,14 @@ class QwenLocalBackend:
         self._phase_history.clear()
         self._current_phase_state = None
         self._tool_context_trace.clear()
+
+    def close(self) -> None:
+        if not self._owns_client:
+            return
+        close = getattr(self.client, "close", None)
+        if callable(close):
+            close()
+        self._owns_client = False
 
     def new_session(self) -> "QwenLocalBackend":
         """Return isolated audit state while reusing the thread-safe client."""
@@ -1085,9 +1109,16 @@ class QwenLocalBackend:
     def audit_config(self) -> dict[str, Any]:
         """Return reproducible non-secret client and required server settings."""
 
+        endpoint = resolve_backend_privacy(
+            "qwen-local",
+            qwen_base_url=self.base_url,
+        ).audit(allowed=True)["endpoint"]
         return {
             "model": self.model,
-            "base_url": self.base_url,
+            "endpoint": endpoint,
+            "proxy_environment_trusted": not endpoint_is_literal_loopback(
+                self.base_url
+            ),
             "max_tokens": self.max_tokens,
             "timeout_seconds": self.timeout,
             "max_retries": self.max_retries,

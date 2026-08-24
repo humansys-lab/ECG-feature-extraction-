@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Optional
 
-from ..models import ECGFeatures
+from ..models import ECGFeatures, resolve_patient_age
 
 
 LIMB_LEADS = frozenset({"I", "II", "III", "aVR", "aVL", "aVF"})
@@ -90,11 +90,7 @@ class ClinicalContext:
 
 def build_context(features: ECGFeatures) -> ClinicalContext:
     patient = features.metadata.get("patient_meta")
-    age = finite_float(_field(patient, "age"))
-    if age is None:
-        age_days = finite_float(_field(patient, "age_days"))
-        if age_days is not None:
-            age = age_days / 365.25
+    age = resolve_patient_age(patient).age_years
     sex = str(_field(patient, "sex", "unknown") or "unknown").strip().lower()
     interpretation = features.interpretation
     lead_reversal = features.metadata.get("lead_reversal", {})

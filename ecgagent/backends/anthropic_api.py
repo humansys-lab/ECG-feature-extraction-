@@ -17,6 +17,7 @@ Three choices here are load-bearing and worth stating:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
@@ -25,6 +26,7 @@ from .base import BackendCapabilities, LLMResponse, ToolCall, ToolOutcome
 DEFAULT_MODEL = "claude-opus-5"
 DEFAULT_MAX_TOKENS = 16000
 DEFAULT_EFFORT = "high"
+DEFAULT_BASE_URL = "https://api.anthropic.com"
 
 # Server-side refusal fallback: on a policy decline the API re-runs the request
 # on a fallback model chosen by refusal category, instead of handing back a
@@ -37,6 +39,7 @@ class AnthropicBackend:
     """Claude backend for the ECG agent loop."""
 
     model: str = DEFAULT_MODEL
+    base_url: str | None = None
     effort: str = DEFAULT_EFFORT
     max_tokens: int = DEFAULT_MAX_TOKENS
     enable_fallbacks: bool = True
@@ -57,6 +60,11 @@ class AnthropicBackend:
     turns: list[dict[str, Any]] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
+        self.base_url = str(
+            self.base_url
+            or os.getenv("ANTHROPIC_BASE_URL", "").strip()
+            or DEFAULT_BASE_URL
+        ).strip()
         self.capabilities = BackendCapabilities(
             native_tool_calls=True,
             structured_output_level=("schema" if self.hard_phase_guards else "json"),
@@ -73,7 +81,10 @@ class AnthropicBackend:
                 ) from exc
             # Zero-arg: resolves ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN, or an
             # `ant auth login` profile, in that order.
-            self.client = anthropic.Anthropic()
+            # Pin the endpoint resolved before construction. This prevents a
+            # hidden SDK/profile override from diverging from the endpoint
+            # authorized and recorded by the caller.
+            self.client = anthropic.Anthropic(base_url=self.base_url)
 
     # -- request ------------------------------------------------------------
     def _system_blocks(self, system: str) -> list[dict[str, Any]]:
@@ -189,8 +200,15 @@ class AnthropicBackend:
 
     def audit_config(self) -> dict[str, Any]:
         """Non-secret provider settings needed to reproduce a run."""
+        from ..privacy import resolve_backend_privacy
+
+        endpoint = resolve_backend_privacy(
+            "anthropic",
+            anthropic_base_url=self.base_url,
+        ).audit(allowed=True)["endpoint"]
         return {
             "model": self.model,
+            "endpoint": endpoint,
             "effort": self.effort,
             "max_tokens": self.max_tokens,
             "fallbacks_enabled": self.enable_fallbacks,

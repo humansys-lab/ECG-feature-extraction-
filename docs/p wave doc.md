@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](p%20wave%20doc) | [English](p%20wave%20doc.en.md) | [日本語](p%20wave%20doc.ja.md)
+[中文](p%20wave%20doc.md) | [English](p%20wave%20doc.en.md) | [日本語](p%20wave%20doc.ja.md)
 <!-- /i18n-nav -->
 
 # 多导联 ECG P 波定界：代码修改重点指南

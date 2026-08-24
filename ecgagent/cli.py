@@ -15,7 +15,11 @@ Three uses:
 from __future__ import annotations
 
 import argparse
+import copy
+import hashlib
+import hmac
 import json
+import secrets
 import sys
 from pathlib import Path
 
@@ -23,8 +27,56 @@ from .agent.protocol import DEFAULT_DIAGNOSTIC_PROTOCOL
 from .evidence.briefing import build_chart_briefing
 from .evidence.diagnostic_briefing import build_diagnostic_briefing
 from .evidence.store import EvidenceStore
+from .privacy import external_egress_error, resolve_backend_privacy
 from .tools.registry import build_default_registry
 from .verify import VerificationPolicy, audit_untraceable_numbers, verify_output
+
+
+CLI_PSEUDONYM_STRATEGY = "hmac-sha256-ephemeral-cli-v1"
+
+
+def _pseudonymized_agent_store(
+    source: EvidenceStore,
+) -> tuple[EvidenceStore, dict[str, str]]:
+    """Build a one-run model view whose record identifier is unlinkable."""
+
+    key = secrets.token_bytes(32)
+    digest = hmac.new(
+        key,
+        f"ecgagent:cli-model-visible-record:v1\0{source.record_id}".encode(
+            "utf-8"
+        ),
+        hashlib.sha256,
+    ).hexdigest()[:24]
+    pseudonym = f"ecg_{digest}"
+    document = copy.deepcopy(source.document)
+    for container in (document, document.get("metadata")):
+        if not isinstance(container, dict):
+            continue
+        for field in ("record", "record_id"):
+            if field in container:
+                container[field] = pseudonym
+    return EvidenceStore.from_dict(document, record_id=pseudonym), {
+        "model_visible_record_id": pseudonym,
+        "strategy": CLI_PSEUDONYM_STRATEGY,
+        "key_scope": "single_cli_invocation",
+    }
+
+
+def _external_egress_error(
+    backend: str,
+    *,
+    allowed: bool,
+    qwen_base_url: str | None = None,
+    anthropic_base_url: str | None = None,
+) -> str | None:
+    """Compatibility wrapper around the shared endpoint-aware policy."""
+    return external_egress_error(
+        backend,
+        allowed=allowed,
+        qwen_base_url=qwen_base_url,
+        anthropic_base_url=anthropic_base_url,
+    )
 
 
 def _demo(store: EvidenceStore, registry, *, mode: str) -> None:
@@ -145,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--backend",
         type=str,
-        default="anthropic",
+        default="medgemma-local",
         choices=[
             "anthropic",
             "deepseek",
@@ -155,9 +207,18 @@ def main(argv: list[str] | None = None) -> int:
             "medgemma",
         ],
         help=(
-            "LLM provider (default anthropic; deepseek reads DEEPSEEK_API_KEY; "
+            "LLM provider (default medgemma-local; cloud backends require "
+            "--allow-external-egress; deepseek reads DEEPSEEK_API_KEY; "
             "qwen-local connects to a vLLM OpenAI server with native tool "
             "calling; medgemma-local runs an in-process checkpoint)"
+        ),
+    )
+    parser.add_argument(
+        "--allow-external-egress",
+        action="store_true",
+        help=(
+            "explicitly authorize sending a run-scoped pseudonymous record ID, "
+            "demographics, and ECG measurements to a selected external endpoint"
         ),
     )
     parser.add_argument(
@@ -177,6 +238,15 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "OpenAI-compatible vLLM endpoint for qwen-local (default "
             "http://127.0.0.1:8000/v1; or set QWEN_BASE_URL)"
+        ),
+    )
+    parser.add_argument(
+        "--anthropic-base-url",
+        type=str,
+        default=None,
+        help=(
+            "Anthropic API endpoint (default https://api.anthropic.com; or set "
+            "ANTHROPIC_BASE_URL). The resolved endpoint is pinned and audited."
         ),
     )
     parser.add_argument(
@@ -293,13 +363,55 @@ def main(argv: list[str] | None = None) -> int:
         from .agent.loop import ECGAgent
         from .backends import build_backend
 
+        egress_policy = resolve_backend_privacy(
+            args.backend,
+            qwen_base_url=args.qwen_base_url,
+            anthropic_base_url=args.anthropic_base_url,
+        )
+        egress_error = _external_egress_error(
+            args.backend,
+            allowed=bool(args.allow_external_egress),
+            qwen_base_url=(
+                egress_policy.effective_endpoint
+                if args.backend in {"qwen-local", "qwen"}
+                else None
+            ),
+            anthropic_base_url=(
+                egress_policy.effective_endpoint
+                if args.backend == "anthropic"
+                else None
+            ),
+        )
+        if egress_error:
+            print(egress_error, file=sys.stderr)
+            return 2
+
+        true_record_id = source_store.record_id
+        agent_source_store, record_identity = _pseudonymized_agent_store(
+            source_store
+        )
+        if args.mode == "diagnose":
+            agent_store = agent_source_store.diagnostic_view()
+            agent_registry = build_default_registry(
+                agent_store,
+                budget=args.budget,
+                include=DIAGNOSTIC_TOOLS,
+            )
+        else:
+            agent_store = agent_source_store
+            agent_registry = build_default_registry(
+                agent_store,
+                budget=args.budget,
+            )
+
         backend_kwargs: dict = {}
         if args.model:
             backend_kwargs["model"] = args.model
         if args.backend in {"qwen-local", "qwen"}:
-            if args.qwen_base_url:
-                backend_kwargs["base_url"] = args.qwen_base_url
+            backend_kwargs["base_url"] = egress_policy.effective_endpoint
             backend_kwargs["thinking"] = bool(args.qwen_thinking)
+        if args.backend == "anthropic":
+            backend_kwargs["base_url"] = egress_policy.effective_endpoint
         if args.backend in {"medgemma-local", "medgemma"}:
             if args.model_max_len is not None:
                 backend_kwargs["model_max_len"] = args.model_max_len
@@ -327,9 +439,13 @@ def main(argv: list[str] | None = None) -> int:
             # ECGDiagnosticAgent captures a bounded rule second opinion before
             # constructing its own diagnosis-safe measurement view. Manual
             # diagnosis tools above still use the scrubbed registry/store.
-            store=source_store if args.mode == "diagnose" else store,
+            store=(
+                agent_source_store
+                if args.mode == "diagnose"
+                else agent_store
+            ),
             backend=backend,
-            registry=registry,
+            registry=agent_registry,
             max_revisions=args.max_revisions,
             **(
                 {
@@ -349,6 +465,13 @@ def main(argv: list[str] | None = None) -> int:
             on_event=None if args.quiet else lambda line: print(line, file=sys.stderr, flush=True),
         )
         result = agent.run()
+        # The model and its trace saw only the ephemeral pseudonym. Restore the
+        # local identifier before rendering/saving user-facing artifacts.
+        result.record_id = true_record_id
+        result.audit["record_identity"] = record_identity
+        result.audit["external_egress"] = egress_policy.audit(
+            allowed=bool(args.allow_external_egress)
+        )
         if args.save_brief_report:
             from .trace import trace_filename
 

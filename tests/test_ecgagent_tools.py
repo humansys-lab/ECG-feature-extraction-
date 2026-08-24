@@ -93,7 +93,8 @@ def _payload() -> dict:
             "record_quality": {"record_grade": "Q1", "rejected_functions": []},
             "diagnostic_gate": {"state": "partial", "stop_reasons": [],
                                 "partial_reasons": ["limb_lead_equation_residual_high"],
-                                "allowed_domains": ["all"]},
+                                "allowed_domains": ["all"],
+                                "suppressed_domains": []},
         },
         "interpretation": {"probable_af": False, "bundle_branch_block": None},
         "clinical_interpretation": {

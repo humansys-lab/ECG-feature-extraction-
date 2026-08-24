@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from feature_extraction.ecgfeat import acquisition_qc
 from feature_extraction.ecgfeat.acquisition_qc import (
     apply_channel_delay_compensation,
     assess_acquisition_chain,
@@ -226,6 +227,57 @@ def test_acquisition_delay_compensation_is_guarded_and_fractional() -> None:
     before = np.corrcoef(ecg[7], reference)[0, 1]
     after = np.corrcoef(corrected[7], reference)[0, 1]
     assert after > before + 0.10
+
+
+def test_zero_mad_large_fixed_delay_is_rejected(monkeypatch) -> None:
+    call_index = 0
+
+    def fake_delay_evidence(*_args, **_kwargs):
+        nonlocal call_index
+        lead_index = call_index
+        call_index += 1
+        if lead_index == 7:  # V2
+            return {
+                "available": True,
+                "delay_samples": 15.0,
+                "delay_ms": 30.0,
+                "mad_ms": 0.0,
+                "beat_count": 8,
+                "raw_envelope_correlation": 0.60,
+                "corrected_envelope_correlation": 0.95,
+                "correlation_improvement": 0.35,
+                "automatic_compensation_approved": False,
+            }
+        return {
+            "available": True,
+            "delay_samples": 0.0,
+            "delay_ms": 0.0,
+            "mad_ms": 0.0,
+            "beat_count": 8,
+            "raw_envelope_correlation": 0.95,
+            "corrected_envelope_correlation": 0.95,
+            "correlation_improvement": 0.0,
+            "automatic_compensation_approved": False,
+        }
+
+    monkeypatch.setattr(acquisition_qc, "_lead_delay_evidence", fake_delay_evidence)
+    monkeypatch.setattr(acquisition_qc, "_duplicate_channel_pairs", lambda _ecg: [])
+    monkeypatch.setattr(
+        acquisition_qc,
+        "_gain_and_filter_outliers",
+        lambda _ecg, _fs: ([], []),
+    )
+    rng = np.random.default_rng(20260823)
+    audit = assess_acquisition_chain(
+        rng.normal(size=(12, 1000)),
+        500,
+        np.arange(100, 901, 100),
+    )
+
+    assert audit["suspicious_delay_leads"] == ["V2"]
+    assert audit["channel_desynchronized"] is True
+    assert audit["fusion_allowed"] is False
+    assert "CHANNEL_DESYNCHRONIZED" in audit["reject_reasons"]
 
 
 def _ta_boundary(

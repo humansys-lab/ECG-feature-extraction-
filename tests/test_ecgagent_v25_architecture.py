@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 from ecgagent.agent.tool_planner import build_tool_plan
@@ -155,6 +156,34 @@ def test_diagnosis_contract_drops_unknown_and_interpretive_families():
     )
 
 
+def test_diagnosis_contract_canonicalizes_conflicting_age_from_age_days():
+    document, _ = build_diagnostic_document(
+        {
+            "metadata": {
+                "patient_meta": {
+                    "age": 40,
+                    "age_days": 30,
+                    "sex": "female",
+                }
+            }
+        }
+    )
+
+    patient = document["metadata"]["patient_meta"]
+    assert patient["age_days"] == 30.0
+    assert patient["age"] == 30.0 / 365.25
+
+    invalid, _ = build_diagnostic_document(
+        {
+            "metadata": {
+                "patient_meta": {"age": 40, "age_days": -1}
+            }
+        }
+    )
+    assert invalid["metadata"]["patient_meta"]["age"] is None
+    assert invalid["metadata"]["patient_meta"]["age_days"] is None
+
+
 def test_tool_plan_is_enum_driven_and_repairs_unassessed_domains():
     plan = build_tool_plan(
         {
@@ -249,6 +278,7 @@ def test_blind_ablation_hides_roles_until_release_export(tmp_path):
         report_path,
         AcceptanceThresholds(min_records=1),
         required=True,
+        expected_truth_source_sha256=hashlib.sha256(truth.read_bytes()).hexdigest(),
     )
     assert failures == []
     assert clinical["serious_miss_rate"] == 0.0

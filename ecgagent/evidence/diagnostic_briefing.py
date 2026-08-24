@@ -85,6 +85,7 @@ def build_diagnostic_briefing(store: EvidenceStore) -> Briefing:
     identity: list[str] = [f"record={store.record_id}"]
     for pointer, label in (
         ("/metadata/patient_meta/age", "age"),
+        ("/metadata/patient_meta/age_days", "age_days"),
         ("/metadata/patient_meta/sex", "sex"),
         ("/metadata/input_fs", "sampling_rate"),
         ("/metadata/duration_sec", "duration"),

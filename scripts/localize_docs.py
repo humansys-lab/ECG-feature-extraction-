@@ -137,8 +137,18 @@ class TranslationCache:
 
 
 def tracked_document_sources() -> list[Path]:
-    raw = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT)
-    paths = [ROOT / item.decode("utf-8") for item in raw.split(b"\0") if item]
+    # Include untracked, non-ignored documents so new files can be localized and
+    # checked before they are staged.  Ignore missing index entries left behind
+    # by an unstaged rename.
+    raw = subprocess.check_output(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=ROOT,
+    )
+    paths = [
+        ROOT / item.decode("utf-8")
+        for item in raw.split(b"\0")
+        if item and (ROOT / item.decode("utf-8")).is_file()
+    ]
     sources: list[Path] = []
     for path in paths:
         relative = path.relative_to(ROOT)

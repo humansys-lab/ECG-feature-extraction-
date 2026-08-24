@@ -8,7 +8,7 @@
 
 ## 结论
 
-`docs/p wave doc` 中要求的首轮确定性 DSP 改造已经接入 `ecgfeat` 主流程。
+`docs/p wave doc.md` 中要求的首轮确定性 DSP 改造已经接入 `ecgfeat` 主流程。
 新实现不再把单个共识边界当作无条件有效结果，而是同时导出逐导联证据、
 strict/robust 边界、经验 CI、P 状态、采集链质控和结构化拒判原因。
 

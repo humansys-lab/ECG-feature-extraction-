@@ -284,11 +284,17 @@ def assess_acquisition_chain(
         )
         delay_evidence[lead] = evidence
         delay_ms = abs(float(evidence.get("delay_ms") or 0.0))
+        mad_value = evidence.get("mad_ms")
+        # A perfectly stable fixed channel delay legitimately has zero MAD.
+        # Do not use truthiness here: treating 0.0 as a missing value would
+        # turn it into infinity and let the most repeatable large delays bypass
+        # the desynchronization guard.
+        mad_ms = float(mad_value) if mad_value is not None else np.inf
         if bool(evidence.get("automatic_compensation_approved")):
             approved_delays[lead] = float(evidence["delay_samples"])
         elif (
             delay_ms > _MAX_AUTOMATIC_DELAY_MS
-            and float(evidence.get("mad_ms") or np.inf) <= _MAX_DELAY_MAD_MS
+            and mad_ms <= _MAX_DELAY_MAD_MS
             and float(evidence.get("corrected_envelope_correlation") or 0.0)
             >= _MIN_CORRECTED_ENVELOPE_CORRELATION
             and float(evidence.get("correlation_improvement") or 0.0)

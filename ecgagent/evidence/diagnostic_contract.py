@@ -10,8 +10,10 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from ..age import canonicalize_patient_age
 
-DIAGNOSTIC_EVIDENCE_CONTRACT_VERSION = "ecgagent.diagnosis-evidence.v3"
+
+DIAGNOSTIC_EVIDENCE_CONTRACT_VERSION = "ecgagent.diagnosis-evidence.v4"
 
 # A morphology map exposes every field as a separate evidence atom.  That is
 # ideal for exact lookup, but a six-lead conduction pathway used to spend 66
@@ -278,7 +280,7 @@ def build_diagnostic_document(
         for key in map(str, patient)
         if key in _FORBIDDEN_KEYS
     )
-    metadata["patient_meta"] = {
+    metadata["patient_meta"] = canonicalize_patient_age({
         str(key): _scrub(
             value,
             path=f"/metadata/patient_meta/{key}",
@@ -286,7 +288,7 @@ def build_diagnostic_document(
         )
         for key, value in patient.items()
         if str(key) in ALLOWED_PATIENT_META
-    }
+    })
     document["metadata"] = metadata
 
     rhythm_source = source.get("rhythm_inputs")

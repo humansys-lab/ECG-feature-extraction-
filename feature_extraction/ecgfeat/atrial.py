@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-from scipy.signal import decimate, find_peaks, welch
+from scipy.signal import correlate, decimate, find_peaks, welch
 
 from .preprocess import lowpass_filter
 
@@ -720,16 +720,34 @@ def _summarize_atrial_residual(residual: np.ndarray, fs: int) -> Dict[str, Any]:
     if lag_max <= lag_min:
         return {"available": False, "reason": "residual_too_short_for_cycle_scan"}
 
-    lag_scores: List[float] = []
-    for lag in range(lag_min, lag_max + 1):
-        shifted_a = signal[:-lag]
-        shifted_b = signal[lag:]
-        denom = float(np.linalg.norm(shifted_a) * np.linalg.norm(shifted_b))
-        lag_scores.append(float(np.dot(shifted_a, shifted_b) / (denom + 1e-12)) if denom > 0 else 0.0)
+    # Compute every numerator in one FFT correlation and every denominator
+    # from prefix energies.  The former implementation sliced the full signal
+    # and ran three BLAS reductions for every lag, which dominated AF/AFL
+    # analysis on otherwise short 10-second records.
+    lags = np.arange(lag_min, lag_max + 1, dtype=int)
+    autocorrelation = correlate(signal, signal, mode="full", method="fft")
+    numerators = np.asarray(
+        autocorrelation[signal.size - 1 + lags],
+        dtype=float,
+    )
+    squared_prefix = np.concatenate(
+        ([0.0], np.cumsum(signal * signal, dtype=float))
+    )
+    first_energy = squared_prefix[signal.size - lags]
+    second_energy = squared_prefix[signal.size] - squared_prefix[lags]
+    denominators = np.sqrt(np.maximum(first_energy * second_energy, 0.0))
+    lag_scores_array = np.divide(
+        numerators,
+        denominators + 1e-12,
+        out=np.zeros_like(numerators),
+        where=denominators > 0.0,
+    )
 
-    dominant_offset = int(np.argmax(lag_scores))
+    dominant_offset = int(np.argmax(lag_scores_array))
     dominant_lag = lag_min + dominant_offset
-    repetitiveness = float(max(0.0, min(1.0, lag_scores[dominant_offset])))
+    repetitiveness = float(
+        np.clip(lag_scores_array[dominant_offset], 0.0, 1.0)
+    )
 
     shifted_a = signal[:-dominant_lag]
     shifted_b = signal[dominant_lag:]

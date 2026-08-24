@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](QRS) | [English](QRS.en.md) | [日本語](QRS.ja.md)
+[中文](QRS.md) | [English](QRS.en.md) | [日本語](QRS.ja.md)
 <!-- /i18n-nav -->
 
 # 多导联心电图波形检测（ECG Delineation）技术调研

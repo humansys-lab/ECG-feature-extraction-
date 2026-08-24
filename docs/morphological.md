@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](morphological) | [English](morphological.en.md) | [日本語](morphological.ja.md)
+[中文](morphological.md) | [English](morphological.en.md) | [日本語](morphological.ja.md)
 <!-- /i18n-nav -->
 
 # 心电图各波形判读标准与12导联对应关系

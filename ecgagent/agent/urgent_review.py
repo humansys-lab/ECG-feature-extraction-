@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from ..age import resolve_patient_age
 from ..evidence.store import EvidenceStore
 from .safety_policy import DEFAULT_CLINICAL_SAFETY_POLICY
 
 
-URGENT_REVIEW_POLICY_VERSION = "ecgagent.urgent-review.v1"
+URGENT_REVIEW_POLICY_VERSION = "ecgagent.urgent-review.v2"
 
 
 def _number(value: Any) -> float | None:
@@ -31,6 +32,10 @@ def assess_urgent_review(store: EvidenceStore) -> dict[str, Any]:
 
     policy = DEFAULT_CLINICAL_SAFETY_POLICY
     triggers: list[dict[str, Any]] = []
+    patient = store.raw("/metadata/patient_meta", {})
+    adult_thresholds_applicable = resolve_patient_age(
+        patient if isinstance(patient, Mapping) else {}
+    ).adult is True
 
     def add(code: str, *pointers: str) -> None:
         triggers.append(
@@ -43,9 +48,17 @@ def assess_urgent_review(store: EvidenceStore) -> dict[str, Any]:
 
     heart_rate = _number(store.raw("/global_features/heart_rate_bpm", None))
     qrs_ms = _number(store.raw("/global_features/qrs_ms", None))
-    if heart_rate is not None and heart_rate < policy.urgent_bradycardia_below_bpm:
+    if (
+        adult_thresholds_applicable
+        and heart_rate is not None
+        and heart_rate < policy.urgent_bradycardia_below_bpm
+    ):
         add("extreme_bradycardia_measurement", "/global_features/heart_rate_bpm")
-    if heart_rate is not None and heart_rate > policy.urgent_tachycardia_above_bpm:
+    if (
+        adult_thresholds_applicable
+        and heart_rate is not None
+        and heart_rate > policy.urgent_tachycardia_above_bpm
+    ):
         add("extreme_tachycardia_measurement", "/global_features/heart_rate_bpm")
         if qrs_ms is not None and qrs_ms >= policy.urgent_wide_qrs_at_least_ms:
             add(
@@ -66,7 +79,8 @@ def assess_urgent_review(store: EvidenceStore) -> dict[str, Any]:
         store.raw("/global_features/qt_reliability", "unavailable") or "unavailable"
     ).lower()
     if (
-        qtc is not None
+        adult_thresholds_applicable
+        and qtc is not None
         and qtc > policy.urgent_qtc_bazett_above_ms
         and qt_reportable is True
         and qt_reliability not in {
@@ -110,9 +124,15 @@ def assess_urgent_review(store: EvidenceStore) -> dict[str, Any]:
         "do_not_delay_human_review": bool(triggers),
         "technical_quality_stop": technical_stop,
         "triggers": triggers,
+        "adult_thresholds_applicable": adult_thresholds_applicable,
         "unassessed_categories": [
             "acute_st_injury_pattern",
             "pacing_sensing_failure",
+            *(
+                []
+                if adult_thresholds_applicable
+                else ["pediatric_or_unknown_age_rate_qrs_qtc_thresholds"]
+            ),
         ],
         "scope_note": (
             "Routing flag only; it neither confirms a diagnosis nor represents "

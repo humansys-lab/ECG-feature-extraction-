@@ -1,10 +1,35 @@
 from __future__ import annotations
 
+import gzip
 import json
+import math
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from statistics import median, pstdev
+from types import SimpleNamespace
 from typing import Any, Callable
+
+from feature_extraction.ecgfeat.export import (
+    _PEDS_QRS_NORMAL_MS,
+    _peds_lookup,
+    _peds_qrs_width_class,
+    _peds_qtc_limits,
+)
+from feature_extraction.ecgfeat.glasgow_rules.intervals import (
+    _pr_limits as _glasgow_pr_limits,
+)
+from feature_extraction.ecgfeat.glasgow_rules.models import GlasgowConfig
+from feature_extraction.ecgfeat.glasgow_rules.rate import (
+    bradycardia_limit,
+    tachycardia_limit,
+)
+from feature_extraction.ecgfeat.interpret import _peds_classify_qrs_axis
+from feature_extraction.ecgfeat.pediatric_rules import (
+    build_pediatric_hypertrophy_evidence,
+    pediatric_age_bin,
+    pediatric_voltage_threshold,
+)
 
 
 STANDARD_12_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
@@ -14,6 +39,17 @@ REPORT_LAYER_CHAR_LIMIT = 2200
 # complete structured diagnostic response without over-allocating KV cache.
 DEFAULT_MODEL_MAX_LEN = 8192
 DEFAULT_MAX_OUTPUT_TOKENS = 2048
+DIAGNOSTIC_GATE_ENFORCEMENT_VERSION = "diagnostic_gate.v3"
+MEDGEMMA_REASONING_PROTOCOL_VERSION = "json_report_no_dx_sequential_v4"
+
+_PEDIATRIC_MORPHOLOGY_MAX_AGE_YEARS = 16.0
+_RATE_ADULT_AGE_DAYS = 18.0 * 365.25
+# Preserve the MedGemma adult 60/100 bpm convention while reusing the
+# project's continuous Glasgow pediatric curves.
+_MEDGEMMA_RATE_CONFIG = GlasgowConfig(
+    adult_tachycardia_bpm=100.0,
+    adult_bradycardia_bpm=60.0,
+)
 
 CANONICAL_LABELS = {
     "_avb": "atrioventricular block",
@@ -100,7 +136,14 @@ def json_dumps(data: Any) -> str:
 
 
 def _safe_read_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
+    if path.name.endswith(".json.gz"):
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    else:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise TypeError(f"expected a JSON object in {path}")
+    return payload
 
 
 def _safe_read_text(path: Path) -> str:
@@ -192,29 +235,116 @@ _DROP_SECTION_MARKERS = (
 
 
 def sanitize_report_text(report_text: str, char_limit: int = REPORT_CHAR_LIMIT) -> str:
+    """Return only diagnosis-free report measurements.
+
+    Generated reports put the dataset record id in the document title as well
+    as in the ``Record ID`` row.  Prefix-only filtering therefore is not a
+    sufficient de-identification boundary.  When a structured report contains
+    section headers, everything before the first section is treated as an
+    untrusted title/preamble and discarded.  The field checks below are
+    deliberately case-insensitive so alternative renderers cannot reintroduce
+    a label via ``diagnosis:``, ``record id:``, etc.
+    """
     cleaned_lines = []
-    drop_prefixes = (
-        "#Dx",
-        "Dx:",
-        "Dx Codes",
-        "Dx Detail",
-        "Diagnosis",
-        "Record ID",
-        "Hx",
-        "Sx",
+    drop_fields = (
+        "dx",
+        "dx code",
+        "dx codes",
+        "dx detail",
+        "diagnosis",
+        "diagnostic label",
+        "disease",
+        "disease label",
+        "ground truth",
+        "ground truth label",
+        "record",
+        "record id",
+        "record identifier",
+        "sample id",
+        "patient id",
+        "hx",
+        "sx",
+        # Treatment fields can identify the target diagnosis as directly as a
+        # label.  They are clinical context, not ECG measurements.
+        "rx",
+        "med",
+        "meds",
+        "medication",
+        "medications",
+        "medication list",
+        "prescription",
+        "prescriptions",
+        "drug",
+        "drugs",
+        "drug therapy",
+        "treatment",
+        "treatments",
+        "therapy",
+        "therapies",
+        "indication",
+        "indications",
+        "clinical history",
+        "medical history",
+        "past medical history",
+        "pmh",
+        "problem list",
+        "condition",
+        "conditions",
+        "chief complaint",
+        "presenting complaint",
         # This is an extractor diagnosis rather than a measurement.  Keep the
         # numeric AF/AFL evidence and F-wave validation in the rhythm section,
         # but withhold the already-decided class from independent reasoning.
-        "Atrial classification",
+        "atrial classification",
     )
-    drop_substrings = ("disease=", "source=", "batch_id=")
+    drop_substrings = (
+        "disease=",
+        "disease_label=",
+        "ground_truth=",
+        "ground_truth_label=",
+        "dataset=",
+        "source=",
+        "batch_id=",
+        "record_id=",
+        "sample_id=",
+    )
+    drop_prefix_fields = set(drop_fields) - {"record"}
+    treatment_field_tokens = {
+        "rx",
+        "med",
+        "meds",
+        "medication",
+        "medications",
+        "drug",
+        "drugs",
+        "prescription",
+        "prescriptions",
+        "therapy",
+        "therapies",
+        "treatment",
+        "treatments",
+        "history",
+        "indication",
+        "indications",
+    }
+
+    has_sections = any(_SECTION_HEADER_RE.match(line) for line in report_text.splitlines())
+    reached_first_section = not has_sections
 
     skipping_section = False
     skipping_wrapped_field = False
     for line in report_text.splitlines():
         stripped = line.strip()
         is_section_header = bool(_SECTION_HEADER_RE.match(line))
-        if is_section_header and any(marker in line for marker in _DROP_SECTION_MARKERS):
+        if is_section_header:
+            reached_first_section = True
+        if not reached_first_section:
+            # Titles are presentation metadata, not ECG measurements.  In the
+            # canonical report this is where ``... REPORT — <record_id>`` lives.
+            continue
+        if is_section_header and any(
+            marker.casefold() in line.casefold() for marker in _DROP_SECTION_MARKERS
+        ):
             skipping_section = True
             continue
         if skipping_section:
@@ -227,16 +357,27 @@ def sanitize_report_text(report_text: str, char_limit: int = REPORT_CHAR_LIMIT) 
             # continuation lines with no " : " of their own (e.g. Dx Detail's
             # parenthetical continuation) — those must be dropped too, or the
             # label text leaks anyway.
-            if not stripped or " : " in line or is_section_header:
+            if not stripped or re.search(r"[:=]", line) or is_section_header:
                 skipping_wrapped_field = False
             else:
                 continue
-        if any(stripped.startswith(prefix) for prefix in drop_prefixes):
+        normalized = stripped.lstrip("#").strip().casefold()
+        field_name = re.split(r"\s*[:=]\s*", normalized, maxsplit=1)[0].strip()
+        field_tokens = set(re.findall(r"[a-z]+", field_name))
+        if (
+            field_name in drop_fields
+            or any(field_name.startswith(field + " ") for field in drop_prefix_fields)
+            or bool(field_tokens & treatment_field_tokens)
+        ):
             skipping_wrapped_field = True
             continue
-        if "NOTE: This report is generated" in stripped:
+        if re.match(r"^(?:ecg\b.*\breport\b|report\b)", normalized):
+            # Also protects short/bare reports which do not have section
+            # headers but still embed their identifier in the title.
             continue
-        if any(token in stripped.lower() for token in drop_substrings):
+        if "note: this report is generated" in normalized:
+            continue
+        if any(token in normalized for token in drop_substrings):
             continue
         cleaned_lines.append(line.rstrip())
 
@@ -247,8 +388,11 @@ def sanitize_report_text(report_text: str, char_limit: int = REPORT_CHAR_LIMIT) 
 
 
 _REPORT_SECTIONS_BY_LAYER = {
-    "L0": ("PATIENT INFORMATION", "SIGNAL QUALITY", "BEAT-LEVEL QUALITY SUMMARY"),
-    "L1": ("PATIENT INFORMATION", "GLOBAL MEASUREMENTS", "RHYTHM SUMMARY"),
+    # Demographics come from the structured allow-list in ``_patient_context``.
+    # Do not route the free-form patient section, where a renderer could add a
+    # medication, history, or indication field that bypasses the sanitizer.
+    "L0": ("SIGNAL QUALITY", "BEAT-LEVEL QUALITY SUMMARY"),
+    "L1": ("GLOBAL MEASUREMENTS", "RHYTHM SUMMARY"),
     "L2": ("GLOBAL MEASUREMENTS", "PER-LEAD MEASUREMENTS"),
     "L3": ("GLOBAL MEASUREMENTS",),
     "L4": ("PER-LEAD MEASUREMENTS",),
@@ -356,12 +500,18 @@ def summarize_clinical_interpretation(
 
 
 def summarize_current_features(data: dict[str, Any], language: str = "en") -> str:
+    """Render the legacy display summary, including automated interpretations.
+
+    This function is not an independent-evaluation input.  Evaluation callers
+    must use :func:`summarize_independent_measurements`; the context builder
+    enforces that separation.
+    """
     gf = data.get("global_features", {})
     interp = data.get("interpretation", {})
     groups = data.get("groups", {})
     quality = data.get("quality", {})
     representative_leads = data.get("representative_leads", {})
-    metadata = data.get("metadata", {})
+    metadata = _metadata_mapping(data)
     patient = metadata.get("patient_meta", {})
     clinical_lines = summarize_clinical_interpretation(
         data.get("clinical_interpretation")
@@ -458,14 +608,19 @@ def build_context_summary_from_paths(
     if features_path is not None:
         data = _safe_read_json(features_path)
         if is_current_features_schema(data):
-            parts.append(summarize_current_features(data, language))
+            # Independent evaluation must never receive the extractor's
+            # ``interpretation`` or ``clinical_interpretation`` answers.
+            parts.append(summarize_independent_measurements(data, language))
         elif is_legacy_input_schema(data):
             parts.append(summarize_legacy_input(data, language))
         else:
             header = "[Uploaded JSON was not recognized as the current features schema]"
             if language == "ja":
                 header = "[アップロードされた JSON は現在の features schema として認識されませんでした]"
-            parts.append(header + "\n" + json.dumps(data, ensure_ascii=False, indent=2)[:3000])
+            # Dumping an unknown object into the prompt previously allowed
+            # arbitrary ``Dx``/ground-truth fields to bypass the schema-aware
+            # sanitizer.  Fail closed and expose no unknown values.
+            parts.append(header + "\n[Content withheld: unsupported schema]")
 
     if report_path is not None:
         report_text = sanitize_report_text(_safe_read_text(report_path))
@@ -483,7 +638,7 @@ def build_prompt(context_summary: str, language: str = "en") -> str:
         system_message = """あなたは、ECG 特徴抽出器の構造化出力をもとに二次診断サマリーを作成する熟練の心電図判読医です。
 
 次の原則を守ってください:
-1. 入力に含まれる ECG 計測値、導聯別結果、信号品質、自動解釈情報のみに基づいて回答すること。
+1. 入力に含まれる ECG 計測値、導聯別結果、信号品質のみに基づいて回答すること。自動診断や元ラベルは入力に使用しないこと。
 2. 低品質導聯を明確に考慮し、信頼性の低い導聯を強い根拠として扱わないこと。
 3. まず最も可能性の高い診断を示し、その後に類似診断/鑑別診断を 3 件、類似度の高い順に挙げること。
 4. 各類似診断について「共通点」と「重要な鑑別点」を必ず書き、病名だけを列挙しないこと。
@@ -519,7 +674,7 @@ def build_prompt(context_summary: str, language: str = "en") -> str:
         system_message = """You are a senior ECG interpretation specialist creating a second-pass diagnostic summary from structured outputs produced by an ECG feature extractor.
 
 Follow these rules:
-1. Base your answer only on the ECG measurements, per-lead findings, signal-quality information, and automated interpretation fields provided in the input.
+1. Base your answer only on ECG measurements, per-lead findings, and signal-quality information. Automated diagnostic interpretations and original labels must not be used.
 2. Explicitly consider low-quality leads and do not treat unreliable leads as strong evidence.
 3. Give the single most likely diagnosis first, then list 3 similar/differential diagnoses ranked from most similar to least similar.
 4. For each similar diagnosis, explain both the shared features and the key differentiating feature(s); do not just list disease names.
@@ -672,13 +827,263 @@ def _fmt_q_wave_detail(mi_evidence: dict[str, Any] | None) -> str:
     return _fmt_list(parts)
 
 
+def _finite_nonnegative(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if math.isfinite(result) and result >= 0.0 else None
+
+
+def _metadata_mapping(data: dict[str, Any]) -> Mapping[str, Any]:
+    metadata = data.get("metadata")
+    return metadata if isinstance(metadata, Mapping) else {}
+
+
+def _patient_metadata(data: dict[str, Any]) -> Mapping[str, Any]:
+    patient = _metadata_mapping(data).get("patient_meta")
+    return patient if isinstance(patient, Mapping) else {}
+
+
+def _resolved_patient_age(data: dict[str, Any]) -> dict[str, Any]:
+    """Resolve age once, with exact ``age_days`` taking precedence.
+
+    An explicitly supplied but invalid ``age_days`` is not silently replaced
+    by a possibly stale year-age.  In that case age-dependent conclusions are
+    withheld.  This mirrors the extractor's exact-day precedence while making
+    the safety behavior for corrupt demographics explicit.
+    """
+    patient = _patient_metadata(data)
+
+    raw_age_days = patient.get("age_days")
+    if raw_age_days is not None:
+        age_days = _finite_nonnegative(raw_age_days)
+        if age_days is None:
+            return {
+                "known": False,
+                "age_days": None,
+                "age_years": None,
+                "source": "invalid_age_days",
+                "pediatric_morphology": False,
+                "pediatric_rate": False,
+            }
+        age_years = age_days / 365.25
+        source = "age_days"
+    else:
+        age_years = _finite_nonnegative(patient.get("age"))
+        if age_years is None:
+            return {
+                "known": False,
+                "age_days": None,
+                "age_years": None,
+                "source": "missing",
+                "pediatric_morphology": False,
+                "pediatric_rate": False,
+            }
+        age_days = age_years * 365.25
+        source = "age_years"
+
+    return {
+        "known": True,
+        "age_days": age_days,
+        "age_years": age_years,
+        "source": source,
+        "pediatric_morphology": age_years < _PEDIATRIC_MORPHOLOGY_MAX_AGE_YEARS,
+        "pediatric_rate": age_days < _RATE_ADULT_AGE_DAYS,
+    }
+
+
+def _age_context_text(age: dict[str, Any]) -> str:
+    if not age["known"]:
+        reason = "invalid age_days" if age["source"] == "invalid_age_days" else "not provided"
+        return f"Age unknown ({reason}; age-specific thresholds unavailable)"
+    if age["source"] == "age_days":
+        days = float(age["age_days"])
+        if days < 365.25:
+            return (
+                f"Age {days:g} days ({float(age['age_years']):.3f} years; "
+                "age_days authoritative)"
+            )
+        return (
+            f"Age {float(age['age_years']):.2f} years "
+            f"(resolved from age_days={days:g})"
+        )
+    return f"Age {float(age['age_years']):g} years"
+
+
 def _patient_context(data: dict[str, Any]) -> str:
-    metadata = data.get("metadata") or {}
-    patient = metadata.get("patient_meta") or {}
+    metadata = _metadata_mapping(data)
+    patient = _patient_metadata(data)
     return (
-        f"Age {patient.get('age', 'N/A')} | Sex {patient.get('sex', 'N/A')} | "
+        f"{_age_context_text(_resolved_patient_age(data))} | Sex {patient.get('sex', 'N/A')} | "
         f"beats {metadata.get('n_beats', len(data.get('beats') or []))} | "
         f"input fs {metadata.get('input_fs', data.get('fs', 'N/A'))} Hz"
+    )
+
+
+_LAYER_GATE_DOMAINS = {
+    "L1": {"rhythm", "ectopy"},
+    "L2": {"conduction", "intervals", "av_conduction", "qrs_conduction"},
+    "L3": {
+        "axis",
+        "axis_quantitative",
+        "voltage",
+        "chamber",
+        "r_progression",
+        "voltage_chamber_r_progression",
+    },
+    "L4": {"repolarization", "st_t", "ischemia", "infarction", "q_wave"},
+}
+
+
+def diagnostic_gate_policy(
+    data: dict[str, Any], *, allow_legacy_missing: bool = False
+) -> dict[str, Any]:
+    """Normalize the extractor's diagnostic gate for downstream consumers.
+
+    Current feature artifacts must carry the complete structured gate
+    contract. Missing, string-valued, or incomplete gates fail closed. The
+    sole compatibility exception is an explicitly acknowledged legacy input
+    schema on the non-independent path; it never applies to current exports.
+    """
+    metadata = data.get("metadata") or {}
+    if not isinstance(metadata, Mapping):
+        metadata = {}
+    raw = metadata.get("diagnostic_gate")
+    if raw is None:
+        if (
+            allow_legacy_missing
+            and is_legacy_input_schema(data)
+            and not is_current_features_schema(data)
+        ):
+            return {
+                "state": "pass",
+                "stop_reasons": [],
+                "partial_reasons": [],
+                "allowed_domains": ["all"],
+                "suppressed_domains": [],
+                "source": "explicit_non_independent_legacy_override",
+            }
+        return {
+            "state": "stop",
+            "stop_reasons": ["missing_diagnostic_gate"],
+            "partial_reasons": [],
+            "allowed_domains": [],
+            "suppressed_domains": [],
+            "source": "metadata.diagnostic_gate",
+        }
+
+    required_fields = {
+        "state",
+        "stop_reasons",
+        "partial_reasons",
+        "allowed_domains",
+        "suppressed_domains",
+    }
+    list_fields = (
+        "stop_reasons",
+        "partial_reasons",
+        "allowed_domains",
+        "suppressed_domains",
+    )
+    malformed = not isinstance(raw, Mapping) or not required_fields.issubset(raw)
+    if malformed:
+        return {
+            "state": "stop",
+            "stop_reasons": ["malformed_diagnostic_gate"],
+            "partial_reasons": [],
+            "allowed_domains": [],
+            "suppressed_domains": [],
+            "source": "metadata.diagnostic_gate",
+        }
+
+    state = str(raw.get("state") or "").strip().lower()
+    if state not in {"pass", "partial", "stop"}:
+        return {
+            "state": "stop",
+            "stop_reasons": ["malformed_diagnostic_gate_state"],
+            "partial_reasons": [],
+            "allowed_domains": [],
+            "suppressed_domains": [],
+            "source": "metadata.diagnostic_gate",
+        }
+
+    normalized_lists: dict[str, list[str]] = {}
+    for field in list_fields:
+        value = raw.get(field)
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) or not item.strip() for item in value
+        ):
+            return {
+                "state": "stop",
+                "stop_reasons": [f"malformed_diagnostic_gate_{field}"],
+                "partial_reasons": [],
+                "allowed_domains": [],
+                "suppressed_domains": [],
+                "source": "metadata.diagnostic_gate",
+            }
+        normalized_lists[field] = [item.strip() for item in value]
+
+    stop_reasons = normalized_lists["stop_reasons"]
+    partial_reasons = normalized_lists["partial_reasons"]
+    allowed = normalized_lists["allowed_domains"]
+    suppressed = normalized_lists["suppressed_domains"]
+    invalid_contract = (
+        state == "pass"
+        and (stop_reasons or partial_reasons or allowed != ["all"] or suppressed)
+    ) or (
+        state == "partial"
+        and (stop_reasons or not partial_reasons or not allowed)
+    ) or (state == "stop" and (not stop_reasons or allowed))
+    if invalid_contract:
+        return {
+            "state": "stop",
+            "stop_reasons": [f"malformed_diagnostic_gate_{state}_contract"],
+            "partial_reasons": [],
+            "allowed_domains": [],
+            "suppressed_domains": [],
+            "source": "metadata.diagnostic_gate",
+        }
+
+    return {
+        "state": state,
+        "stop_reasons": stop_reasons,
+        "partial_reasons": partial_reasons,
+        "allowed_domains": [item.lower() for item in allowed],
+        "suppressed_domains": [item.lower() for item in suppressed],
+        "source": "metadata.diagnostic_gate",
+    }
+
+
+def diagnostic_gate_blocked_layers(gate: dict[str, Any]) -> set[str]:
+    """Map domain-level quality restrictions onto the MedGemma layers."""
+    if gate.get("state") == "stop":
+        return set(LAYER_KEYS[1:])
+
+    blocked: set[str] = set()
+    suppressed = set(gate.get("suppressed_domains") or [])
+    for layer_key, domains in _LAYER_GATE_DOMAINS.items():
+        if domains & suppressed:
+            blocked.add(layer_key)
+
+    allowed = set(gate.get("allowed_domains") or [])
+    if allowed and "all" not in allowed:
+        for layer_key, domains in _LAYER_GATE_DOMAINS.items():
+            if not domains & allowed:
+                blocked.add(layer_key)
+    return blocked
+
+
+def _gate_withheld_text(layer_key: str, gate: dict[str, Any]) -> str:
+    reasons = list(gate.get("stop_reasons") or []) + list(gate.get("partial_reasons") or [])
+    suppressed = gate.get("suppressed_domains") or []
+    return (
+        f"- WITHHELD BY DIAGNOSTIC GATE: {layer_key} evidence and deterministic facts are not "
+        f"available for diagnosis (state={gate.get('state')}; reasons={_fmt_list(reasons)}; "
+        f"suppressed_domains={_fmt_list(suppressed)}). The only permitted conclusion for this "
+        "layer is abstention."
     )
 
 
@@ -859,8 +1264,10 @@ def summarize_layered_evidence(data: dict[str, Any], language: str = "en") -> di
     quality = data.get("quality", {})
     representative_leads = data.get("representative_leads", {})
     groups = data.get("groups", {})
-    metadata = data.get("metadata", {})
+    metadata = _metadata_mapping(data)
     patient_line = _patient_context(data)
+    gate = diagnostic_gate_policy(data)
+    blocked_layers = diagnostic_gate_blocked_layers(gate)
 
     unreliable_leads = [
         f"{lead}({_fmt_list(info.get('flags', []))})"
@@ -873,6 +1280,11 @@ def summarize_layered_evidence(data: dict[str, Any], language: str = "en") -> di
             f"- Patient/record: {patient_line}",
             f"- Record quality grade: {(metadata.get('record_quality') or {}).get('record_grade', 'N/A')}; "
             f"reason codes={_fmt_list((metadata.get('record_quality') or {}).get('reason_codes'))}",
+            f"- Diagnostic gate: state={gate['state']}; "
+            f"stop reasons={_fmt_list(gate.get('stop_reasons'))}; "
+            f"partial reasons={_fmt_list(gate.get('partial_reasons'))}; "
+            f"allowed domains={_fmt_list(gate.get('allowed_domains'))}; "
+            f"suppressed domains={_fmt_list(gate.get('suppressed_domains'))}",
             f"- Overall unreliable leads: {_fmt_list(unreliable_leads)}",
             f"- P-unreliable={_fmt_flagged_leads(quality, 'reliable_for_p')}, "
             f"QRS-unreliable={_fmt_flagged_leads(quality, 'reliable_for_qrs')}, "
@@ -938,59 +1350,173 @@ def summarize_layered_evidence(data: dict[str, Any], language: str = "en") -> di
         ]
     )
 
-    return {"L0": l0, "L1": l1, "L2": l2, "L3": l3, "L4": l4}
+    layers = {"L0": l0, "L1": l1, "L2": l2, "L3": l3, "L4": l4}
+    for layer_key in blocked_layers:
+        layers[layer_key] = _gate_withheld_text(layer_key, gate)
+    return layers
 
 
-def _adult_rate_class(heart_rate: Any) -> str:
-    if not isinstance(heart_rate, (int, float)):
+def _numeric_measurement(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return result if math.isfinite(result) else None
+
+
+def _rate_class(
+    heart_rate: Any, age: dict[str, Any]
+) -> tuple[str, float | None, float | None]:
+    value = _numeric_measurement(heart_rate)
+    if value is None:
+        return "unavailable", None, None
+    if not age["known"]:
+        return "unavailable because age is unknown; adult limits were not applied", None, None
+    age_days = float(age["age_days"])
+    brady_limit = bradycardia_limit(age_days, _MEDGEMMA_RATE_CONFIG)
+    tachy_limit = tachycardia_limit(age_days, _MEDGEMMA_RATE_CONFIG)
+    profile = "age-adjusted pediatric" if age["pediatric_rate"] else "adult"
+    if value < brady_limit:
+        return f"bradycardic by {profile} limits", brady_limit, tachy_limit
+    if value > tachy_limit:
+        return f"tachycardic by {profile} limits", brady_limit, tachy_limit
+    return f"normal by {profile} limits", brady_limit, tachy_limit
+
+
+def _pr_limits_for_age(age: dict[str, Any]) -> dict[str, float] | None:
+    if not age["known"]:
+        return None
+    if float(age["age_days"]) < _RATE_ADULT_AGE_DAYS:
+        context = SimpleNamespace(
+            patient=SimpleNamespace(age_days=float(age["age_days"]))
+        )
+        return dict(_glasgow_pr_limits(context))
+    return {"short": 120.0, "first_degree": 200.0, "borderline": 200.0}
+
+
+def _pr_class(pr_ms: Any, age: dict[str, Any]) -> tuple[str, dict[str, float] | None]:
+    value = _numeric_measurement(pr_ms)
+    limits = _pr_limits_for_age(age)
+    if value is None:
+        return "unavailable", limits
+    if limits is None:
+        return "unavailable because age is unknown; adult limits were not applied", None
+    profile = "age-adjusted pediatric" if age["pediatric_rate"] else "adult"
+    if value < limits["short"]:
+        return f"short by {profile} limits", limits
+    if value >= limits["first_degree"]:
+        return (
+            f"prolonged by {profile} limits; can support first-degree AV delay only with 1:1 conduction",
+            limits,
+        )
+    return (
+        f"within {profile} limits; does not support first-degree AV delay",
+        limits,
+    )
+
+
+def _qrs_class(
+    qrs_ms: Any, age: dict[str, Any]
+) -> tuple[str, dict[str, float] | None]:
+    value = _numeric_measurement(qrs_ms)
+    if value is None:
+        return "unavailable", None
+    if not age["known"]:
+        return "unavailable because age is unknown; adult limits were not applied", None
+    if age["pediatric_morphology"]:
+        normal = _peds_lookup(
+            _PEDS_QRS_NORMAL_MS, float(age["age_years"])
+        )
+        if normal is None:
+            return "pediatric threshold unavailable", None
+        limits = {
+            "normal": float(normal),
+            "borderline": float(normal) * 1.10,
+            "nonspecific": float(normal) * 1.20,
+        }
+        category = _peds_qrs_width_class(value, float(normal))
+        labels = {
+            "normal": "normal by age-adjusted pediatric limit",
+            "above_normal_below_ivcd": "above the pediatric normal limit but below IVCD range",
+            "borderline_ivcd_range": "pediatric borderline IVCD range",
+            "nonspecific_ivcd_range": "pediatric nonspecific IVCD/BBB duration range",
+            "indeterminate": "pediatric threshold unavailable",
+        }
+        return labels.get(category, str(category)), limits
+    limits = {"normal": 110.0, "borderline": 110.0, "nonspecific": 120.0}
+    if value < 110:
+        return "normal adult duration", limits
+    if value < 120:
+        return "mildly prolonged; BBB requires compatible morphology", limits
+    return "wide", limits
+
+
+def _qrs_axis_class(axis_deg: Any, age: dict[str, Any]) -> str:
+    value = _numeric_measurement(axis_deg)
+    if value is None:
         return "unavailable"
-    if heart_rate < 60:
-        return "bradycardic"
-    if heart_rate > 100:
-        return "tachycardic"
-    return "normal adult rate"
-
-
-def _adult_pr_class(pr_ms: Any) -> str:
-    if not isinstance(pr_ms, (int, float)):
-        return "unavailable"
-    if pr_ms < 120:
-        return "short"
-    if pr_ms <= 200:
-        return "normal; does not support first-degree AV delay"
-    return "prolonged; can support first-degree AV delay only with 1:1 conduction"
-
-
-def _adult_qrs_class(qrs_ms: Any) -> str:
-    if not isinstance(qrs_ms, (int, float)):
-        return "unavailable"
-    if qrs_ms < 110:
-        return "normal duration"
-    if qrs_ms < 120:
-        return "mildly prolonged; BBB requires compatible morphology"
-    return "wide"
-
-
-def _qrs_axis_class(axis_deg: Any) -> str:
-    if not isinstance(axis_deg, (int, float)):
-        return "unavailable"
-    if axis_deg < -30:
+    if not age["known"]:
+        return "unavailable because age is unknown; adult limits were not applied"
+    if age["pediatric_morphology"]:
+        category = _peds_classify_qrs_axis(value, float(age["age_years"]))
+        labels = {
+            "LAD": "left axis deviation by age-adjusted pediatric limits",
+            "LAFB": "left axis deviation/LAFB range by age-adjusted pediatric limits",
+            "borderline_LAD": "borderline left axis by age-adjusted pediatric limits",
+            "RAD": "right axis deviation by age-adjusted pediatric limits",
+            "borderline_RAD": "borderline right axis by age-adjusted pediatric limits",
+            "normal": "normal age-adjusted pediatric axis",
+            "indeterminate": "pediatric axis threshold unavailable",
+        }
+        return labels.get(category, str(category))
+    if value < -30:
         return "left axis deviation"
-    if axis_deg > 90:
+    if value > 90:
         return "right axis deviation"
     return "normal adult axis"
 
 
-def _qtc_class(qtc_ms: Any, sex: str | None) -> tuple[str, float]:
+def _qtc_class(
+    qtc_ms: Any, sex: str | None, age: dict[str, Any]
+) -> tuple[str, str]:
+    value = _numeric_measurement(qtc_ms)
+    if not age["known"]:
+        return (
+            "unavailable because age is unknown; adult limits were not applied",
+            "age-specific limits unavailable",
+        )
+    if age["pediatric_morphology"]:
+        limits = _peds_qtc_limits(float(age["age_years"]), sex)
+        borderline = limits["borderline_prolonged_ms"]
+        prolonged = limits["prolonged_ms"]
+        if value is None or borderline is None or prolonged is None:
+            return "unavailable", "pediatric limits unavailable"
+        if value < float(limits["short_ms"]):
+            result = "short by age-adjusted pediatric limits"
+        elif value > float(limits["severe_ms"]):
+            result = "significantly prolonged by age-adjusted pediatric limits"
+        elif value > float(prolonged):
+            result = "prolonged by age-adjusted pediatric limits"
+        elif value > float(borderline):
+            result = "borderline prolonged by age-adjusted pediatric limits"
+        else:
+            result = "normal by age-adjusted pediatric limits"
+        return (
+            result,
+            f"pediatric borderline>{float(borderline):.0f} ms, prolonged>{float(prolonged):.0f} ms",
+        )
+
     sex_lower = (sex or "").lower()
     upper = 450.0 if sex_lower.startswith("m") else 470.0 if sex_lower.startswith("f") else 460.0
-    if not isinstance(qtc_ms, (int, float)):
-        return "unavailable", upper
-    if qtc_ms > upper:
-        return "prolonged", upper
-    if qtc_ms < 350:
-        return "short", upper
-    return "within the usual adult range", upper
+    if value is None:
+        return "unavailable", f"adult upper {upper:.0f} ms"
+    if value > upper:
+        return "prolonged", f"adult upper {upper:.0f} ms"
+    if value < 350:
+        return "short", f"adult upper {upper:.0f} ms"
+    return "within the usual adult range", f"adult upper {upper:.0f} ms"
 
 
 def _lead_param(data: dict[str, Any], lead: str, key: str) -> Any:
@@ -999,8 +1525,53 @@ def _lead_param(data: dict[str, Any], lead: str, key: str) -> Any:
 
 def _lvh_voltage_facts(data: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Return computed LVH voltage criteria and their audit strings."""
-    patient = (data.get("metadata") or {}).get("patient_meta") or {}
+    patient = _patient_metadata(data)
     sex = str(patient.get("sex") or "")
+    age = _resolved_patient_age(data)
+    if not age["known"]:
+        return [], [
+            "LVH voltage classification withheld because age is unknown; adult voltage thresholds were not applied"
+        ]
+
+    if age["pediatric_morphology"]:
+        age_years = float(age["age_years"])
+        axis_category = _peds_classify_qrs_axis(
+            (data.get("global_features") or {}).get("qrs_axis_deg"),
+            age_years,
+        )
+        evidence = build_pediatric_hypertrophy_evidence(
+            representative_leads=data.get("representative_leads") or {},
+            age_years=age_years,
+            sex=sex or None,
+            qrs_axis_class=axis_category,
+            # Automated BBB interpretations are intentionally unavailable on
+            # this independent path; the voltage facts therefore do not claim
+            # that a morphology-based bypass was adjudicated.
+            bundle_branch_block=None,
+        )
+        lvh = evidence.get("lvh") or {}
+        criteria = [
+            "pediatric LVH R-V6 >98th-percentile voltage"
+            for item in (lvh.get("criteria") or [])
+            if item == "lvh_r_v6_98p_mv"
+        ]
+        r_v6 = _lead_param(data, "V6", "r_amp_mv")
+        threshold = pediatric_voltage_threshold(
+            age_years, sex or None, "lvh_r_v6_98p_mv"
+        )
+        audit = [
+            "Pediatric LVH voltage route selected "
+            f"(age_days={float(age['age_days']):g}, age_bin={pediatric_age_bin(age_years) or 'unavailable'})"
+        ]
+        if isinstance(r_v6, (int, float)) and threshold is not None:
+            audit.append(
+                f"Pediatric RV6={float(r_v6):.3f} mV (>98th-percentile threshold "
+                f"{float(threshold):.3f}; met={float(r_v6) >= float(threshold)})"
+            )
+        else:
+            audit.append("Pediatric RV6 voltage criterion unavailable")
+        return criteria, audit
+
     ra_vl = _lead_param(data, "aVL", "r_amp_mv")
     sv1 = _lead_param(data, "V1", "s_amp_mv")
     sv3 = _lead_param(data, "V3", "s_amp_mv")
@@ -1017,11 +1588,27 @@ def _lvh_voltage_facts(data: dict[str, Any]) -> tuple[list[str], list[str]]:
             criteria.append("Sokolow-Lyon")
     if isinstance(ra_vl, (int, float)) and isinstance(sv3, (int, float)):
         cornell = ra_vl + abs(min(sv3, 0.0))
-        threshold = 2.8 if sex.lower().startswith("m") else 2.0
-        met = cornell > threshold
-        audit.append(f"Cornell RaVL+|SV3|={cornell:.3f} mV (sex threshold {threshold:.1f}; met={met})")
-        if met:
-            criteria.append("Cornell voltage")
+        sex_lower = sex.strip().lower()
+        threshold = (
+            2.8
+            if sex_lower.startswith("m")
+            else 2.0
+            if sex_lower.startswith("f")
+            else None
+        )
+        if threshold is None:
+            audit.append(
+                f"Cornell RaVL+|SV3|={cornell:.3f} mV (indeterminate: sex-specific threshold "
+                "cannot be selected because sex is unknown)"
+            )
+        else:
+            met = cornell > threshold
+            audit.append(
+                f"Cornell RaVL+|SV3|={cornell:.3f} mV "
+                f"(sex threshold {threshold:.1f}; met={met})"
+            )
+            if met:
+                criteria.append("Cornell voltage")
     if isinstance(ra_vl, (int, float)):
         met = ra_vl >= 1.1
         audit.append(f"RaVL={ra_vl:.3f} mV (threshold 1.1; met={met})")
@@ -1045,6 +1632,37 @@ def _t_polarity_facts(data: dict[str, Any]) -> tuple[list[str], list[str]]:
     return negative_observed, conflicts
 
 
+def _age_resolved_q_wave_leads(
+    data: dict[str, Any], age: dict[str, Any]
+) -> tuple[list[str], str]:
+    if not age["known"]:
+        return [], "age unknown; adult Q-wave duration criteria were not applied"
+
+    qualifying: list[str] = []
+    if age["pediatric_morphology"]:
+        for lead in STANDARD_12_LEADS:
+            if lead == "aVR":
+                continue
+            amplitude = _numeric_measurement(_lead_param(data, lead, "q_amp_mv"))
+            duration = _numeric_measurement(_lead_param(data, lead, "q_duration_ms"))
+            ratio = _numeric_measurement(_lead_param(data, lead, "q_r_ratio"))
+            if amplitude is None or amplitude >= 0:
+                continue
+            infarct_ratio = ratio is not None and ratio > 0.20 and (
+                duration is None or duration >= 35.0
+            )
+            if abs(amplitude) >= 0.15 or infarct_ratio:
+                qualifying.append(lead)
+        return qualifying, "pediatric large-Q criterion (|Q|>=0.15 mV or age-route Q/R criterion)"
+
+    for lead in STANDARD_12_LEADS:
+        duration = _numeric_measurement(_lead_param(data, lead, "q_duration_ms"))
+        amplitude = _numeric_measurement(_lead_param(data, lead, "q_amp_mv"))
+        if lead != "aVR" and duration is not None and duration >= 40 and amplitude is not None and amplitude < 0:
+            qualifying.append(lead)
+    return qualifying, "adult measured Q duration >=40 ms"
+
+
 def _organized_atrial_residual_facts(
     data: dict[str, Any],
 ) -> tuple[bool, list[str], list[str]]:
@@ -1059,6 +1677,12 @@ def _organized_atrial_residual_facts(
         ((data.get("metadata") or {}).get("rhythm_analysis") or {}).get(
             "atrial_residual"
         )
+        or (((data.get("rhythm_inputs") or {}).get("af_afl") or {}).get(
+            "qrst_subtraction_quality"
+        ))
+        or (((data.get("rhythm_inputs") or {}).get("af_afl") or {}).get(
+            "atrial_residual_signal_summary"
+        ))
         or {}
     )
     per_lead = residual.get("per_lead_atrial_activity") or {}
@@ -1093,8 +1717,9 @@ def build_validated_measurement_facts(data: dict[str, Any]) -> dict[str, str]:
     ``interpretation``, unified-rule output, or original Dx is used.
     """
     gf = data.get("global_features") or {}
-    patient = (data.get("metadata") or {}).get("patient_meta") or {}
+    patient = _patient_metadata(data)
     sex = str(patient.get("sex") or "")
+    age = _resolved_patient_age(data)
     hr = gf.get("heart_rate_bpm")
     pr = gf.get("pr_ms")
     qrs = gf.get("qrs_ms")
@@ -1102,26 +1727,19 @@ def build_validated_measurement_facts(data: dict[str, Any]) -> dict[str, str]:
     qtc_f = gf.get("qtc_fridericia_ms")
     qrs_axis = gf.get("qrs_axis_deg")
     ptf_v1 = gf.get("ptf_v1_mv_ms")
-    qtc_b_class, qtc_upper = _qtc_class(qtc_b, sex)
-    qtc_f_class, _ = _qtc_class(qtc_f, sex)
+    rate_class, brady_limit, tachy_limit = _rate_class(hr, age)
+    pr_class, pr_limits = _pr_class(pr, age)
+    qrs_class, qrs_limits = _qrs_class(qrs, age)
+    qtc_b_class, qtc_limits_text = _qtc_class(qtc_b, sex, age)
+    qtc_f_class, _ = _qtc_class(qtc_f, sex, age)
+    qrs_axis_class = _qrs_axis_class(qrs_axis, age)
     voltage_criteria, voltage_audit = _lvh_voltage_facts(data)
     negative_t, t_conflicts = _t_polarity_facts(data)
     organized_atrial, organized_atrial_leads, organized_atrial_audit = (
         _organized_atrial_residual_facts(data)
     )
 
-    q40_leads = []
-    for lead in STANDARD_12_LEADS:
-        duration = _lead_param(data, lead, "q_duration_ms")
-        amplitude = _lead_param(data, lead, "q_amp_mv")
-        if (
-            lead != "aVR"
-            and isinstance(duration, (int, float))
-            and duration >= 40
-            and isinstance(amplitude, (int, float))
-            and amplitude < 0
-        ):
-            q40_leads.append(lead)
+    q_wave_leads, q_wave_criterion = _age_resolved_q_wave_leads(data, age)
 
     j_offsets = []
     for lead in STANDARD_12_LEADS:
@@ -1132,12 +1750,15 @@ def build_validated_measurement_facts(data: dict[str, Any]) -> dict[str, str]:
     facts = {
         "L0": (
             "- Source policy: JSON measurement fields plus diagnosis-free report measurements; "
-            "original Dx codes/labels and automated diagnostic conclusions are excluded."
+            "original Dx codes/labels and automated diagnostic conclusions are excluded.\n"
+            f"- Demographic threshold route: {_age_context_text(age)}."
         ),
         "L1": "\n".join(
             [
-                f"- Deterministic adult rate class: HR {_fmt_num(hr, 1, ' bpm')} => {_adult_rate_class(hr)}. "
-                "A named rhythm must still be supported by atrial activity and RR behavior.",
+                f"- Deterministic age-resolved rate check: HR {_fmt_num(hr, 1, ' bpm')} => {rate_class}; "
+                f"brady limit={_fmt_num(brady_limit, 1, ' bpm')}, "
+                f"tachy limit={_fmt_num(tachy_limit, 1, ' bpm')}. A named rhythm must still be "
+                "supported by atrial activity and RR behavior.",
                 f"- Independent rapid organized atrial-residual check (no classifier/Dx fields): "
                 f"qualifying leads={_fmt_list(organized_atrial_leads)}; strict multilead support="
                 f"{organized_atrial}.",
@@ -1155,18 +1776,24 @@ def build_validated_measurement_facts(data: dict[str, Any]) -> dict[str, str]:
         ),
         "L2": "\n".join(
             [
-                f"- Deterministic PR check: {_fmt_num(pr, 0, ' ms')} => {_adult_pr_class(pr)}.",
-                f"- Deterministic QRS-duration check: {_fmt_num(qrs, 0, ' ms')} => {_adult_qrs_class(qrs)}.",
-                f"- Deterministic QTc check ({sex or 'sex unknown'}, usual upper {qtc_upper:.0f} ms): "
+                f"- Deterministic age-resolved PR check: {_fmt_num(pr, 0, ' ms')} => {pr_class}; "
+                f"limits={pr_limits or 'unavailable'}.",
+                f"- Deterministic age-resolved QRS-duration check: {_fmt_num(qrs, 0, ' ms')} => "
+                f"{qrs_class}; limits={qrs_limits or 'unavailable'}.",
+                f"- Deterministic age-resolved QTc check ({sex or 'sex unknown'}; {qtc_limits_text}): "
                 f"QTcB {_fmt_num(qtc_b, 0, ' ms')} => {qtc_b_class}; "
                 f"QTcF {_fmt_num(qtc_f, 0, ' ms')} => {qtc_f_class}.",
             ]
         ),
         "L3": "\n".join(
             [
-                f"- Deterministic QRS-axis check: {_fmt_num(qrs_axis, 0, '°')} => {_qrs_axis_class(qrs_axis)}.",
-                f"- Deterministic PTF-V1 check: {_fmt_num(ptf_v1, 3, ' mV·ms')}; the common abnormal magnitude "
-                "threshold is about 4.0 mV·ms, so smaller magnitudes alone do not support LA abnormality.",
+                f"- Deterministic age-resolved QRS-axis check: {_fmt_num(qrs_axis, 0, '°')} => {qrs_axis_class}.",
+                (
+                    f"- Deterministic PTF-V1 check: {_fmt_num(ptf_v1, 3, ' mV·ms')}; the shared morphology "
+                    "threshold is about 4.0 mV·ms, so smaller magnitudes alone do not support LA abnormality."
+                    if age["known"]
+                    else "- Deterministic PTF-V1 diagnostic classification withheld because age is unknown."
+                ),
                 f"- Computed LVH voltage criteria met: {_fmt_list(voltage_criteria)}.",
                 *[f"- {item}." for item in voltage_audit],
             ]
@@ -1175,14 +1802,39 @@ def build_validated_measurement_facts(data: dict[str, Any]) -> dict[str, str]:
             [
                 f"- Observed negative T polarity leads: {_fmt_list(negative_t)}; aVR negativity is usually expected.",
                 f"- T-amplitude/polarity field conflicts requiring downgrade to uncertain: {_fmt_list(t_conflicts)}.",
-                f"- Non-aVR Q waves with measured duration >=40 ms: {_fmt_list(q40_leads)}; prior-MI pattern "
-                "still requires at least two contiguous territorial leads.",
+                f"- Age-resolved Q-wave screen ({q_wave_criterion}): {_fmt_list(q_wave_leads)}; "
+                "a prior-MI pattern still requires at least two contiguous territorial leads.",
                 f"- Raw signed ST-J offsets (mV; do not reverse signs or substitute ST-80 for J point): "
                 f"{'; '.join(j_offsets) or '—'}.",
             ]
         ),
     }
+    gate = diagnostic_gate_policy(data)
+    for layer_key in diagnostic_gate_blocked_layers(gate):
+        facts[layer_key] = _gate_withheld_text(layer_key, gate)
     return facts
+
+
+def summarize_independent_measurements(
+    data: dict[str, Any], language: str = "en"
+) -> str:
+    """Build the single-shot context from measurements and quality only.
+
+    This is intentionally separate from :func:`summarize_current_features`,
+    which is retained for non-evaluation display compatibility and includes
+    automated interpretations.  Keeping the independent DTO explicit makes it
+    difficult for newly-added rule outputs to enter an evaluation prompt by
+    accident.
+    """
+    layers = summarize_layered_evidence(data, language)
+    facts = build_validated_measurement_facts(data)
+    blocks = ["[Independent Measurement-Only ECG Context]"]
+    for layer_key in LAYER_KEYS:
+        blocks.append(
+            f"[{layer_key} measurement evidence]\n{layers[layer_key]}\n\n"
+            f"[{layer_key} deterministic measurement checks]\n{facts[layer_key]}"
+        )
+    return "\n\n".join(blocks)
 
 
 def summarize_reference_only(data: dict[str, Any]) -> str:
@@ -1223,9 +1875,10 @@ _LAYER_RULES_EN = {
     ),
     "L2": (
         "Do not call incomplete RBBB from duration alone: require compatible V1/V2 terminal "
-        "R' morphology, a broad terminal S in I/V6, and an adult QRS duration in the "
-        "110-119 ms range. First-degree AV delay requires PR >200 ms with 1:1 conduction; "
-        "PR 120-200 ms is not first-degree AV block. Do not call second-degree AV block "
+        "R' morphology, a broad terminal S in I/V6, and the supplied age-resolved QRS range "
+        "(110-119 ms applies only to adults). First-degree AV delay requires the supplied "
+        "age-resolved PR threshold plus 1:1 conduction; never substitute an adult threshold "
+        "when age is pediatric or unknown. Do not call second-degree AV block "
         "without a reproducible P:QRS pattern (progressive PR with a dropped QRS, or fixed "
         "PR with dropped QRS). Never call a QTc normal when it exceeds the supplied "
         "sex-specific deterministic upper limit."
@@ -1238,8 +1891,9 @@ _LAYER_RULES_EN = {
         "adding signed S-wave amplitudes incorrectly."
     ),
     "L4": (
-        "Require Q-wave duration and contiguous territorial support before calling a prior-MI "
-        "pattern; a large Q/R ratio caused by a tiny R wave is not sufficient. Check high "
+        "Use the supplied age route and require age-appropriate Q-wave criteria plus contiguous "
+        "territorial support before calling a prior-MI pattern; if age is unknown, do not force "
+        "adult Q-duration criteria. A large Q/R ratio caused by a tiny R wave is not sufficient. Check high "
         "QRS voltage and lead placement as confounders. ST-J baseline offsets alone are not "
         "proof of acute ischemia. Preserve the sign of every ST value and use ST-J, not ST-80, "
         "for a J-point elevation claim. If T amplitude and observed polarity conflict, mark "
@@ -1252,9 +1906,9 @@ _LAYER_RULES_EN = {
 _LAYER_RULES_JA = {
     "L0": "全体Q0/Q1だけで導聯別フラグを上書きせず、P/QRS/T/QTのどの測定が不可靠か明記してください。",
     "L1": "中央RRが規則的で少数の休止・外れ値だけがCVを上げている場合、全RR CVだけで心房細動と診断しないでください。",
-    "L2": "QRS時間だけで不完全右脚ブロックとせず、V1/V2の終末R'、I/V6の幅広いS、成人QRS 110–119 msを確認してください。再現性のあるP:QRS関係なしに二度房室ブロックと診断しないでください。",
+    "L2": "QRS時間だけで不完全右脚ブロックとせず、V1/V2の終末R'、I/V6の幅広いS、提示された年齢別QRS基準を確認してください（110–119 msは成人にのみ適用）。年齢が小児または不明な場合に成人PR/QRS基準を代用しないでください。再現性のあるP:QRS関係なしに二度房室ブロックと診断しないでください。",
     "L3": "単一の高振幅だけで心腔診断を行わず、年齢・性別、連続導聯、電気軸、電極位置の可能性を確認してください。",
-    "L4": "既往梗塞パターンにはQ波幅と連続する領域導聯の支持を必要とし、小さいRによる高Q/R比だけを根拠にしないでください。症状、連続ECG変化、トロポニンがない場合、急性MI/NSTEMIと断定せずECGパターンとして記載してください。",
+    "L4": "既往梗塞パターンには年齢別Q波基準と連続する領域導聯の支持を必要とし、年齢不明時に成人Q波幅基準を強制せず、小さいRによる高Q/R比だけを根拠にしないでください。症状、連続ECG変化、トロポニンがない場合、急性MI/NSTEMIと断定せずECGパターンとして記載してください。",
 }
 
 
@@ -1364,6 +2018,7 @@ def build_synthesis_prompt(
         system_message = """あなたは最終ECG統合判定者です。L0〜L4は互いに隔離された測定段階で個別判定されています。各段階の結論と反証だけを統合し、新しい測定値や診断を作らないでください。
 
 必須ルール:
+- 「WITHHELD BY DIAGNOSTIC GATE」の段階は完全に利用不可です。その領域の所見・診断・正常判定を統合に追加せず、棄却理由だけを記載してください。
 - 最有力診断の各要素は、該当段階の具体的な数値または形態で支持されなければなりません。
 - 「決定的測定チェック」は数値から計算された制約であり、段階文章と矛盾する場合は測定チェックを優先してください。
 - 段階間の矛盾は解消するか、未解決として明記してください。
@@ -1375,6 +2030,7 @@ def build_synthesis_prompt(
         system_message = """You are the final ECG synthesis adjudicator. L0-L4 were assessed in separate, measurement-isolated calls. Integrate their auditable findings and counterevidence; do not invent new measurements or diagnoses.
 
 Mandatory rules:
+- A stage marked WITHHELD BY DIAGNOSTIC GATE is completely unavailable. Do not add a finding, diagnosis, or normality claim from that domain; report only the abstention reason.
 - Every component of the most likely diagnosis must be supported by concrete numeric or morphologic evidence in the relevant stage.
 - The deterministic measurement checks are arithmetic constraints. If stage prose conflicts with them, the deterministic checks take precedence.
 - Resolve cross-layer conflicts or explicitly leave them unresolved.
@@ -1704,11 +2360,53 @@ def check_rr_outlier_driven_irregularity(data: dict[str, Any]) -> list[str]:
 
 
 def run_feature_guardrails(data: dict[str, Any]) -> list[str]:
+    """Legacy guardrails, including comparisons to extractor interpretations.
+
+    Kept for display/backward-compatible callers only.  Independent MedGemma
+    evaluation uses :func:`run_independent_feature_guardrails` below so these
+    rule-engine answers cannot enter a revision prompt.
+    """
     return (
         check_q_wave_lvh_false_positive(data)
         + check_qrs_consensus_bbb_gap(data)
         + check_rr_outlier_driven_irregularity(data)
     )
+
+
+def run_independent_feature_guardrails(data: dict[str, Any]) -> list[str]:
+    """Guardrails derived solely from raw measurements, never interpretation."""
+    notes = check_rr_outlier_driven_irregularity(data)
+    age = _resolved_patient_age(data)
+
+    consensus_qrs = (data.get("global_features") or {}).get("qrs_ms")
+    wide_leads: list[tuple[str, float]] = []
+    if isinstance(consensus_qrs, (int, float)) and consensus_qrs < 100:
+        for lead, info in (data.get("representative_leads") or {}).items():
+            raw_qrs = ((info or {}).get("params") or {}).get("qrs_ms")
+            if isinstance(raw_qrs, (int, float)) and 100 <= raw_qrs < 120:
+                wide_leads.append((str(lead), float(raw_qrs)))
+    if wide_leads:
+        leads = ", ".join(
+            f"{lead}={value:.0f}ms"
+            for lead, value in sorted(wide_leads, key=lambda item: -item[1])
+        )
+        notes.append(
+            f"Measured consensus QRS is {consensus_qrs:.0f}ms, but raw per-lead QRS reaches "
+            f"{leads}; the consensus may undercount the widest lead. Review per-lead conduction "
+            "morphology before ruling out a borderline "
+            "conduction delay."
+        )
+
+    voltage_criteria, voltage_audit = _lvh_voltage_facts(data)
+    q_wave_leads, q_wave_criterion = _age_resolved_q_wave_leads(data, age)
+    if voltage_criteria and q_wave_leads:
+        notes.append(
+            f"Age-resolved Q-wave findings ({q_wave_criterion}) are present in "
+            f"{_fmt_list(q_wave_leads)} while raw voltages meet "
+            f"{_fmt_list(voltage_criteria)} ({'; '.join(voltage_audit)}). Adjudicate high-voltage "
+            "confounding before calling an infarct Q-wave pattern."
+        )
+    return notes
 
 
 def clean_model_output(raw_text: str) -> str:
@@ -1779,20 +2477,31 @@ def run_stage_claim_guardrails(
     """Detect direct contradictions between stage prose and measured values."""
     notes: dict[str, list[str]] = {key: [] for key in LAYER_KEYS}
     gf = data.get("global_features") or {}
-    patient = (data.get("metadata") or {}).get("patient_meta") or {}
+    patient = _patient_metadata(data)
     sex = str(patient.get("sex") or "")
+    age = _resolved_patient_age(data)
 
     hr = gf.get("heart_rate_bpm")
     l1 = stage_outputs.get("L1", "").lower()
-    rate_class = _adult_rate_class(hr)
-    if rate_class == "bradycardic" and "brady" not in l1:
+    rate_class, brady_limit, tachy_limit = _rate_class(hr, age)
+    if not age["known"] and _has_nonnegated_claim(
+        stage_outputs.get("L1", ""),
+        (r"\bbradycard(?:ia|ic)\b", r"\btachycard(?:ia|ic)\b"),
+    ):
         notes["L1"].append(
-            f"HR is {_fmt_num(hr, 1, ' bpm')}, which is adult bradycardia (<60). "
+            "Age is unknown, so an age-specific bradycardia/tachycardia threshold cannot be "
+            "selected. Do not justify the rate class with adult cutoffs; obtain age or mark it uncertain."
+        )
+    if rate_class.startswith("bradycardic") and "brady" not in l1:
+        notes["L1"].append(
+            f"HR is {_fmt_num(hr, 1, ' bpm')}, below the resolved age-specific bradycardia "
+            f"limit of {_fmt_num(brady_limit, 1, ' bpm')}. "
             "Name the rate as bradycardic rather than merely 'sinus rhythm'."
         )
-    if rate_class == "tachycardic" and "tachy" not in l1:
+    if rate_class.startswith("tachycardic") and "tachy" not in l1:
         notes["L1"].append(
-            f"HR is {_fmt_num(hr, 1, ' bpm')}, which is adult tachycardia (>100). "
+            f"HR is {_fmt_num(hr, 1, ' bpm')}, above the resolved age-specific tachycardia "
+            f"limit of {_fmt_num(tachy_limit, 1, ' bpm')}. "
             "Name the rate as tachycardic and adjudicate the rhythm mechanism."
         )
     organized_atrial, organized_atrial_leads, organized_atrial_audit = (
@@ -1815,16 +2524,36 @@ def run_stage_claim_guardrails(
         stage_outputs.get("L2", ""),
         (r"first[- ]degree[^.\n]{0,40}(?:av|atrioventricular)",),
     )
-    if isinstance(pr, (int, float)) and pr <= 200 and first_degree_claim:
+    pr_value = _numeric_measurement(pr)
+    _pr_result, pr_limits = _pr_class(pr, age)
+    first_degree_limit = pr_limits.get("first_degree") if pr_limits else None
+    if first_degree_claim and first_degree_limit is None:
         notes["L2"].append(
-            f"Measured PR is {pr:.0f} ms (normal adult range 120-200 ms), so first-degree AV "
-            "block/delay is not supported. Remove that diagnosis."
+            "Age is unknown, so the first-degree AV-delay PR threshold cannot be selected. "
+            "Do not substitute the adult threshold; downgrade the claim pending age."
         )
-    if isinstance(pr, (int, float)) and pr > 200 and not (
-        first_degree_claim or "prolonged pr" in l2 or "pr prolong" in l2
+    if (
+        pr_value is not None
+        and first_degree_limit is not None
+        and pr_value < first_degree_limit
+        and first_degree_claim
     ):
         notes["L2"].append(
-            f"Measured PR is {pr:.0f} ms (>200 ms). With confirmed 1:1 conduction this supports "
+            f"Measured PR is {pr_value:.0f} ms, below the resolved age-specific first-degree "
+            f"threshold of {first_degree_limit:.0f} ms, so first-degree AV block/delay is not "
+            "supported. Remove that diagnosis."
+        )
+    if (
+        pr_value is not None
+        and first_degree_limit is not None
+        and pr_value >= first_degree_limit
+        and not (
+        first_degree_claim or "prolonged pr" in l2 or "pr prolong" in l2
+        )
+    ):
+        notes["L2"].append(
+            f"Measured PR is {pr_value:.0f} ms (age-specific threshold "
+            f"{first_degree_limit:.0f} ms). With confirmed 1:1 conduction this supports "
             "first-degree AV delay; explicitly adjudicate it."
         )
 
@@ -1833,58 +2562,70 @@ def run_stage_claim_guardrails(
     qtc_value = max(value for value in (qtc_b, qtc_f) if isinstance(value, (int, float))) if any(
         isinstance(value, (int, float)) for value in (qtc_b, qtc_f)
     ) else None
-    qtc_class, qtc_upper = _qtc_class(qtc_value, sex)
+    qtc_class, qtc_limits_text = _qtc_class(qtc_value, sex, age)
     normal_qt_claim = any(term in l2 for term in ("normal qt", "qt interval is normal", "qtc is normal"))
-    if qtc_class == "prolonged" and (normal_qt_claim or "prolong" not in l2):
+    qtc_abnormal_high = "prolonged" in qtc_class
+    if qtc_abnormal_high and (normal_qt_claim or "prolong" not in l2):
         notes["L2"].append(
-            f"QTc reaches {_fmt_num(qtc_value, 0, ' ms')}, above the usual {sex or 'adult'} upper "
-            f"limit of {qtc_upper:.0f} ms. It cannot be called normal; report prolonged QTc and "
+            f"QTc reaches {_fmt_num(qtc_value, 0, ' ms')} ({qtc_limits_text}). It cannot be "
+            "called normal; report the age-resolved prolonged/borderline-prolonged QTc and "
             "its measurement reliability."
         )
     prolonged_qt_claim = _has_nonnegated_claim(
         stage_outputs.get("L2", ""),
         _PROLONGED_QT_PATTERNS,
     )
-    if qtc_class == "within the usual adult range" and prolonged_qt_claim:
+    if not age["known"] and prolonged_qt_claim:
         notes["L2"].append(
-            f"QTc is {_fmt_num(qtc_value, 0, ' ms')}, within the supplied adult limit; a prolonged "
+            "Age is unknown, so an age-appropriate QTc threshold cannot be selected. Do not "
+            "assert prolonged QTc from an adult cutoff; report the measurement and uncertainty."
+        )
+    if qtc_class in {"within the usual adult range", "normal by age-adjusted pediatric limits"} and prolonged_qt_claim:
+        notes["L2"].append(
+            f"QTc is {_fmt_num(qtc_value, 0, ' ms')}, within the supplied age-specific limits; a prolonged "
             "QT diagnosis is not supported by this measurement."
         )
 
     l3 = stage_outputs.get("L3", "").lower()
     qrs_axis = gf.get("qrs_axis_deg")
-    axis_class = _qrs_axis_class(qrs_axis)
-    if axis_class == "left axis deviation" and (
+    axis_class = _qrs_axis_class(qrs_axis, age)
+    left_axis_claim = _has_nonnegated_claim(
+        stage_outputs.get("L3", ""), (r"left\s+axis\s+deviation",)
+    )
+    right_axis_claim = _has_nonnegated_claim(
+        stage_outputs.get("L3", ""), (r"right\s+axis\s+deviation",)
+    )
+    if not age["known"] and (left_axis_claim or right_axis_claim):
+        notes["L3"].append(
+            "Age is unknown, so age-appropriate QRS-axis limits cannot be selected. Do not "
+            "substitute the adult -30°/+90° limits; report the measured axis as indeterminate."
+        )
+    if axis_class.startswith("left axis deviation") and (
         "normal qrs axis" in l3 or "left axis" not in l3
     ):
         notes["L3"].append(
-            f"QRS axis is {_fmt_num(qrs_axis, 0, '°')}, below -30°, so it is left axis deviation, "
-            "not a normal adult axis."
+            f"QRS axis is {_fmt_num(qrs_axis, 0, '°')}, classified as {axis_class}; it must not "
+            "be called normal."
         )
-    if axis_class == "right axis deviation" and (
+    if axis_class.startswith("right axis deviation") and (
         "normal qrs axis" in l3 or "right axis" not in l3
     ):
         notes["L3"].append(
-            f"QRS axis is {_fmt_num(qrs_axis, 0, '°')}, above +90°, so it is right axis deviation, "
-            "not a normal adult axis."
+            f"QRS axis is {_fmt_num(qrs_axis, 0, '°')}, classified as {axis_class}; it must not "
+            "be called normal."
         )
-    if axis_class == "normal adult axis":
-        left_axis_claim = _has_nonnegated_claim(
-            stage_outputs.get("L3", ""), (r"left\s+axis\s+deviation",)
-        )
-        right_axis_claim = _has_nonnegated_claim(
-            stage_outputs.get("L3", ""), (r"right\s+axis\s+deviation",)
-        )
+    if axis_class in {"normal adult axis", "normal age-adjusted pediatric axis"}:
         if left_axis_claim or right_axis_claim:
             claimed = "left" if left_axis_claim else "right"
             notes["L3"].append(
-                f"QRS axis is {_fmt_num(qrs_axis, 0, '°')}, within the adult -30° to +90° "
-                f"range. Do not diagnose {claimed} QRS-axis deviation from the P or T axis."
+                f"QRS axis is {_fmt_num(qrs_axis, 0, '°')}, classified as {axis_class}. Do not "
+                f"diagnose {claimed} QRS-axis deviation from the P or T axis."
             )
 
     ptf_v1 = gf.get("ptf_v1_mv_ms")
     if (
-        isinstance(ptf_v1, (int, float))
+        age["known"]
+        and isinstance(ptf_v1, (int, float))
         and abs(ptf_v1) < 4.0
         and _has_nonnegated_claim(
             stage_outputs.get("L3", ""),
@@ -1897,6 +2638,15 @@ def run_stage_claim_guardrails(
         )
 
     lvh_criteria, lvh_audit = _lvh_voltage_facts(data)
+    lvh_claim = _has_nonnegated_claim(
+        stage_outputs.get("L3", ""),
+        (r"left\s+ventricular\s+hypertrophy", r"(?:^|\s)lvh\b"),
+    )
+    if not age["known"] and lvh_claim:
+        notes["L3"].append(
+            "Age is unknown, so age-appropriate ventricular-voltage thresholds cannot be "
+            "selected. Do not apply adult LVH voltage criteria; downgrade the claim."
+        )
     if lvh_criteria and not any(term in l3 for term in ("lvh", "left ventricular hypertroph")):
         notes["L3"].append(
             "Raw voltages meet ECG LVH voltage criteria "
@@ -1907,6 +2657,16 @@ def run_stage_claim_guardrails(
         notes["L3"].append(
             f"The statement that no LVH voltage criterion is met contradicts the computed raw "
             f"criteria ({_fmt_list(lvh_criteria)}). Recalculate using absolute S-wave depth."
+        )
+
+    irbbb_claim = _has_nonnegated_claim(
+        stage_outputs.get("L2", ""),
+        (r"incomplete\s+right\s+bundle\s+branch\s+block", r"(?:^|\s)irbbb\b"),
+    )
+    if not age["known"] and irbbb_claim:
+        notes["L2"].append(
+            "Age is unknown, so the incomplete-RBBB QRS-duration range cannot be selected. "
+            "Do not substitute the adult 110-119 ms range; require age and compatible morphology."
         )
 
     l4_raw = stage_outputs.get("L4", "")
@@ -1947,6 +2707,32 @@ def _guardrail_target_layer(note: str) -> str:
     if "consensus qrs" in lowered or "per-lead raw qrs" in lowered:
         return "L2"
     return "L4"
+
+
+def _guardrail_required_layers(note: str) -> set[str]:
+    """Return every evidence layer a revision note depends upon."""
+    lowered = note.lower()
+    if "raw rr" in lowered or "atrial fibrillation" in lowered:
+        return {"L1"}
+    if "consensus qrs" in lowered or "per-lead raw qrs" in lowered:
+        return {"L2"}
+    if "voltage" in lowered and ("q wave" in lowered or "q-wave" in lowered):
+        return {"L3", "L4"}
+    return {_guardrail_target_layer(note)}
+
+
+def _synthesis_guardrail_target_layer(note: str) -> str | None:
+    """Classify a final guardrail so gate-suppressed domains stay withheld."""
+    lowered = note.lower()
+    if any(token in lowered for token in ("heart rate", " hr ", "atrial flutter", "atrial fibrillation", "tachycard", "bradycard")):
+        return "L1"
+    if any(token in lowered for token in ("qrs axis", "axis deviation", "lvh", "ventricular hypertroph", "ptf-v1")):
+        return "L3"
+    if any(token in lowered for token in ("pr is", "measured pr", "qtc", "qt interval", "qrs", "bundle branch")):
+        return "L2"
+    if any(token in lowered for token in ("t-wave", "t wave", "infarct", "myocardial", "stemi", "nstemi")):
+        return "L4"
+    return None
 
 
 def _guardrail_addressed(note: str, raw_output: str) -> bool:
@@ -1991,20 +2777,13 @@ def _guardrail_addressed(note: str, raw_output: str) -> bool:
     return False
 
 
-def _has_contiguous_pathological_q_support(data: dict[str, Any]) -> bool:
-    representative = data.get("representative_leads") or {}
-    qualifying = set()
-    for lead in STANDARD_12_LEADS:
-        params = (representative.get(lead) or {}).get("params") or {}
-        duration = params.get("q_duration_ms")
-        amplitude = params.get("q_amp_mv")
-        if (
-            isinstance(duration, (int, float))
-            and duration >= 40
-            and isinstance(amplitude, (int, float))
-            and amplitude < 0
-        ):
-            qualifying.add(lead)
+def _has_contiguous_pathological_q_support(
+    data: dict[str, Any], age: dict[str, Any] | None = None
+) -> bool | None:
+    resolved_age = age or _resolved_patient_age(data)
+    if not resolved_age["known"]:
+        return None
+    qualifying = set(_age_resolved_q_wave_leads(data, resolved_age)[0])
     territories = (
         {"II", "III", "aVF"},
         {"V1", "V2", "V3", "V4"},
@@ -2039,62 +2818,93 @@ def run_synthesis_guardrails(
         else synthesis_text_raw
     )
     gf = data.get("global_features") or {}
-    patient = (data.get("metadata") or {}).get("patient_meta") or {}
+    patient = _patient_metadata(data)
     sex = str(patient.get("sex") or "")
+    age = _resolved_patient_age(data)
 
     pr = gf.get("pr_ms")
-    if isinstance(pr, (int, float)) and pr <= 200 and _has_nonnegated_claim(
+    pr_value = _numeric_measurement(pr)
+    _pr_result, pr_limits = _pr_class(pr, age)
+    first_degree_limit = pr_limits.get("first_degree") if pr_limits else None
+    first_degree_claim = _has_nonnegated_claim(
         primary_claims, (r"first[- ]degree[^.\n]{0,40}(?:av|atrioventricular)",)
+    )
+    if first_degree_claim and first_degree_limit is None:
+        notes.append(
+            "The synthesis asserts first-degree AV block/delay, but age is unknown and the "
+            "age-specific PR threshold cannot be selected. Do not substitute the adult cutoff; "
+            "downgrade the claim pending age."
+        )
+    if (
+        pr_value is not None
+        and first_degree_limit is not None
+        and pr_value < first_degree_limit
+        and first_degree_claim
     ):
         notes.append(
-            f"The synthesis asserts first-degree AV block/delay, but measured PR is {pr:.0f} ms "
-            "(normal adult range 120-200 ms). Remove the unsupported AV-block diagnosis."
+            f"The synthesis asserts first-degree AV block/delay, but measured PR is "
+            f"{pr_value:.0f} ms, below the resolved age-specific threshold of "
+            f"{first_degree_limit:.0f} ms. Remove the unsupported AV-block diagnosis."
         )
 
     hr = gf.get("heart_rate_bpm")
+    rate_class, brady_limit, tachy_limit = _rate_class(hr, age)
+    if not age["known"] and _has_nonnegated_claim(
+        primary_claims,
+        (r"\bbradycard(?:ia|ic)\b", r"\btachycard(?:ia|ic)\b"),
+    ):
+        notes.append(
+            "The synthesis assigns a bradycardic/tachycardic rate class while age is unknown. "
+            "Do not apply adult rate cutoffs; obtain age or mark the rate class uncertain."
+        )
     if (
-        isinstance(hr, (int, float))
-        and hr < 60
+        rate_class.startswith("bradycardic")
         and any(term in top1 for term in ("sinus", "rhythm"))
         and "brady" not in top1
     ):
         notes.append(
-            f"The most likely diagnosis omits bradycardia despite HR {hr:.1f} bpm (<60). "
+            f"The most likely diagnosis omits bradycardia despite HR {float(hr):.1f} bpm "
+            f"(resolved age-specific limit {_fmt_num(brady_limit, 1, ' bpm')}). "
             "Name sinus bradycardia when sinus origin is supported."
         )
     if (
-        isinstance(hr, (int, float))
-        and hr > 100
+        rate_class.startswith("tachycardic")
         and "tachy" not in synthesis_text
     ):
         notes.append(
-            f"The synthesis omits the tachycardic rate despite HR {hr:.1f} bpm (>100). "
+            f"The synthesis omits the tachycardic rate despite HR {float(hr):.1f} bpm "
+            f"(resolved age-specific limit {_fmt_num(tachy_limit, 1, ' bpm')}). "
             "Include tachycardia/rate response in the final interpretation."
         )
 
     qrs_axis = gf.get("qrs_axis_deg")
-    axis_class = _qrs_axis_class(qrs_axis)
-    if axis_class == "left axis deviation" and (
+    axis_class = _qrs_axis_class(qrs_axis, age)
+    left_axis_claim = _has_nonnegated_claim(primary_claims, (r"left\s+axis\s+deviation",))
+    right_axis_claim = _has_nonnegated_claim(primary_claims, (r"right\s+axis\s+deviation",))
+    if not age["known"] and (left_axis_claim or right_axis_claim):
+        notes.append(
+            "The synthesis assigns QRS-axis deviation while age is unknown. Do not substitute "
+            "adult -30°/+90° limits; report the measured axis as age-indeterminate."
+        )
+    if axis_class.startswith("left axis deviation") and (
         "normal qrs axis" in synthesis_text or "left axis" not in synthesis_text
     ):
         notes.append(
-            f"QRS axis {_fmt_num(qrs_axis, 0, '°')} is left axis deviation (<-30°). "
-            "The synthesis must not call it normal or omit this measured abnormality."
+            f"QRS axis {_fmt_num(qrs_axis, 0, '°')} is {axis_class}. The synthesis must not "
+            "call it normal or omit this measured abnormality."
         )
-    if axis_class == "right axis deviation" and (
+    if axis_class.startswith("right axis deviation") and (
         "normal qrs axis" in synthesis_text or "right axis" not in synthesis_text
     ):
         notes.append(
-            f"QRS axis {_fmt_num(qrs_axis, 0, '°')} is right axis deviation (>+90°). "
-            "The synthesis must not call it normal or omit this measured abnormality."
+            f"QRS axis {_fmt_num(qrs_axis, 0, '°')} is {axis_class}. The synthesis must not "
+            "call it normal or omit this measured abnormality."
         )
-    if axis_class == "normal adult axis":
-        left_axis_claim = _has_nonnegated_claim(primary_claims, (r"left\s+axis\s+deviation",))
-        right_axis_claim = _has_nonnegated_claim(primary_claims, (r"right\s+axis\s+deviation",))
+    if axis_class in {"normal adult axis", "normal age-adjusted pediatric axis"}:
         if left_axis_claim or right_axis_claim:
             claimed = "left" if left_axis_claim else "right"
             notes.append(
-                f"QRS axis {_fmt_num(qrs_axis, 0, '°')} is within -30° to +90°. Remove "
+                f"QRS axis {_fmt_num(qrs_axis, 0, '°')} is classified as {axis_class}. Remove "
                 f"the unsupported {claimed} QRS-axis deviation; P/T axes do not define the QRS axis."
             )
 
@@ -2115,33 +2925,46 @@ def run_synthesis_guardrails(
         if isinstance(value, (int, float))
     ]
     qtc_value = max(qtc_values) if qtc_values else None
-    qtc_class, qtc_upper = _qtc_class(qtc_value, sex)
-    if qtc_class == "prolonged" and (
+    qtc_class, qtc_limits_text = _qtc_class(qtc_value, sex, age)
+    prolonged_qt_claim = _has_nonnegated_claim(
+        adjudicated_claims, _PROLONGED_QT_PATTERNS
+    )
+    if not age["known"] and prolonged_qt_claim:
+        notes.append(
+            "The synthesis asserts prolonged QTc while age is unknown, so an age-appropriate "
+            "threshold cannot be selected. Do not substitute an adult cutoff; report the measured "
+            "QTc and uncertainty."
+        )
+    if "prolonged" in qtc_class and (
         any(term in synthesis_text for term in ("normal qt", "qt interval is normal", "qtc is normal"))
         or "prolong" not in synthesis_text
     ):
         notes.append(
-            f"QTc reaches {_fmt_num(qtc_value, 0, ' ms')} (usual {sex or 'adult'} upper limit "
-            f"{qtc_upper:.0f} ms). The synthesis must report prolonged QTc, not normal QT."
+            f"QTc reaches {_fmt_num(qtc_value, 0, ' ms')} ({qtc_limits_text}). The synthesis "
+            "must report the age-resolved prolonged/borderline-prolonged QTc, not normal QT."
         )
-    if qtc_class == "within the usual adult range" and _has_nonnegated_claim(
-        adjudicated_claims, _PROLONGED_QT_PATTERNS
-    ):
+    if qtc_class in {"within the usual adult range", "normal by age-adjusted pediatric limits"} and prolonged_qt_claim:
         notes.append(
-            f"QTc reaches {_fmt_num(qtc_value, 0, ' ms')}, within the usual {sex or 'adult'} "
-            f"upper limit of {qtc_upper:.0f} ms. Remove the unsupported prolonged-QTc statement "
+            f"QTc reaches {_fmt_num(qtc_value, 0, ' ms')}, within the resolved age-specific "
+            "limits. Remove the unsupported prolonged-QTc statement "
             "while keeping QT dispersion separate."
         )
 
     lvh_criteria, _lvh_audit = _lvh_voltage_facts(data)
+    lvh_claim = _has_nonnegated_claim(
+        primary_claims, (r"left\s+ventricular\s+hypertrophy", r"(?:^|\s)lvh\b")
+    )
+    if not age["known"] and lvh_claim:
+        notes.append(
+            "The synthesis asserts an LVH pattern while age is unknown, so age-appropriate "
+            "voltage thresholds cannot be selected. Do not substitute adult LVH criteria."
+        )
     if lvh_criteria and not any(term in synthesis_text for term in ("lvh", "left ventricular hypertroph")):
         notes.append(
             f"Raw measurements meet ECG LVH voltage criteria ({_fmt_list(lvh_criteria)}). "
             "Include this as an ECG voltage pattern while avoiding an unsupported anatomic claim."
         )
-    if lvh_criteria and _has_nonnegated_claim(
-        primary_claims, (r"left\s+ventricular\s+hypertrophy",)
-    ) and "voltage" not in primary_claims.lower():
+    if lvh_criteria and lvh_claim and "voltage" not in primary_claims.lower():
         notes.append(
             "Only ECG voltage criteria are available for LVH. Rephrase the primary finding as "
             "'voltage criteria/pattern for LVH' rather than asserting anatomic left ventricular "
@@ -2177,19 +3000,51 @@ def run_synthesis_guardrails(
         )
     )
     if prior_mi_claim:
-        if not _has_contiguous_pathological_q_support(data):
+        q_support = _has_contiguous_pathological_q_support(data, age)
+        if q_support is None:
+            notes.append(
+                "The top diagnosis asserts prior MI, but age is unknown, so age-appropriate "
+                "Q-wave criteria cannot be selected. Do not substitute the adult >=40 ms "
+                "criterion; obtain age or downgrade the claim to uncertain."
+            )
+        elif not q_support:
+            _q_leads, q_criterion = _age_resolved_q_wave_leads(data, age)
             notes.append(
                 "The top diagnosis asserts prior MI, but raw per-lead measurements do not show "
-                "Q duration >=40 ms in at least two leads of a contiguous territory. Do not use "
+                f"the required {q_criterion} in at least two leads of a contiguous territory. Do not use "
                 "Q/R ratio or extractor flags alone to confirm prior MI."
             )
 
     if any(term in top1 for term in ("incomplete right bundle branch block", "irbbb")):
         qrs = (data.get("global_features") or {}).get("qrs_ms")
-        if not isinstance(qrs, (int, float)) or not 110 <= qrs < 120:
+        qrs_value = _numeric_measurement(qrs)
+        _qrs_result, qrs_limits = _qrs_class(qrs, age)
+        if not age["known"]:
+            notes.append(
+                "The top diagnosis asserts incomplete RBBB, but age is unknown, so the "
+                "age-specific QRS-duration criterion cannot be selected. Do not substitute the "
+                "adult 110-119 ms range; obtain age and require compatible morphology."
+            )
+        elif age["pediatric_morphology"]:
+            incomplete_lower = (qrs_limits or {}).get("borderline")
+            bbb_limit = (qrs_limits or {}).get("nonspecific")
+            if (
+                qrs_value is None
+                or incomplete_lower is None
+                or bbb_limit is None
+                or not incomplete_lower < qrs_value <= bbb_limit
+            ):
+                notes.append(
+                    f"The top diagnosis asserts incomplete RBBB, but QRS is "
+                    f"{_fmt_num(qrs_value, 0, ' ms')}, outside the resolved pediatric "
+                    f"borderline-IVCD to BBB range ({_fmt_num(incomplete_lower, 0, ' ms')} to "
+                    f"{_fmt_num(bbb_limit, 0, ' ms')}). Require the pediatric V1 R' amplitude/"
+                    "duration and lateral terminal-S morphology as well."
+                )
+        elif qrs_value is None or not 110 <= qrs_value < 120:
             notes.append(
                 f"The top diagnosis asserts incomplete RBBB, but consensus QRS is "
-                f"{_fmt_num(qrs, 0, ' ms')}, outside the adult 110-119 ms range; require both "
+                f"{_fmt_num(qrs_value, 0, ' ms')}, outside the adult 110-119 ms range; require both "
                 "duration and compatible V1/V2 plus I/V6 terminal morphology."
             )
 
@@ -2245,9 +3100,19 @@ def run_layered_diagnosis(
     data = _safe_read_json(features_path)
     if not is_current_features_schema(data):
         raise ValueError("Sequential reasoning requires the current ECG features schema.")
+    diagnostic_gate = diagnostic_gate_policy(data)
+    blocked_layers = diagnostic_gate_blocked_layers(diagnostic_gate)
     layer_evidence = summarize_layered_evidence(data, language)
     report_text = sanitize_report_text(_safe_read_text(report_path)) if report_path is not None else ""
     report_by_layer = summarize_report_by_layer(report_text)
+    if blocked_layers:
+        # The readable report is a redundant, presentation-oriented view whose
+        # broad sections can mix domains (for example axes and intervals in one
+        # GLOBAL MEASUREMENTS table).  Once any domain is suppressed, using a
+        # report excerpt in another stage could reintroduce the withheld values.
+        # Keep the sanitized report for audit only and reason from the gated
+        # structured JSON bundles.
+        report_by_layer = {key: "" for key in LAYER_KEYS}
     validated_facts = build_validated_measurement_facts(data)
     reasoning_evidence: dict[str, str] = {}
     for layer_key in LAYER_KEYS:
@@ -2256,12 +3121,82 @@ def run_layered_diagnosis(
             "[Deterministic measurement checks; computed from JSON without Dx]\n"
             + validated_facts[layer_key],
         ]
-        if report_by_layer.get(layer_key):
+        if layer_key not in blocked_layers and report_by_layer.get(layer_key):
             blocks.append(
                 "[Diagnosis-free report measurement cross-check]\n"
                 + report_by_layer[layer_key]
             )
         reasoning_evidence[layer_key] = "\n\n".join(blocks)
+
+    if diagnostic_gate["state"] == "stop":
+        stop_reasons = diagnostic_gate.get("stop_reasons") or ["unspecified_quality_stop"]
+        stage_outputs = {
+            "L0": (
+                "- Diagnostic quality gate STOP. No model inference was performed. "
+                f"Reasons: {_fmt_list(stop_reasons)}."
+            ),
+            **{
+                layer_key: _gate_withheld_text(layer_key, diagnostic_gate)
+                for layer_key in LAYER_KEYS[1:]
+            },
+        }
+        synthesis_output = (
+            "#### Most Likely Diagnosis\n"
+            "- ABSTAIN — diagnostic quality gate stopped interpretation\n\n"
+            "#### Diagnostic Rationale (layer references)\n"
+            f"- No diagnosis is permitted. Gate reasons: {_fmt_list(stop_reasons)}.\n\n"
+            "#### Similar Diagnoses (ranked by similarity)\n"
+            "- Not generated.\n\n"
+            "#### Layer Conflicts\n"
+            "- Not assessed.\n\n"
+            "#### Uncertainty and Review Priorities\n"
+            "- Reacquire or repair the ECG before diagnostic interpretation."
+        )
+        raw_output = compose_sequential_output(stage_outputs, synthesis_output, language)
+        parsed = parse_layered_output(raw_output)
+        parsed.update(
+            {
+                "top1_raw": None,
+                "top1_normalized": None,
+                "similar_raw": [],
+                "similar_normalized": [],
+                "abstained": True,
+                "abstention_reason": "diagnostic_gate_stop",
+            }
+        )
+        reference_only = summarize_reference_only(data)
+        return {
+            "reasoning_mode": "diagnostic_gate_stop_abstention_v2",
+            "gate_enforcement_version": DIAGNOSTIC_GATE_ENFORCEMENT_VERSION,
+            "reasoning_sources": ["metadata.diagnostic_gate"],
+            "dx_code_used_in_reasoning": False,
+            "diagnostic_gate": diagnostic_gate,
+            "blocked_layers": sorted(blocked_layers),
+            "abstained": True,
+            "abstention_reason": "diagnostic_gate_stop",
+            "layer_evidence": layer_evidence,
+            "reasoning_evidence": reasoning_evidence,
+            "validated_measurement_facts": validated_facts,
+            "report_layer_context": report_by_layer,
+            "stage_prompts": {},
+            "stage_outputs": stage_outputs,
+            "stage_revision_prompts": {key: [] for key in LAYER_KEYS},
+            "synthesis_prompt": "",
+            "synthesis_output": synthesis_output,
+            "synthesis_revision_prompts": [],
+            "prompt": "",
+            "raw_model_output": raw_output,
+            "parsed": parsed,
+            "guardrail_notes": [],
+            "stage_claim_guardrail_notes": {key: [] for key in LAYER_KEYS},
+            "unaddressed_guardrail_notes": [],
+            "synthesis_guardrail_notes": [],
+            "revised": False,
+            "supplementary_report_sanitized": report_text,
+            "supplementary_report_used_in_reasoning": False,
+            "reference_only": reference_only,
+            "reference_agreement": "not_compared_abstained",
+        }
 
     stage_prompts: dict[str, str] = {}
     stage_outputs: dict[str, str] = {}
@@ -2273,6 +3208,11 @@ def run_layered_diagnosis(
 
     quality_conclusion = stage_outputs["L0"]
     for layer_key in LAYER_KEYS[1:]:
+        if layer_key in blocked_layers:
+            stage_outputs[layer_key] = _gate_withheld_text(
+                layer_key, diagnostic_gate
+            )
+            continue
         stage_prompt = build_layer_reasoning_prompt(
             layer_key,
             reasoning_evidence[layer_key],
@@ -2282,7 +3222,11 @@ def run_layered_diagnosis(
         stage_prompts[layer_key] = stage_prompt
         stage_outputs[layer_key] = clean_model_output(generate_text_fn(stage_prompt))
 
-    guardrail_notes = run_feature_guardrails(data)
+    guardrail_notes = [
+        note
+        for note in run_independent_feature_guardrails(data)
+        if not (_guardrail_required_layers(note) & blocked_layers)
+    ]
     revised = False
     if max_revision_rounds > 0:
         for _round in range(max_revision_rounds):
@@ -2292,12 +3236,14 @@ def run_layered_diagnosis(
                 if not _guardrail_addressed(note, stage_outputs.get(target, "")):
                     notes_by_layer[target].append(note)
             claim_notes = run_stage_claim_guardrails(data, stage_outputs)
+            for layer_key in blocked_layers:
+                claim_notes[layer_key] = []
             for layer_key, notes in claim_notes.items():
                 notes_by_layer[layer_key].extend(notes)
             if not any(notes_by_layer.values()):
                 break
             for layer_key, notes in notes_by_layer.items():
-                if not notes:
+                if not notes or layer_key in blocked_layers:
                     continue
                 notes = list(dict.fromkeys(notes))
                 revision_prompt = build_layer_revision_prompt(
@@ -2319,6 +3265,8 @@ def run_layered_diagnosis(
         )
     ]
     final_stage_claim_notes = run_stage_claim_guardrails(data, stage_outputs)
+    for layer_key in blocked_layers:
+        final_stage_claim_notes[layer_key] = []
     unaddressed = unaddressed_feature_notes + [
         note for notes in final_stage_claim_notes.values() for note in notes
     ]
@@ -2336,7 +3284,11 @@ def run_layered_diagnosis(
     raw_output = compose_sequential_output(stage_outputs, synthesis_output, language)
     parsed = parse_layered_output(raw_output)
 
-    synthesis_guardrail_notes = run_synthesis_guardrails(data, parsed, clinician_notes)
+    synthesis_guardrail_notes = [
+        note
+        for note in run_synthesis_guardrails(data, parsed, clinician_notes)
+        if _synthesis_guardrail_target_layer(note) not in blocked_layers
+    ]
     synthesis_revision_prompts: list[str] = []
     if synthesis_guardrail_notes and max_revision_rounds > 0:
         for _round in range(max_revision_rounds):
@@ -2351,19 +3303,32 @@ def run_layered_diagnosis(
             raw_output = compose_sequential_output(stage_outputs, synthesis_output, language)
             parsed = parse_layered_output(raw_output)
             revised = True
-            synthesis_guardrail_notes = run_synthesis_guardrails(data, parsed, clinician_notes)
+            synthesis_guardrail_notes = [
+                note
+                for note in run_synthesis_guardrails(data, parsed, clinician_notes)
+                if _synthesis_guardrail_target_layer(note) not in blocked_layers
+            ]
             if not synthesis_guardrail_notes:
                 break
 
     reference_only = summarize_reference_only(data)
     return {
-        "reasoning_mode": "json_report_no_dx_sequential_v3",
+        "reasoning_mode": MEDGEMMA_REASONING_PROTOCOL_VERSION,
+        "gate_enforcement_version": DIAGNOSTIC_GATE_ENFORCEMENT_VERSION,
         "reasoning_sources": [
             "features_json_measurements",
-            *(["sanitized_report_measurements"] if report_text else []),
+            *(
+                ["sanitized_report_measurements"]
+                if report_text and not blocked_layers
+                else []
+            ),
             "deterministic_measurement_checks",
         ],
         "dx_code_used_in_reasoning": False,
+        "diagnostic_gate": diagnostic_gate,
+        "blocked_layers": sorted(blocked_layers),
+        "abstained": False,
+        "abstention_reason": None,
         "layer_evidence": layer_evidence,
         "reasoning_evidence": reasoning_evidence,
         "validated_measurement_facts": validated_facts,
@@ -2383,7 +3348,7 @@ def run_layered_diagnosis(
         "synthesis_guardrail_notes": synthesis_guardrail_notes,
         "revised": revised,
         "supplementary_report_sanitized": report_text,
-        "supplementary_report_used_in_reasoning": bool(report_text),
+        "supplementary_report_used_in_reasoning": bool(report_text) and not blocked_layers,
         "reference_only": reference_only,
         "reference_agreement": compare_with_reference(parsed, reference_only),
     }

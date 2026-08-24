@@ -587,6 +587,69 @@ def _robust_affine_fit(
     return alpha, beta, error
 
 
+def _robust_affine_errors_multilead(
+    model: np.ndarray,
+    observation: np.ndarray,
+    fit_mask: np.ndarray,
+) -> np.ndarray:
+    """Vectorized equivalent of ``_robust_affine_fit`` for candidate scoring."""
+    x = np.asarray(model, dtype=float)[:, fit_mask]
+    y = np.asarray(observation, dtype=float)[:, fit_mask]
+    if x.shape != y.shape or x.shape[1] < 8:
+        return np.full(x.shape[0], np.inf, dtype=float)
+    weights = np.ones_like(x)
+    alpha = np.ones(x.shape[0], dtype=float)
+    beta = np.zeros(x.shape[0], dtype=float)
+    active = np.ones(x.shape[0], dtype=bool)
+    x_squared = x * x
+    for _ in range(5):
+        weight_sum = np.sum(weights, axis=1)
+        weighted_x = np.sum(weights * x, axis=1)
+        weighted_y = np.sum(weights * y, axis=1)
+        weighted_xx = np.sum(weights * x_squared, axis=1)
+        weighted_xy = np.sum(weights * x * y, axis=1)
+        denominator = weighted_xx * weight_sum - weighted_x * weighted_x
+        scale = np.maximum.reduce(
+            (
+                np.abs(weighted_xx * weight_sum),
+                np.abs(weighted_x * weighted_x),
+                np.ones_like(weight_sum),
+            )
+        )
+        valid = active & (np.abs(denominator) > np.finfo(float).eps * scale)
+        if not np.any(valid):
+            break
+        alpha[valid] = (
+            weighted_xy[valid] * weight_sum[valid]
+            - weighted_x[valid] * weighted_y[valid]
+        ) / denominator[valid]
+        beta[valid] = (
+            weighted_xx[valid] * weighted_y[valid]
+            - weighted_x[valid] * weighted_xy[valid]
+        ) / denominator[valid]
+        residual = y - (alpha[:, None] * x + beta[:, None])
+        center = np.median(residual, axis=1)
+        absolute_deviation = np.abs(residual - center[:, None])
+        sigma = 1.4826 * np.median(absolute_deviation, axis=1)
+        degenerate = sigma <= 1e-12
+        if np.any(degenerate):
+            sigma[degenerate] = np.std(
+                residual[degenerate], axis=1, ddof=1
+            )
+        sigma = np.maximum(sigma, 1e-6)
+        limit = 1.5 * sigma
+        weights = np.ones_like(absolute_deviation)
+        outliers = absolute_deviation > limit[:, None]
+        weights[outliers] = np.broadcast_to(
+            limit[:, None], absolute_deviation.shape
+        )[outliers] / np.maximum(absolute_deviation[outliers], 1e-12)
+        active &= valid
+    alpha = np.clip(alpha, 0.50, 1.50)
+    beta_limit = np.maximum(0.02, 0.25 * np.ptp(y, axis=1))
+    beta = np.clip(beta, -beta_limit, beta_limit)
+    return np.sqrt(np.mean((y - (alpha[:, None] * x + beta[:, None])) ** 2, axis=1))
+
+
 def _resample_template_variant(
     template: np.ndarray,
     shift_samples: int,
@@ -693,16 +756,17 @@ def _constrained_t_reconstruction(
     for stretch in (0.97, 1.0, 1.03):
         for shift in shifts:
             variant = _resample_template_variant(template, shift, stretch)
-            errors = []
-            for lead_index in range(target.shape[0]):
-                _alpha, _beta, error = _robust_affine_fit(
-                    variant[lead_index],
-                    target[lead_index],
-                    fit_mask,
-                )
-                if np.isfinite(error):
-                    errors.append(error)
-            score = float(np.median(errors)) if errors else np.inf
+            errors = _robust_affine_errors_multilead(
+                variant,
+                target,
+                fit_mask,
+            )
+            finite_errors = errors[np.isfinite(errors)]
+            score = (
+                float(np.median(finite_errors))
+                if finite_errors.size
+                else np.inf
+            )
             if score < best_error:
                 best_error = score
                 best_variant = variant

@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import ipaddress
 import json
+import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from medgemma_ecg_core import (
     DEFAULT_MODEL_MAX_LEN,
     DEFAULT_MAX_OUTPUT_TOKENS,
     build_context_summary_from_paths,
     build_prompt as shared_build_prompt,
+    diagnostic_gate_policy,
     sanitize_report_text as shared_sanitize_report_text,
     summarize_clinical_interpretation,
 )
@@ -20,6 +23,16 @@ MODEL_MAX_OUTPUT_TOKENS = DEFAULT_MAX_OUTPUT_TOKENS
 REPORT_CHAR_LIMIT = 6000
 STANDARD_12_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
 LANGUAGE_CHOICES = [("English", "en"), ("日本語", "ja")]
+
+
+def _is_loopback_host(host: str) -> bool:
+    value = host.strip().strip("[]").lower()
+    if value == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(value).is_loopback
+    except ValueError:
+        return False
 
 I18N = {
     "en": {
@@ -50,6 +63,12 @@ I18N = {
         "preview_error_prefix": "Context build failed",
         "empty_context_message": "Please upload `*_features.json` or `*_report.txt`, or add brief notes.",
         "missing_input_message": "Please upload a valid ECG feature file or report file first.",
+        "quality_stop_message": (
+            "ABSTAIN — the ECG diagnostic quality gate is {state}. This single-shot UI "
+            "cannot safely enforce domain-level restrictions, so no model inference was "
+            "performed. Reacquire/repair the ECG or use the governed layered workflow. "
+            "Reasons: {reasons}."
+        ),
         "regenerate_notice": "Language updated. Click `Run Diagnosis` to regenerate the diagnostic answer in the selected language.",
         "unknown_json_header": "[Uploaded JSON was not recognized as the current features schema]",
         "supplementary_report_header": "[Supplementary Readable Report (Dx labels removed)]",
@@ -153,6 +172,11 @@ I18N = {
         "preview_error_prefix": "コンテキスト構築に失敗しました",
         "empty_context_message": "`*_features.json` または `*_report.txt` をアップロードするか、短い補足情報を入力してください。",
         "missing_input_message": "先に有効な ECG 特徴ファイルまたはレポートファイルをアップロードしてください。",
+        "quality_stop_message": (
+            "判定保留 — ECG 診断品質ゲートは {state} です。この単発 UI では領域別制限を"
+            "安全に強制できないため、モデル推論は実行されませんでした。ECG を再取得・修復するか、"
+            "管理された分層ワークフローを使用してください。理由: {reasons}。"
+        ),
         "regenerate_notice": "言語を更新しました。選択した言語で診断結果を再生成するには `診断を実行` を押してください。",
         "unknown_json_header": "[アップロードされた JSON は現在の features schema として認識されませんでした]",
         "supplementary_report_header": "[補足可読レポート（Dx ラベル削除済み）]",
@@ -475,6 +499,56 @@ def build_prompt(context_summary: str, language: str = "en") -> str:
     return shared_build_prompt(context_summary, language)
 
 
+def features_diagnostic_gate(features_file) -> dict[str, Any] | None:
+    """Return a strict gate for every uploaded feature artifact."""
+    if features_file is None:
+        return None
+    path = Path(features_file.name)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        # A file supplied through the feature input is never allowed to become
+        # model context merely because its safety contract cannot be parsed.
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    return diagnostic_gate_policy(data)
+
+
+def guarded_diagnosis(
+    features_file,
+    report_file,
+    clinician_notes: str,
+    language: str,
+    generate_text_fn: Callable[[str], str],
+) -> tuple[str, str, str]:
+    """Build the prompt and fail closed before inference when quality says STOP."""
+    context_summary, prompt = preview_prompt(
+        features_file,
+        report_file,
+        clinician_notes,
+        language,
+    )
+    gate = features_diagnostic_gate(features_file)
+    if gate is not None and gate.get("state") != "pass":
+        state = str(gate.get("state") or "stop").upper()
+        reasons = ", ".join(
+            [
+                *list(gate.get("stop_reasons") or []),
+                *list(gate.get("partial_reasons") or []),
+            ]
+            or ["unspecified_quality_limitation"]
+        )
+        message = get_text(language)["quality_stop_message"].format(
+            state=state,
+            reasons=reasons,
+        )
+        return context_summary, "", message
+    if not prompt:
+        return context_summary, prompt, get_text(language)["missing_input_message"]
+    return context_summary, prompt, generate_text_fn(prompt)
+
+
 def preview_prompt(features_file, report_file, clinician_notes, language: str = "en"):
     t = get_text(language)
     try:
@@ -524,11 +598,17 @@ if __name__ == "__main__":
     )
 
     def diagnose(features_file, report_file, clinician_notes, language):
-        context_summary, prompt = preview_prompt(features_file, report_file, clinician_notes, language)
-        if not prompt:
-            return context_summary, prompt, get_text(language)["missing_input_message"]
-        outputs = llm.generate([prompt], sampling_params)
-        return context_summary, prompt, outputs[0].outputs[0].text
+        def generate(prompt: str) -> str:
+            outputs = llm.generate([prompt], sampling_params)
+            return outputs[0].outputs[0].text
+
+        return guarded_diagnosis(
+            features_file,
+            report_file,
+            clinician_notes or "",
+            language,
+            generate,
+        )
 
     def refresh_ui(language, features_file, report_file, clinician_notes):
         t = get_text(language)
@@ -629,4 +709,15 @@ if __name__ == "__main__":
             outputs=[context_preview, prompt_preview, output],
         )
 
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    server_name = os.getenv("ECG_GEMMA_UI_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    server_port = int(os.getenv("ECG_GEMMA_UI_PORT", "7860"))
+    auth = None
+    if not _is_loopback_host(server_name):
+        username = os.getenv("ECG_GEMMA_UI_USERNAME", "").strip()
+        password = os.getenv("ECG_GEMMA_UI_PASSWORD", "")
+        if not username or len(password) < 16:
+            raise RuntimeError(
+                "ECG_GEMMA_UI_HOST 指向非回环地址时，必须设置用户名和至少 16 字符的密码"
+            )
+        auth = (username, password)
+    demo.launch(server_name=server_name, server_port=server_port, auth=auth)

@@ -48,7 +48,13 @@ htmlcov/
 *.safetensors
 *.ckpt
 *.pth
+*.pt
 *.onnx
+/all_diseases_pt100/
+/all_diseases_ecgfeat/
+/all_diseases_medgemma/
+/ptbxl_*_ecgagent/
+.ecgagent_pseudonym_key*
 
 # Generated root-level demo artifacts
 /*_features.json

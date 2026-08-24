@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](Twave%20related) | [English](Twave%20related.en.md) | [日本語](Twave%20related.ja.md)
+[中文](Twave%20related.md) | [English](Twave%20related.en.md) | [日本語](Twave%20related.ja.md)
 <!-- /i18n-nav -->
 
 > 翻訳に関する注意：この日本語版は参考用です。原文と相違がある場合は、原文を優先します。

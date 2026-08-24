@@ -11,6 +11,7 @@ import re
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+from ..age import resolve_patient_age
 from .safety_policy import (
     ClinicalSafetyPolicy,
     DEFAULT_CLINICAL_SAFETY_POLICY,
@@ -183,8 +184,7 @@ def _arithmetic_problems(verdict: Mapping[str, Any]) -> list[str]:
 def _adult_patient(document: Mapping[str, Any]) -> bool:
     metadata = _mapping(document.get("metadata"))
     patient = _mapping(metadata.get("patient_meta"))
-    age = _finite_number(patient.get("age"))
-    return age is not None and age >= 18.0
+    return resolve_patient_age(patient).adult is True
 
 
 def _diagnosis_evidence_numbers(

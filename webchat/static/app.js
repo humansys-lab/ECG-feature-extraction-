@@ -6,9 +6,10 @@
   const STORAGE_KEY = "chat-conversations";
   const SETTINGS_KEY = "chat-settings";
   const THEME_KEY = "chat-theme";
+  const SESSION_ID_KEY = "chat-session-id";
 
   // Images are re-encoded below this edge length so a screenshot cannot blow
-  // up the context, and previewed far smaller so history fits in localStorage.
+  // up the context, and previewed far smaller so the tab-scoped history stays bounded.
   const MAX_IMAGE_EDGE = 2048;
   const PREVIEW_EDGE = 480;
 
@@ -60,6 +61,14 @@
   let currentId = null;
   let pending = [];        // attachments staged for the next message
   let controller = null;   // aborts the in-flight generation
+  let apiToken = "";       // deliberately memory-only; refresh requires re-entry
+  let chatSessionId = sessionStorage.getItem(SESSION_ID_KEY) || "";
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(chatSessionId)) {
+    chatSessionId = (self.crypto && crypto.randomUUID)
+      ? crypto.randomUUID().replace(/-/g, "")
+      : Array.from(crypto.getRandomValues(new Uint8Array(24)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    sessionStorage.setItem(SESSION_ID_KEY, chatSessionId);
+  }
 
   /* ---------- persistence ---------- */
 
@@ -70,7 +79,7 @@
 
   function load(key, fallback) {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = sessionStorage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     } catch (err) {
       return fallback;
@@ -79,14 +88,63 @@
 
   function saveConversations() {
     try {
-      localStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(conversations));
+      sessionStorage.setItem(storageKey(STORAGE_KEY), JSON.stringify(conversations));
     } catch (err) {
-      toast("对话历史保存失败（浏览器存储已满）");
+      toast("当前标签页的对话历史保存失败（浏览器存储已满）");
     }
   }
 
   function saveSettings() {
-    localStorage.setItem(storageKey(SETTINGS_KEY), JSON.stringify(settings));
+    sessionStorage.setItem(storageKey(SETTINGS_KEY), JSON.stringify(settings));
+  }
+
+  async function apiFetch(url, options, retryAuth) {
+    const init = Object.assign({}, options || {});
+    const headers = new Headers(init.headers || {});
+    headers.set("X-Chat-Session", chatSessionId);
+    if (apiToken) headers.set("X-Chat-Token", apiToken);
+    init.headers = headers;
+    const response = await fetch(url, init);
+    if (response.status === 401 && retryAuth !== false) {
+      const supplied = window.prompt("此聊天服务需要访问令牌。令牌仅保存在当前页面内存中：", "");
+      if (supplied) {
+        apiToken = supplied;
+        return apiFetch(url, options, false);
+      }
+    }
+    return response;
+  }
+
+  function attachmentsInMessages(messages) {
+    const ids = new Set();
+    (messages || []).forEach((message) => {
+      (message.attachments || []).forEach((file) => {
+        if (file.id) ids.add(file.id);
+      });
+    });
+    return Array.from(ids);
+  }
+
+  function deleteRemoteAttachments(messages) {
+    attachmentsInMessages(messages).forEach((id) => {
+      apiFetch("/api/attachments/" + id, { method: "DELETE" }).catch(() => {});
+    });
+  }
+
+  function discardPending() {
+    deleteRemoteAttachments([{ attachments: pending }]);
+    pending = [];
+  }
+
+  function clearMedicalBrowserData() {
+    [localStorage, sessionStorage].forEach((storage) => {
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index) || "";
+        if (key.startsWith(STORAGE_KEY + ":") || key.startsWith(SETTINGS_KEY + ":")) {
+          storage.removeItem(key);
+        }
+      }
+    });
   }
 
   function current() {
@@ -94,6 +152,7 @@
   }
 
   function newConversation() {
+    discardPending();
     const conv = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       title: "新的对话",
@@ -102,7 +161,6 @@
     };
     conversations.unshift(conv);
     currentId = conv.id;
-    pending = [];
     saveConversations();
     renderConvList();
     renderMessages();
@@ -133,6 +191,7 @@
       del.title = "删除对话";
       del.onclick = (event) => {
         event.stopPropagation();
+        deleteRemoteAttachments(conv.messages);
         conversations = conversations.filter((row) => row.id !== conv.id);
         if (currentId === conv.id) {
           if (conversations.length) currentId = conversations[0].id;
@@ -145,7 +204,7 @@
       item.append(name, del);
       item.onclick = () => {
         currentId = conv.id;
-        pending = [];
+        discardPending();
         renderConvList();
         renderMessages();
         renderPending();
@@ -189,7 +248,7 @@
     pending.forEach((file, index) => {
       el.attachments.appendChild(
         fileChip(file, () => {
-          if (file.id) fetch("/api/attachments/" + file.id, { method: "DELETE" });
+          if (file.id) apiFetch("/api/attachments/" + file.id, { method: "DELETE" });
           pending.splice(index, 1);
           renderPending();
         })
@@ -291,6 +350,7 @@
       edit.onclick = () => {
         const conv = current();
         el.input.value = message.content;
+        deleteRemoteAttachments(conv.messages.slice(index));
         conv.messages = conv.messages.slice(0, index);
         saveConversations();
         renderMessages();
@@ -400,7 +460,7 @@
     requestAnimationFrame(paint);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -593,7 +653,7 @@
       form.append("file", payload, file.name);
       form.append("strip_dx", settings.stripDx ? "true" : "false");
       try {
-        const response = await fetch("/api/upload", { method: "POST", body: form });
+        const response = await apiFetch("/api/upload", { method: "POST", body: form });
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || "上传失败");
         Object.assign(placeholder, data, { pending: false, preview: placeholder.preview });
@@ -649,6 +709,20 @@
       saveSettings();
       syncSettingsInputs();
     };
+    $("clear-local-data").onclick = () => {
+      deleteRemoteAttachments(conversations.flatMap((conv) => conv.messages || []));
+      discardPending();
+      clearMedicalBrowserData();
+      conversations = [];
+      currentId = null;
+      settings = Object.assign({}, DEFAULT_SETTINGS, {
+        system: serverConfig.default_system_prompt || "",
+        max_tokens: serverConfig.default_max_tokens || DEFAULT_SETTINGS.max_tokens,
+      });
+      newConversation();
+      syncSettingsInputs();
+      toast("已清除当前浏览器中的全部对话数据");
+    };
     ["set-temp", "set-topp", "set-topk"].forEach((id) => {
       $(id).oninput = () => {
         const value = Number($(id).value);
@@ -666,7 +740,7 @@
 
   async function checkHealth() {
     try {
-      const response = await fetch("/api/health");
+      const response = await apiFetch("/api/health");
       const data = await response.json();
       if (data.ok) {
         el.statusDot.className = "dot ok";
@@ -754,6 +828,8 @@
     $("clear-chat").onclick = () => {
       const conv = current();
       if (!conv) return;
+      deleteRemoteAttachments(conv.messages);
+      discardPending();
       conv.messages = [];
       conv.title = "新的对话";
       saveConversations();
@@ -820,11 +896,18 @@
 
     // The profile decides which history bucket to read, so load config first.
     try {
-      serverConfig = await (await fetch("/api/config")).json();
+      const response = await apiFetch("/api/config");
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      serverConfig = await response.json();
     } catch (err) {
       /* the health indicator already surfaces backend problems */
     }
     applyServerConfig();
+
+    // Remove data written by older releases. Medical conversation history is
+    // now tab-scoped and disappears when the tab closes.
+    localStorage.removeItem(storageKey(STORAGE_KEY));
+    localStorage.removeItem(storageKey(SETTINGS_KEY));
 
     settings = Object.assign(
       {},

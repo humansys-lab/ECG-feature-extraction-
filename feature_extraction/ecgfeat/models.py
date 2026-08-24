@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union
+import math
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 
 STANDARD_12_LEADS = [
@@ -36,6 +37,65 @@ class PatientMeta:
     filter_highpass_hz: Optional[float] = None
     filter_lowpass_hz: Optional[float] = None
     muscle_filter_enabled: Optional[bool] = None
+    # Kept at the end to preserve the positional constructor contract.
+    patient_id: Optional[str] = None
+
+
+DAYS_PER_YEAR = 365.25
+
+
+@dataclass(frozen=True)
+class ResolvedPatientAge:
+    """One internally consistent age pair for all interpretation layers."""
+
+    age_years: Optional[float]
+    age_days: Optional[float]
+    source: str
+
+    @property
+    def known(self) -> bool:
+        return self.age_days is not None
+
+
+def _patient_field(patient: Any, name: str) -> Any:
+    if isinstance(patient, Mapping):
+        return patient.get(name)
+    return getattr(patient, name, None)
+
+
+def _finite_nonnegative(value: Any) -> Optional[float]:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return number if math.isfinite(number) and number >= 0.0 else None
+
+
+def resolve_patient_age(patient: Any) -> ResolvedPatientAge:
+    """Resolve demographics with exact-day precedence and no invalid fallback.
+
+    ``age_days`` is used when supplied because neonatal thresholds cannot be
+    selected reliably from a rounded year-age. If that explicit field is
+    malformed, a potentially conflicting ``age`` value is not substituted.
+    """
+
+    raw_days = _patient_field(patient, "age_days")
+    if raw_days is not None:
+        days = _finite_nonnegative(raw_days)
+        if days is None:
+            return ResolvedPatientAge(None, None, "invalid_age_days")
+        return ResolvedPatientAge(days / DAYS_PER_YEAR, days, "age_days")
+
+    raw_years = _patient_field(patient, "age")
+    if raw_years is not None:
+        years = _finite_nonnegative(raw_years)
+        if years is None:
+            return ResolvedPatientAge(None, None, "invalid_age_years")
+        return ResolvedPatientAge(years, years * DAYS_PER_YEAR, "age_years")
+
+    return ResolvedPatientAge(None, None, "missing")
 
 
 @dataclass

@@ -34,7 +34,12 @@ from .interpret import (
     TALL_T_REL_MV,
 )
 from .mi import build_culprit_artery_evidence
-from .models import ECGFeatures, LeadBeatFeatures, STANDARD_12_LEADS
+from .models import (
+    ECGFeatures,
+    LeadBeatFeatures,
+    STANDARD_12_LEADS,
+    resolve_patient_age,
+)
 from .pediatric_rules import (
     PEDS_BVH_Q_V6_AMP_MV,
     PEDS_BVH_Q_V6_DUR_MS,
@@ -994,8 +999,9 @@ _PEDS_BRAD_THRESHOLD_360 = _peds_table([205, 205, 205, 200, 115, 115, 115, 115, 
 
 
 def _age_route(features: ECGFeatures) -> Tuple[str, str, Optional[float], bool]:
-    age = _finite(_patient_value(features, "age"))
-    age_valid = age is not None and age >= 0.0
+    resolved = resolve_patient_age(features.metadata.get("patient_meta"))
+    age = resolved.age_years
+    age_valid = resolved.known
     if not age_valid:
         return "adult", "age_missing_or_invalid_default_to_adult", age, False
     if age < PEDS_MAX_AGE_YEARS:
@@ -1756,7 +1762,10 @@ def build_morphology_inputs(features: ECGFeatures) -> Dict[str, Any]:
         "record": {
             "fs": int(features.fs),
             "duration_sec": features.metadata.get("duration_sec"),
-            "age_years": _patient_value(features, "age"),
+            "age_years": age_years,
+            "age_days": resolve_patient_age(
+                features.metadata.get("patient_meta")
+            ).age_days,
             "age_valid": age_valid,
             "sex": sex,
             "algorithm_age_group": algorithm_age_group,
@@ -2127,11 +2136,13 @@ def build_rhythm_inputs(features: ECGFeatures) -> Dict[str, Any]:
     continuous_pacing = bool(n_beats and len(paced_ids) == n_beats)
     intermittent_pacing = bool(0 < len(paced_ids) < n_beats)
 
+    resolved_age = resolve_patient_age(features.metadata.get("patient_meta"))
     return {
         "record": {
             "fs": int(features.fs),
             "duration_sec": features.metadata.get("duration_sec"),
-            "age_years": _patient_value(features, "age"),
+            "age_years": resolved_age.age_years,
+            "age_days": resolved_age.age_days,
             "sex": _patient_value(features, "sex"),
             "lead_order": to_dict(features.metadata.get("lead_order")),
             "record_quality": to_dict(record_quality),
@@ -2435,6 +2446,7 @@ def prepare_json_export(
     *,
     include_beat_features: bool = False,
     round_ndigits: Optional[int] = 6,
+    profile: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Shrink a `to_dict()` payload before writing it to disk.
 
@@ -2448,8 +2460,24 @@ def prepare_json_export(
 
     This only reshapes the already-built `to_dict()` payload for the on-disk
     artifact — it does not change `to_dict()`'s own return value, so no
-    existing in-memory consumer of `to_dict()` is affected.
+    existing in-memory consumer of `to_dict()` is affected. Export profiles
+    are `summary` (compact clinical output), `audit` (the historical default),
+    and `debug` (all per-beat details). The legacy `include_beat_features`
+    switch remains supported and selects `debug` when no profile is supplied.
     """
+    if profile is None:
+        selected_profile = "debug" if include_beat_features else "audit"
+    else:
+        selected_profile = str(profile).strip().lower()
+        if selected_profile not in {"summary", "audit", "debug"}:
+            raise ValueError(
+                "profile must be one of: summary, audit, debug"
+            )
+        if include_beat_features and selected_profile != "debug":
+            raise ValueError(
+                "include_beat_features=True is only compatible with profile='debug'"
+            )
+
     trimmed = dict(payload)
     trimmed.pop("glasgow", None)
     metadata = trimmed.get("metadata")
@@ -2457,8 +2485,22 @@ def prepare_json_export(
         metadata = dict(metadata)
         metadata.pop("glasgow_analysis", None)
         trimmed["metadata"] = metadata
-    if not include_beat_features:
+    if selected_profile != "debug":
         trimmed.pop("beat_features", None)
+    if selected_profile == "summary":
+        # These fields repeat the derived rhythm/morphology summaries and are
+        # useful for audit/debugging, but dominate the serialized artifact.
+        trimmed.pop("p_wave_assessments", None)
+        metadata = trimmed.get("metadata")
+        if isinstance(metadata, dict):
+            metadata = dict(metadata)
+            metadata.pop("rhythm_analysis", None)
+            trimmed["metadata"] = metadata
+        morphology_inputs = trimmed.get("morphology_inputs")
+        if isinstance(morphology_inputs, dict):
+            morphology_inputs = dict(morphology_inputs)
+            morphology_inputs.pop("native_beat_profiles", None)
+            trimmed["morphology_inputs"] = morphology_inputs
     # This pass is also the JSON-safety boundary: real-world records can
     # produce NaN/Inf in optional measurements. JSON has no representation for
     # those values, so export them as null even when rounding is disabled.
@@ -2476,11 +2518,13 @@ def build_structured_payload(features: ECGFeatures) -> Dict[str, Any]:
         morphology_inputs=morphology_inputs,
     )
     clinical = _clinical_export_payload(features)
+    resolved_age = resolve_patient_age(features.metadata.get("patient_meta"))
     return {
         "record": {
             "fs": int(features.fs),
             "duration_sec": features.metadata.get("duration_sec"),
-            "age_years": _patient_value(features, "age"),
+            "age_years": resolved_age.age_years,
+            "age_days": resolved_age.age_days,
             "sex": _patient_value(features, "sex"),
             "lead_order": to_dict(features.metadata.get("lead_order")),
             "record_quality": to_dict(record_quality),

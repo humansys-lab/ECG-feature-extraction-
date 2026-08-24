@@ -33,6 +33,7 @@ from .models import (
     PatientMeta,
     RepresentativeLeadFeatures,
     STANDARD_12_LEADS,
+    resolve_patient_age,
 )
 from .pediatric_rules import build_pediatric_hypertrophy_evidence
 
@@ -2746,12 +2747,9 @@ def interpret(features: ECGFeatures) -> ECGInterpretation:
     is_female: Optional[bool] = (
         meta.sex.lower() in ("f", "female") if (meta and meta.sex) else None
     )
-    patient_age: Optional[float] = meta.age if meta is not None else None
-    patient_age_days: Optional[float] = None
-    if meta is not None and meta.age_days is not None:
-        patient_age_days = float(meta.age_days)
-    elif patient_age is not None:
-        patient_age_days = float(patient_age) * 365.25
+    resolved_age = resolve_patient_age(meta)
+    patient_age = resolved_age.age_years
+    patient_age_days = resolved_age.age_days
 
     # Pediatric routing: Chapter 4 applies for ages 0 to < 16 years
     is_ped = patient_age is not None and 0 <= patient_age < PEDS_MAX_AGE_YEARS

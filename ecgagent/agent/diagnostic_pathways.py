@@ -14,7 +14,7 @@ from .diagnosis_catalog import DIAGNOSIS_CATALOG
 from .deterministic_pathways import program_owns_pathway_step
 
 
-DIAGNOSTIC_PATHWAY_VERSION = "ecgagent.diagnostic-pathways.v7"
+DIAGNOSTIC_PATHWAY_VERSION = "ecgagent.diagnostic-pathways.v8"
 
 
 #: Gate semantics for a pathway node.
@@ -699,8 +699,14 @@ def build_diagnostic_pathway(
     code: str,
     *,
     fallback_checks: Sequence[Mapping[str, Any]] = (),
+    program_owned: bool = True,
 ) -> dict[str, Any]:
-    """Build one compact path, using candidate checks only as a fallback."""
+    """Build one compact path, using candidate checks only as a fallback.
+
+    The current deterministic threshold policy is adult-only.  Callers set
+    ``program_owned=False`` for pediatric or unresolved age so those steps are
+    adjudicated from the visible measurements instead of forcing adult norms.
+    """
 
     steps, cautions = _definition(code)
     if not steps:
@@ -716,7 +722,8 @@ def build_diagnostic_pathway(
     for step in steps:
         step["owner"] = (
             "program"
-            if program_owns_pathway_step(code, str(step.get("id") or ""))
+            if program_owned
+            and program_owns_pathway_step(code, str(step.get("id") or ""))
             else "model"
         )
     return {

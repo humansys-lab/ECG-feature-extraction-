@@ -107,6 +107,24 @@ def test_pediatric_rate_is_not_forced_through_adult_cutoff() -> None:
     assert validate_diagnosis_measurement_semantics(verdict, payload) == []
 
 
+def test_age_days_overrides_conflicting_adult_year_age_in_semantic_guard() -> None:
+    payload = _payload()
+    payload["metadata"]["patient_meta"].update({"age": 40, "age_days": 30})
+    payload["global_features"]["heart_rate_bpm"] = 63.0
+    verdict = _diagnostic_verdict()
+    verdict["diagnoses"] = [
+        _positive_diagnosis(
+            "bradycardia",
+            category="rate",
+            value=63,
+            unit="bpm",
+            citation="ev:/global_features/heart_rate_bpm",
+        )
+    ]
+
+    assert validate_diagnosis_measurement_semantics(verdict, payload) == []
+
+
 def test_first_degree_av_delay_requires_pr_above_200_ms() -> None:
     diagnosis = _positive_diagnosis(
         "first_degree_av_delay",

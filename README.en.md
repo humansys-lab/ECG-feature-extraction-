@@ -24,6 +24,12 @@ ecg_gemma/
 │   ├── ecgfeat/                  # ECG 特征提取核心包
 │   ├── README.md                 # 核心包的补充说明
 │   └── pyproject.toml
+├── ecgagent/                     # 诊断 Agent、证据与校验
+├── webchat/                      # Web UI 与模型服务
+├── scripts/                      # 维护、本地化与队列工具
+├── tools/generation_conditions/  # 专项审计与探针
+├── tests/                        # 单元、契约与回归测试
+├── docs/                         # 设计、算法与验证文档
 ├── demo_feature_extraction.py    # 单条 WFDB .mat/.hea 记录演示
 ├── batch_extract_ecgfeat.py      # ECG 特征批处理
 ├── medgemma_ecg_core.py          # MedGemma 上下文与诊断流程
@@ -31,14 +37,19 @@ ecg_gemma/
 ├── app.py                        # Gradio 界面入口
 ├── evaluate_*.py / validate_*.py # 数据集评估与验证入口
 ├── dataset -> data/010           # demo 默认读取的数据目录
-├── tests/                        # 算法、导出与临床规则测试
-├── data/                         # 数据、特征、报告与图像
+├── data/                         # 本地原始/参考数据（Git 忽略）
+├── medgemma-27b/                 # 本地 MedGemma 模型（Git 忽略）
+├── qwen3.8-27b/                  # 本地 Qwen 模型（Git 忽略）
+├── document/                     # 外部参考资料（Git 忽略）
 ├── requirements.txt              # 完整项目依赖
-└── medgemma-27b/                 # MedGemma 相关代码
+└── .gitignore                    # 本地大文件与生成物隔离规则
 ```
 
 For a more complete description of entry classification, shared module boundaries, and maintenance conventions see
 [Code Base Navigation and Maintenance Conventions](docs/codebase_guide.en.md).
+
+For the cleanup scope, retained files, and ongoing rules, see the
+[Project Code and File Organization Report](docs/project_organization_and_cleanup.en.md).
 
 ECG Diagnostic Agent’s current dual-channel architecture, evidence contract, Compact/Legacy workflow,
 For tool and verification design, see [ECGAgent complete design document](docs/ecg_agent_complete_design.en.md).

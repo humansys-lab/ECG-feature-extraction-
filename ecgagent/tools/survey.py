@@ -9,6 +9,9 @@ from .registry import ToolResult, ToolSpec
 
 
 _OVERVIEW_POINTERS: tuple[tuple[str, str], ...] = (
+    ("patient age (years)", "/metadata/patient_meta/age"),
+    ("patient age (days)", "/metadata/patient_meta/age_days"),
+    ("patient sex", "/metadata/patient_meta/sex"),
     ("record quality", "/metadata/record_quality/record_grade"),
     ("measurement gate", "/metadata/diagnostic_gate/state"),
     ("detected beats", "/metadata/n_beats"),

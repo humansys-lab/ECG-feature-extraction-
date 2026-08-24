@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -54,6 +55,10 @@ LEAD_TO_ANN_EXT = {v: k for k, v in ANN_EXT_TO_LEAD.items()}
 # Max distance (ms) to match a detected R-peak to a GT R-peak
 MATCH_TOLERANCE_MS = 75
 
+
+class AnnotationReadError(RuntimeError):
+    """A requested LUDB lead annotation could not be read."""
+
 # ── Annotation parsing ───────────────────────────────────────────────────────
 
 def parse_ludb_annotations(record_path: str, ext: str) -> List[Dict]:
@@ -66,8 +71,10 @@ def parse_ludb_annotations(record_path: str, ext: str) -> List[Dict]:
     """
     try:
         ann = wfdb.rdann(record_path, ext)
-    except Exception:
-        return []
+    except Exception as exc:
+        raise AnnotationReadError(
+            f"cannot read annotation {record_path}.{ext}: {type(exc).__name__}: {exc}"
+        ) from exc
 
     symbols = ann.symbol
     samples = ann.sample
@@ -124,21 +131,63 @@ def match_beats(
     Returns list of (gt_beat, det_beat) pairs within MATCH_TOLERANCE_MS.
     """
     tol = int(MATCH_TOLERANCE_MS * fs / 1000)
-    gt_rs  = np.array([b["r_sample"] for b in gt_beats])
-    det_rs = np.array([d.qrs.peak for d in det_beats if d.qrs.peak is not None])
-    if len(det_rs) == 0 or len(gt_rs) == 0:
+    gt = sorted(gt_beats, key=lambda beat: int(beat["r_sample"]))
+    detected = sorted(
+        (beat for beat in det_beats if beat.qrs.peak is not None),
+        key=lambda beat: int(beat.qrs.peak),
+    )
+    if not detected or not gt:
         return []
 
-    pairs = []
-    used_det = set()
-    for gi, gt in enumerate(gt_beats):
-        dists = np.abs(det_rs - gt["r_sample"])
-        best = int(np.argmin(dists))
-        if dists[best] <= tol and best not in used_det:
-            # Find the actual LeadBeatFeatures object
-            det_obj = [d for d in det_beats if d.qrs.peak is not None][best]
-            pairs.append((gt, det_obj))
-            used_det.add(best)
+    # Order-preserving dynamic programming first maximizes the match count and
+    # then minimizes total R-peak error. A nearest-neighbour loop can consume a
+    # detection needed by the next GT beat and under-count a valid assignment.
+    n_gt, n_det = len(gt), len(detected)
+    scores = [[(0, 0) for _ in range(n_det + 1)] for _ in range(n_gt + 1)]
+    choices = [["" for _ in range(n_det + 1)] for _ in range(n_gt + 1)]
+
+    def better(candidate: tuple[int, int], current: tuple[int, int]) -> bool:
+        return candidate[0] > current[0] or (
+            candidate[0] == current[0] and candidate[1] < current[1]
+        )
+
+    for gt_index in range(1, n_gt + 1):
+        choices[gt_index][0] = "skip_gt"
+    for det_index in range(1, n_det + 1):
+        choices[0][det_index] = "skip_det"
+    for gt_index in range(1, n_gt + 1):
+        for det_index in range(1, n_det + 1):
+            best = scores[gt_index - 1][det_index]
+            choice = "skip_gt"
+            if better(scores[gt_index][det_index - 1], best):
+                best = scores[gt_index][det_index - 1]
+                choice = "skip_det"
+            distance = abs(
+                int(gt[gt_index - 1]["r_sample"])
+                - int(detected[det_index - 1].qrs.peak)
+            )
+            if distance <= tol:
+                previous = scores[gt_index - 1][det_index - 1]
+                candidate = (previous[0] + 1, previous[1] + distance)
+                if better(candidate, best):
+                    best = candidate
+                    choice = "match"
+            scores[gt_index][det_index] = best
+            choices[gt_index][det_index] = choice
+
+    pairs: List[Tuple[Dict, object]] = []
+    gt_index, det_index = n_gt, n_det
+    while gt_index > 0 or det_index > 0:
+        choice = choices[gt_index][det_index]
+        if choice == "match":
+            pairs.append((gt[gt_index - 1], detected[det_index - 1]))
+            gt_index -= 1
+            det_index -= 1
+        elif choice == "skip_gt":
+            gt_index -= 1
+        else:
+            det_index -= 1
+    pairs.reverse()
     return pairs
 
 
@@ -203,6 +252,8 @@ def _det_p_by_gt_p_timing(
 def evaluate_record(
     record_id: str,
     extractor: ECGFeatureExtractor,
+    *,
+    failure_details: List[str] | None = None,
 ) -> List[Dict]:
     """
     Run extraction on one LUDB record and return a list of error dicts
@@ -213,6 +264,8 @@ def evaluate_record(
         rec = wfdb.rdrecord(record_path)
     except Exception as e:
         print(f"  [skip] {record_id}: cannot read signal — {e}")
+        if failure_details is not None:
+            failure_details.append(f"signal: {type(e).__name__}: {e}")
         return []
 
     ecg = rec.p_signal.T   # [12, N]
@@ -222,6 +275,8 @@ def evaluate_record(
         feat = extractor.extract(ecg, float(fs))
     except Exception as e:
         print(f"  [skip] {record_id}: extractor failed — {e}")
+        if failure_details is not None:
+            failure_details.append(f"extractor: {type(e).__name__}: {e}")
         return []
 
     # Build per-lead dict of detected beat features
@@ -234,7 +289,13 @@ def evaluate_record(
         ext = LEAD_TO_ANN_EXT.get(lead)
         if ext is None:
             continue
-        gt_beats = parse_ludb_annotations(record_path, ext)
+        try:
+            gt_beats = parse_ludb_annotations(record_path, ext)
+        except AnnotationReadError as exc:
+            print(f"  [coverage failure] {record_id}/{lead}: {exc}")
+            if failure_details is not None:
+                failure_details.append(f"annotation {lead}: {exc}")
+            continue
         if not gt_beats:
             continue
         det_beats = det_by_lead.get(lead, [])
@@ -614,7 +675,7 @@ def save_csv(rows: List[Dict], out_dir: Path) -> None:
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description="Evaluate boundary detection on LUDB")
     parser.add_argument("--n",   type=int, default=None,
                         help="Limit to first N records (default: all 200)")
@@ -637,27 +698,53 @@ def main() -> None:
     print()
 
     all_rows: List[Dict] = []
+    failed_records: List[Dict[str, object]] = []
     for i, rid in enumerate(all_records, 1):
         print(f"  [{i:>3d}/{len(all_records)}]  {rid}", end="  ", flush=True)
-        rows = evaluate_record(rid, extractor)
+        record_failures: List[str] = []
+        rows = evaluate_record(
+            rid,
+            extractor,
+            failure_details=record_failures,
+        )
         n_pairs = len(rows)
         print(f"→ {n_pairs} beat×lead pairs matched")
+        if record_failures or not rows:
+            failed_records.append(
+                {
+                    "record_id": rid,
+                    "errors": record_failures or ["no scored beat×lead pairs"],
+                }
+            )
         all_rows.extend(rows)
 
+    out_dir = Path(args.out) if args.out else PROJECT_ROOT / "results"
+    if failed_records:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "coverage_failures.json").write_text(
+            json.dumps(failed_records, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
     if not all_rows:
         print("No results — check that LUDB data directory is accessible.")
-        return
+        return 1
 
     summary = compute_summary(all_rows)
     print_summary(summary, len(all_records), len(all_rows))
 
-    out_dir = Path(args.out) if args.out else PROJECT_ROOT / "results"
     save_csv(all_rows, out_dir)
     print()
     print(f"  Generating visualisations...")
     plot_results(all_rows, summary, out_dir)
     print(f"  All outputs saved to: {out_dir.resolve()}")
+    if failed_records:
+        print(
+            f"  Coverage failure: {len(failed_records)} requested record(s) "
+            "had unreadable inputs/annotations or produced no scored pairs."
+        )
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

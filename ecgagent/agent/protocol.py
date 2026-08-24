@@ -15,7 +15,7 @@ from .runtime import (
 )
 from .safety_policy import CLINICAL_SAFETY_POLICY_VERSION
 
-DIAGNOSTIC_AGENT_PROTOCOL_VERSION = "ecgagent.diagnostic.v40"
+DIAGNOSTIC_AGENT_PROTOCOL_VERSION = "ecgagent.diagnostic.v41"
 
 DIAGNOSTIC_DOMAINS: tuple[str, ...] = (
     "quality",

@@ -7,6 +7,7 @@ from feature_extraction.ecgfeat.models import (
     GlobalFeatures,
     PatientMeta,
     RepresentativeLeadFeatures,
+    resolve_patient_age,
 )
 from feature_extraction.ecgfeat.pediatric_rules import (
     build_pediatric_hypertrophy_evidence,
@@ -171,6 +172,28 @@ class PediatricRulesTests(unittest.TestCase):
 
         self.assertIsNone(result.pediatric_hypertrophy_evidence["rvh"]["class"])
         self.assertIsNone(result.rvh_class)
+
+    def test_age_days_overrides_conflicting_adult_age_in_interpretation(self) -> None:
+        features = _minimal_pediatric_features({})
+        features.metadata["patient_meta"] = PatientMeta(
+            age=40.0,
+            age_days=30.0,
+            sex="M",
+        )
+
+        result = interpret(features)
+
+        self.assertTrue(result.is_pediatric)
+        self.assertTrue(result.pediatric_hypertrophy_evidence)
+
+    def test_invalid_explicit_age_days_fails_closed_without_year_fallback(self) -> None:
+        resolved = resolve_patient_age(
+            PatientMeta(age=40.0, age_days=float("nan"), sex="M")
+        )
+
+        self.assertFalse(resolved.known)
+        self.assertIsNone(resolved.age_years)
+        self.assertEqual("invalid_age_days", resolved.source)
 
     def test_interpret_pediatric_bvh_matches_exported_evidence_for_rs_sum(self) -> None:
         features = _minimal_pediatric_features(

@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from evaluate_ludb import _det_p_by_gt_p_timing
+import pytest
+
+import evaluate_ludb
+from evaluate_ludb import (
+    AnnotationReadError,
+    _det_p_by_gt_p_timing,
+    match_beats,
+    parse_ludb_annotations,
+)
 
 
 def _det(qrs_on: int, qrs_peak: int, p_on: int | None = None, p_peak: int | None = None, p_off: int | None = None):
@@ -42,3 +50,26 @@ def test_det_p_by_gt_p_timing_does_not_cross_implausible_gap() -> None:
     )
 
     assert 100 not in mapping
+
+
+def test_match_beats_finds_maximum_one_to_one_assignment() -> None:
+    ground_truth = [{"r_sample": 0}, {"r_sample": 5}]
+    first = _det(0, 4)
+    second = _det(75, 79)
+
+    pairs = match_beats(ground_truth, [first, second], fs=1000)
+
+    assert [(gt["r_sample"], det.qrs.peak) for gt, det in pairs] == [
+        (0, 4),
+        (5, 79),
+    ]
+
+
+def test_annotation_read_error_is_not_silently_treated_as_empty(monkeypatch) -> None:
+    def fail(*args, **kwargs):
+        raise OSError("missing annotation")
+
+    monkeypatch.setattr(evaluate_ludb.wfdb, "rdann", fail)
+
+    with pytest.raises(AnnotationReadError, match="missing annotation"):
+        parse_ludb_annotations("record", "ii")

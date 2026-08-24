@@ -14,8 +14,19 @@ def test_exact_age_days_takes_precedence_over_year_conversion() -> None:
     context = build_context(features, GlasgowConfig())
 
     assert context.patient.age_days == 14.0
+    assert context.patient.age_years == 14.0 / 365.25
     assert context.patient.age_days_source == "provided"
     assert context.patient.pediatric is True
+
+
+def test_invalid_explicit_age_days_does_not_use_conflicting_year_age() -> None:
+    features = make_features(meta=PatientMeta(age=40.0, age_days=-1.0, sex="Male"))
+
+    context = build_context(features, GlasgowConfig())
+
+    assert context.patient.age_days is None
+    assert context.patient.age_years is None
+    assert context.patient.age_missing is True
 
 
 def test_age_years_are_converted_to_days_and_marked_approximate() -> None:

@@ -12,7 +12,11 @@ from feature_extraction.ecgfeat.api import (
 )
 from feature_extraction.ecgfeat.quality import validate_pacing_spikes_against_qrs
 from feature_extraction.ecgfeat.grouping import cluster_beats
-from feature_extraction.ecgfeat.quality import detect_pacing_spikes, remove_pacing_spikes
+from feature_extraction.ecgfeat.quality import (
+    detect_pacing_spikes,
+    prepare_pacing_detection_cache,
+    remove_pacing_spikes,
+)
 
 
 class PacingGroupingTests(unittest.TestCase):
@@ -93,6 +97,28 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertTrue(result["paced"])
         self.assertEqual("on", result["state"])
         self.assertEqual(4, result["lead_vote_count"])
+
+    def test_pacing_detection_cache_preserves_threshold_results(self) -> None:
+        fs = 500
+        rng = np.random.default_rng(42)
+        ecg = rng.normal(0.0, 0.002, size=(12, 1500))
+        for sample in (200, 600, 1000, 1400):
+            ecg[:8, sample] += 0.35
+        cache = prepare_pacing_detection_cache(ecg, fs)
+
+        for threshold in (250.0, 150.0, 100.0, 25.0):
+            fresh = detect_pacing_spikes(
+                ecg,
+                fs,
+                min_prominence_uv=threshold,
+            )
+            cached = detect_pacing_spikes(
+                ecg,
+                fs,
+                min_prominence_uv=threshold,
+                detection_cache=cache,
+            )
+            self.assertEqual(fresh, cached)
 
     def test_detect_pacing_spikes_uses_mad_threshold_for_low_amplitude_multilead_spikes(self) -> None:
         fs = 500

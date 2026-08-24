@@ -15,12 +15,17 @@ import re
 import time
 from typing import Any, Mapping, Sequence
 
+from ..age import resolve_patient_age
 from ..backends.base import LLMBackend
 from ..evidence.diagnostic_briefing import (
     build_compact_diagnostic_briefing,
     build_diagnostic_briefing,
 )
 from ..evidence.store import EvidenceStore
+from ..quality_gate import (
+    QUALITY_GATE_VALIDATION_VERSION,
+    validate_diagnostic_gate,
+)
 from ..tools.registry import ToolRegistry, build_default_registry
 from ..verify import VerificationPolicy
 from . import compact_diagnostic_prompts, diagnostic_prompts
@@ -177,23 +182,31 @@ def _abnormal_domain_count(store: EvidenceStore) -> int:
             return None
         return float(value)
 
+    patient = store.raw("/metadata/patient_meta", {})
+    age = resolve_patient_age(patient if isinstance(patient, Mapping) else {})
     domains = 0
-    rate = number("/global_features/heart_rate_bpm")
-    if rate is not None and not (60.0 <= rate <= 100.0):
-        domains += 1
-    pr = number("/global_features/pr_ms")
-    if pr is None or pr > 200.0 or pr < 120.0:
-        domains += 1
-    qrs = number("/global_features/qrs_ms")
-    if qrs is not None and qrs >= 110.0:
-        domains += 1
+    if age.adult is True:
+        rate = number("/global_features/heart_rate_bpm")
+        if rate is not None and not (60.0 <= rate <= 100.0):
+            domains += 1
+        pr = number("/global_features/pr_ms")
+        if pr is None or pr > 200.0 or pr < 120.0:
+            domains += 1
+        qrs = number("/global_features/qrs_ms")
+        if qrs is not None and qrs >= 110.0:
+            domains += 1
+        axis = number("/global_features/qrs_axis_deg")
+        if axis is not None and not (-30.0 <= axis <= 90.0):
+            domains += 1
+        p_axis = number("/global_features/p_axis_deg")
+        if p_axis is None or not (0.0 <= p_axis <= 90.0):
+            domains += 1
+    else:
+        # Adult reference intervals cannot classify pediatric or unknown-age
+        # records.  Count those domains as unresolved for budget sizing so the
+        # model gets enough measurement checks without calling them abnormal.
+        domains += 5
     if store.raw("/global_features/qt_reportable", None) is False:
-        domains += 1
-    axis = number("/global_features/qrs_axis_deg")
-    if axis is not None and not (-30.0 <= axis <= 90.0):
-        domains += 1
-    p_axis = number("/global_features/p_axis_deg")
-    if p_axis is None or not (0.0 <= p_axis <= 90.0):
         domains += 1
     if store.raw("/rhythm_inputs/background/background_rr_regular", None) is False:
         domains += 1
@@ -367,6 +380,7 @@ def _diagnostic_prompt_fingerprint() -> str:
             compact_diagnostic_prompts.SYSTEM_PROMPT,
             json.dumps(DEFAULT_DIAGNOSTIC_PROTOCOL.to_dict(), sort_keys=True),
             json.dumps(DEFAULT_CLINICAL_SAFETY_POLICY.to_dict(), sort_keys=True),
+            QUALITY_GATE_VALIDATION_VERSION,
             *(phase.instruction for phase in phase_templates),
             json.dumps(
                 [
@@ -474,14 +488,15 @@ class ECGDiagnosticAgent(ECGAgent):
             "quality_limitations": [],
         }
         self._compact_decision_audit: dict[str, Any] = {}
-        self._quality_gate = diagnostic_store.raw(
-            "/metadata/diagnostic_gate", {}
+        self._quality_gate = validate_diagnostic_gate(
+            diagnostic_store.raw("/metadata/diagnostic_gate", None)
         )
-        self._quality_gate = (
-            dict(self._quality_gate)
-            if isinstance(self._quality_gate, Mapping)
-            else {}
-        )
+        metadata = diagnostic_store.document.setdefault("metadata", {})
+        if isinstance(metadata, dict):
+            # Keep every downstream contract, briefing and tool view aligned
+            # with the same fail-closed gate rather than retaining the invalid
+            # persisted object beside a separate validated copy.
+            metadata["diagnostic_gate"] = copy.deepcopy(self._quality_gate)
         self.urgent_review_assessment = assess_urgent_review(diagnostic_store)
         selected_phases = phases or (
             compact_diagnostic_phases(diagnostic_store)
@@ -854,6 +869,15 @@ class ECGDiagnosticAgent(ECGAgent):
         pointer_tools: Mapping[str, set[str]],
     ) -> tuple[Any, ...] | None:
         """Resolve definition-level nodes that need no model interpretation."""
+
+        patient = self.store.raw("/metadata/patient_meta", {})
+        if resolve_patient_age(
+            patient if isinstance(patient, Mapping) else {}
+        ).adult is not True:
+            # The program-owned thresholds are explicitly adult.  Pediatric
+            # and unknown-age pathway steps remain model-owned so raw age and
+            # measurements can be interpreted with the appropriate norms.
+            return None
 
         def visible(pointer: str) -> bool:
             return expected_tool in pointer_tools.get(pointer, set())
@@ -2549,11 +2573,16 @@ class ECGDiagnosticAgent(ECGAgent):
 
     def _compact_candidate_semantic_conflict(self, code: str) -> str | None:
         if code == "wide_complex_tachycardia":
+            patient = self.store.raw("/metadata/patient_meta", {})
+            adult = resolve_patient_age(
+                patient if isinstance(patient, Mapping) else {}
+            ).adult
             maximum_rate = self.store.raw(
                 "/global_features/heart_rate_max_bpm", None
             )
             if (
-                isinstance(maximum_rate, (int, float))
+                adult is True
+                and isinstance(maximum_rate, (int, float))
                 and float(maximum_rate)
                 <= float(
                     DEFAULT_CLINICAL_SAFETY_POLICY.tachycardia_lower_exclusive_bpm
@@ -2868,6 +2897,10 @@ class ECGDiagnosticAgent(ECGAgent):
             seen_families[family] = candidate
             seen_ids.add(candidate_id)
             added.append(code)
+        patient_meta = self.store.raw("/metadata/patient_meta", {})
+        adult_program_pathways = resolve_patient_age(
+            patient_meta if isinstance(patient_meta, Mapping) else {}
+        ).adult is True
         for candidate in merged:
             candidate["diagnostic_pathway"] = build_diagnostic_pathway(
                 str(candidate.get("code") or ""),
@@ -2876,6 +2909,7 @@ class ECGDiagnosticAgent(ECGAgent):
                     for row in (candidate.get("checks") or [])
                     if isinstance(row, Mapping)
                 ],
+                program_owned=adult_program_pathways,
             )
         independent_rows = [
             row
@@ -4491,6 +4525,12 @@ class ECGDiagnosticAgent(ECGAgent):
         finished.audit["clinical_safety_policy"] = (
             DEFAULT_CLINICAL_SAFETY_POLICY.to_dict()
         )
+        finished.audit["diagnostic_gate_validation"] = {
+            "version": QUALITY_GATE_VALIDATION_VERSION,
+            "state": self._quality_gate.get("state"),
+            "source": self._quality_gate.get("source", "validated_artifact"),
+            "stop_reasons": list(self._quality_gate.get("stop_reasons") or []),
+        }
         finished.audit["deterministic_pathway_policy"] = {
             key: getattr(DEFAULT_DETERMINISTIC_PATHWAY_POLICY, key)
             for key in DEFAULT_DETERMINISTIC_PATHWAY_POLICY.__dataclass_fields__

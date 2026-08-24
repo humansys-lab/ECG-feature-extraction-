@@ -12,7 +12,7 @@ Generation time: 2026-07-28
 <a id="结论"></a>
 ## Conclusion
 
-The first round of deterministic DSP transformation required in `docs/p wave doc` has been integrated into the `ecgfeat` main process.
+The first round of deterministic DSP transformation required in `docs/p wave doc.md` has been integrated into the `ecgfeat` main process.
 The new implementation no longer treats a single consensus boundary as an unconditionally valid result, but simultaneously derives lead-by-lead evidence,
 strict/robust boundaries, experience CI, P status, collection chain quality control and structured rejection reasons.
 

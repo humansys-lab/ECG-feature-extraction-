@@ -99,8 +99,10 @@
         <input type="checkbox" id="set-thinking" />
         <span>启用思考模式（模型先输出推理过程再给答案，更准但更慢）</span>
       </label>
+      <p class="hint">隐私：对话和生成设置仅保存在当前浏览器标签页；关闭标签页后自动清除。</p>
     </div>
     <div class="modal-foot">
+      <button class="btn danger" id="clear-local-data">清除全部对话数据</button>
       <button class="btn ghost" id="reset-settings">恢复默认</button>
       <button class="btn primary" id="save-settings">完成</button>
     </div>

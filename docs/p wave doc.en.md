@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](p%20wave%20doc) | [English](p%20wave%20doc.en.md) | [日本語](p%20wave%20doc.ja.md)
+[中文](p%20wave%20doc.md) | [English](p%20wave%20doc.en.md) | [日本語](p%20wave%20doc.ja.md)
 <!-- /i18n-nav -->
 
 > Translation note: This English version is provided for convenience. If it differs from the source document, the source document prevails.

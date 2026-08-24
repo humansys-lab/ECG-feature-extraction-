@@ -30,6 +30,41 @@ class PrepareJsonExportTests(unittest.TestCase):
             [{"lead": "I", "r_amp_mv": 0.123456789}], result["beat_features"]
         )
 
+    def test_debug_profile_keeps_beat_features(self) -> None:
+        result = prepare_json_export(self._payload(), profile="debug")
+
+        self.assertIn("beat_features", result)
+
+    def test_summary_profile_removes_repeated_audit_details(self) -> None:
+        payload = {
+            **self._payload(),
+            "p_wave_assessments": [{"beat_id": 1}],
+            "metadata": {"rhythm_analysis": {"atrial_events": [1, 2]}},
+            "morphology_inputs": {
+                "native_beat_profiles": [{"beat_id": 1}],
+                "statement_evidence": {"available": True},
+            },
+        }
+
+        result = prepare_json_export(payload, profile="summary")
+
+        self.assertNotIn("beat_features", result)
+        self.assertNotIn("p_wave_assessments", result)
+        self.assertNotIn("rhythm_analysis", result["metadata"])
+        self.assertNotIn("native_beat_profiles", result["morphology_inputs"])
+        self.assertIn("statement_evidence", result["morphology_inputs"])
+        self.assertIn("p_wave_assessments", payload)
+
+    def test_rejects_invalid_or_conflicting_profile(self) -> None:
+        with self.assertRaises(ValueError):
+            prepare_json_export(self._payload(), profile="unknown")
+        with self.assertRaises(ValueError):
+            prepare_json_export(
+                self._payload(),
+                profile="summary",
+                include_beat_features=True,
+            )
+
     def test_rounds_floats_to_default_precision(self) -> None:
         result = prepare_json_export(self._payload())
 

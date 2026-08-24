@@ -323,10 +323,12 @@ def summarize_rows(
         bool(metric_summary["numeric_pass"])
         for metric_summary in metrics.values()
     )
-    complete = all(
+    measurement_complete = all(
         bool(metric_summary["complete_on_reference_available"])
         for metric_summary in metrics.values()
     )
+    operational_complete = bool(rows) and not failed_rows
+    complete = measurement_complete and operational_complete
     return {
         "schema_version": "ecgfeat_ludb_cse_proxy.v1",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -361,6 +363,8 @@ def summarize_rows(
         ],
         "metrics": metrics,
         "all_metrics_numeric_pass": numeric_pass,
+        "measurement_coverage_complete": measurement_complete,
+        "operational_coverage_complete": operational_complete,
         "all_metrics_complete": complete,
         "proxy_verdict": (
             "meets_numeric_limits_with_complete_coverage"
@@ -614,7 +618,7 @@ def run_evaluation(
     ]
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Evaluate ecgfeat on LUDB against CSE-style interval limits."
     )
@@ -669,7 +673,11 @@ def main() -> None:
     write_outputs(rows, summary, args.out_dir.resolve())
     print(render_markdown(summary))
     print(f"Outputs: {args.out_dir.resolve()}")
+    return 0 if (
+        summary["all_metrics_numeric_pass"]
+        and summary["all_metrics_complete"]
+    ) else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

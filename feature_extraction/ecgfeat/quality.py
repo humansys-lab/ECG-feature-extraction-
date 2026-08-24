@@ -691,8 +691,22 @@ def _spike_prominence_uv(sig: np.ndarray, peak: int, fs: int, width_ms: float) -
 
 
 def _lead_pacing_candidates(
-    sig: np.ndarray, fs: int, min_prominence_uv: float = PACE_SPIKE_LOW_UV
+    sig: np.ndarray,
+    fs: int,
+    min_prominence_uv: float = PACE_SPIKE_LOW_UV,
+    *,
+    prepared: Optional[List[tuple]] = None,
 ) -> List[tuple]:
+    details = prepared if prepared is not None else _prepare_lead_pacing_candidates(sig, fs)
+    return [
+        (int(peak), float(score), float(width_ms))
+        for peak, score, width_ms, prominence_uv in details
+        if float(prominence_uv) >= float(min_prominence_uv)
+    ]
+
+
+def _prepare_lead_pacing_candidates(sig: np.ndarray, fs: int) -> List[tuple]:
+    """Compute threshold-independent pacing candidates once per lead."""
     if fs <= 0 or len(sig) == 0:
         return []
     enhanced = _pacing_enhancer(sig)
@@ -723,11 +737,10 @@ def _lead_pacing_candidates(
         width_ms = float(max(over_threshold_width_ms, raw_width_ms))
         if over_threshold_width_ms <= max_width_ms and raw_width_ms <= max_width_ms:
             prominence_uv = _spike_prominence_uv(sig, peak, fs, width_ms)
-            # Default 12SL low-spike gate. Lower rescue thresholds are only used
-            # by the API-level QRS-validated rescue path.
-            if prominence_uv >= float(min_prominence_uv):
-                score = float(np.max(seg / np.maximum(sigma[start:end + 1], 1e-9)))
-                candidates.append((int(peak), score, width_ms))
+            score = float(
+                np.max(seg / np.maximum(sigma[start:end + 1], 1e-9))
+            )
+            candidates.append((int(peak), score, width_ms, prominence_uv))
         idx += 1
     return candidates
 
@@ -741,24 +754,32 @@ def _accept_pacing_cluster(lead_count: int, scores: List[float], min_lead_votes:
 
 
 def _legacy_highpass_pacing_detection(
-    ecg: np.ndarray, fs: int, min_lead_votes: int, min_prominence_uv: float = PACE_SPIKE_LOW_UV
+    ecg: np.ndarray,
+    fs: int,
+    min_lead_votes: int,
+    min_prominence_uv: float = PACE_SPIKE_LOW_UV,
+    *,
+    prepared: Optional[List[tuple[np.ndarray, np.ndarray]]] = None,
 ) -> Dict[str, object]:
     n_leads, _ = ecg.shape
     win_samples = max(1, int(0.050 * fs))
     amplitude_floor_mv = float(min_prominence_uv) / 1000.0
     spike_events: List[tuple] = []
     for lead_idx in range(min(n_leads, 12)):
-        sig = ecg[lead_idx].astype(float)
-        hp = highpass_filter(
-            sig[None, :],
-            fs,
-            cutoff_hz=_pacing_highpass_cutoff_hz(fs),
-        )[0]
-        hp_sq = hp ** 2
-        kernel = np.ones(win_samples) / win_samples
-        _conv = np.convolve(hp_sq, kernel, mode="full")
-        rms_inc = np.sqrt(np.clip(_conv[: len(hp)], 0.0, None))
-        local_rms = np.concatenate([[rms_inc[0]], rms_inc[:-1]])
+        if prepared is not None and lead_idx < len(prepared):
+            hp, local_rms = prepared[lead_idx]
+        else:
+            sig = ecg[lead_idx].astype(float)
+            hp = highpass_filter(
+                sig[None, :],
+                fs,
+                cutoff_hz=_pacing_highpass_cutoff_hz(fs),
+            )[0]
+            hp_sq = hp ** 2
+            kernel = np.ones(win_samples) / win_samples
+            _conv = np.convolve(hp_sq, kernel, mode="full")
+            rms_inc = np.sqrt(np.clip(_conv[: len(hp)], 0.0, None))
+            local_rms = np.concatenate([[rms_inc[0]], rms_inc[:-1]])
         # 12SL absolute-amplitude gate on the high-pass envelope (replaces the old
         # 10 microvolt floor, which admitted sub-threshold QRS-edge artefacts).
         spike_mask = np.abs(hp) >= np.maximum(5.0 * local_rms, amplitude_floor_mv)
@@ -835,11 +856,48 @@ def _pacing_highpass_cutoff_hz(fs: int, requested_hz: float = 100.0) -> float:
     return float(min(requested_hz, 0.90 * (float(fs) / 2.0)))
 
 
+def prepare_pacing_detection_cache(ecg: np.ndarray, fs: int) -> Dict[str, Any]:
+    """Cache threshold-independent filters used by normal and rescue passes."""
+    values = np.asarray(ecg, dtype=float)
+    n_leads = min(values.shape[0], 12)
+    win_samples = max(1, int(0.050 * fs))
+    legacy: List[tuple[np.ndarray, np.ndarray]] = []
+    candidates: List[List[tuple]] = []
+    for lead_idx in range(n_leads):
+        signal = values[lead_idx]
+        legacy_hp = highpass_filter(
+            signal[None, :],
+            fs,
+            cutoff_hz=_pacing_highpass_cutoff_hz(fs),
+        )[0]
+        kernel = np.ones(win_samples) / win_samples
+        convolution = np.convolve(legacy_hp * legacy_hp, kernel, mode="full")
+        rms_increment = np.sqrt(
+            np.clip(convolution[: legacy_hp.size], 0.0, None)
+        )
+        local_rms = np.concatenate(
+            ([rms_increment[0]], rms_increment[:-1])
+        )
+        legacy.append((legacy_hp, local_rms))
+        pacing_signal = highpass_filter(
+            signal[None, :], fs, cutoff_hz=0.5
+        )[0]
+        candidates.append(_prepare_lead_pacing_candidates(pacing_signal, fs))
+    return {
+        "shape": tuple(int(value) for value in values.shape),
+        "fs": int(fs),
+        "legacy": legacy,
+        "candidates": candidates,
+    }
+
+
 def detect_pacing_spikes(
     ecg: np.ndarray,
     fs: int,
     min_lead_votes: int = 4,
     min_prominence_uv: float = PACE_SPIKE_LOW_UV,
+    *,
+    detection_cache: Optional[Dict[str, Any]] = None,
 ) -> dict:
     """
     T024 — Detect pacing spikes in 12-lead ECG.
@@ -855,14 +913,34 @@ def detect_pacing_spikes(
     # Collect (sample_index, lead_idx) so we can count per-lead votes
     spike_events: List[tuple] = []
     candidate_events: List[Dict[str, object]] = []
+    cache = detection_cache
+    if (
+        not isinstance(cache, dict)
+        or cache.get("shape") != tuple(int(value) for value in ecg.shape)
+        or cache.get("fs") != int(fs)
+    ):
+        cache = prepare_pacing_detection_cache(ecg, fs)
     legacy_result = _legacy_highpass_pacing_detection(
-        ecg, fs, min_lead_votes, min_prominence_uv=min_prominence_uv
+        ecg,
+        fs,
+        min_lead_votes,
+        min_prominence_uv=min_prominence_uv,
+        prepared=cache.get("legacy"),
     )
 
     for lead_idx in range(min(n_leads, 12)):
-        sig = ecg[lead_idx].astype(float)
-        pacing_sig = highpass_filter(sig[None, :], fs, cutoff_hz=0.5)[0]
-        for s, score, width_ms in _lead_pacing_candidates(pacing_sig, fs, min_prominence_uv):
+        prepared_candidates = cache.get("candidates", [])
+        lead_candidates = (
+            prepared_candidates[lead_idx]
+            if lead_idx < len(prepared_candidates)
+            else None
+        )
+        for s, score, width_ms in _lead_pacing_candidates(
+            ecg[lead_idx],
+            fs,
+            min_prominence_uv,
+            prepared=lead_candidates,
+        ):
             spike_events.append((s, lead_idx))
             candidate_events.append({
                 "sample": int(s),
@@ -1012,6 +1090,8 @@ def validate_pacing_spikes_against_qrs(
     spike_times: List[int],
     r_locs: np.ndarray,
     pacing_result: Dict[str, Any],
+    *,
+    detection_cache: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Reject multilead high-frequency QRS edges misclassified as pacing spikes."""
     result: Dict[str, Any] = dict(pacing_result or {})
@@ -1023,11 +1103,24 @@ def validate_pacing_spikes_against_qrs(
         return result
 
     n_leads, n_samp = ecg.shape
-    hp = highpass_filter(
-        np.asarray(ecg[: min(n_leads, 12)], dtype=float),
-        fs,
-        cutoff_hz=_pacing_highpass_cutoff_hz(fs),
+    cached_legacy = (
+        detection_cache.get("legacy")
+        if isinstance(detection_cache, dict)
+        and detection_cache.get("shape") == tuple(int(value) for value in ecg.shape)
+        and detection_cache.get("fs") == int(fs)
+        else None
     )
+    if cached_legacy is not None and len(cached_legacy) >= min(n_leads, 12):
+        hp = np.stack(
+            [cached_legacy[index][0] for index in range(min(n_leads, 12))],
+            axis=0,
+        )
+    else:
+        hp = highpass_filter(
+            np.asarray(ecg[: min(n_leads, 12)], dtype=float),
+            fs,
+            cutoff_hz=_pacing_highpass_cutoff_hz(fs),
+        )
     spike_radius = max(1, int(round(0.002 * fs)))
     qrs_lo = max(1, int(round(0.008 * fs)))
     qrs_hi = max(qrs_lo + 1, int(round(0.030 * fs)))
@@ -1214,6 +1307,22 @@ def remove_pacing_spikes(
     return cleaned
 
 
+def _finite_correlation(first: np.ndarray, second: np.ndarray) -> Optional[float]:
+    """Pearson correlation that abstains for constant or malformed signals."""
+    a = np.asarray(first, dtype=float).reshape(-1)
+    b = np.asarray(second, dtype=float).reshape(-1)
+    if a.size != b.size or a.size < 2:
+        return None
+    if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
+        return None
+    a = a - float(np.mean(a))
+    b = b - float(np.mean(b))
+    denominator = float(np.sqrt(np.dot(a, a) * np.dot(b, b)))
+    if denominator <= 1e-12:
+        return None
+    return float(np.clip(np.dot(a, b) / denominator, -1.0, 1.0))
+
+
 def detect_limb_lead_reversal(ecg: np.ndarray) -> Dict[str, object]:
     """Detect electrode swaps from lead-specific polarity/correlation patterns.
 
@@ -1243,11 +1352,17 @@ def detect_limb_lead_reversal(ecg: np.ndarray) -> Dict[str, object]:
     out: Dict[str, object] = dict(swaps)
     einthoven_err = np.sqrt(np.mean((II - I - III) ** 2))
     ref_scale = np.std(II) + 1e-6
-    if np.corrcoef(I, -II)[0, 1] > 0.75 and np.corrcoef(aVR, aVL)[0, 1] > 0.55:
+    corr_i_ii = _finite_correlation(I, -II)
+    corr_avr_avl = _finite_correlation(aVR, aVL)
+    corr_ii_i = _finite_correlation(II, -I)
+    corr_avr_avf = _finite_correlation(aVR, aVF)
+    corr_iii_i = _finite_correlation(III, -I)
+    corr_avl_avf = _finite_correlation(aVL, aVF)
+    if corr_i_ii is not None and corr_avr_avl is not None and corr_i_ii > 0.75 and corr_avr_avl > 0.55:
         out["probable_ra_la"] = True
-    if np.corrcoef(II, -I)[0, 1] > 0.75 and np.corrcoef(aVR, aVF)[0, 1] > 0.55:
+    if corr_ii_i is not None and corr_avr_avf is not None and corr_ii_i > 0.75 and corr_avr_avf > 0.55:
         out["probable_ra_ll"] = True
-    if np.corrcoef(III, -I)[0, 1] > 0.65 and np.corrcoef(aVL, aVF)[0, 1] > 0.55:
+    if corr_iii_i is not None and corr_avl_avf is not None and corr_iii_i > 0.65 and corr_avl_avf > 0.55:
         out["probable_la_ll"] = True
     limb_ranges = {
         "I": float(np.ptp(I)),

@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, replace
 from math import isfinite
 from typing import Any, Dict, List, Optional
 
-from ..models import ECGFeatures, STANDARD_12_LEADS
+from ..models import ECGFeatures, STANDARD_12_LEADS, resolve_patient_age
 from .models import GlasgowConfig
 
 
@@ -109,31 +109,23 @@ class GlasgowContext:
 
 
 def _patient_route(features: ECGFeatures) -> PatientRoute:
-    age_years = _finite(_patient_value(features, "age"))
-    if age_years is not None and age_years < 0.0:
-        age_years = None
-    provided_days = _finite(_patient_value(features, "age_days"))
-    if provided_days is not None and provided_days < 0.0:
-        provided_days = None
+    resolved_age = resolve_patient_age(features.metadata.get("patient_meta"))
+    age_years = resolved_age.age_years
+    age_days = resolved_age.age_days
 
-    if provided_days is not None:
-        age_days = provided_days
+    if resolved_age.source == "age_days":
         age_days_source = "provided"
         age_approximation = False
-        if age_years is None:
-            age_years = provided_days / 365.25
-    elif age_years is not None:
-        age_days = age_years * 365.25
+    elif resolved_age.source == "age_years":
         age_days_source = "derived_from_age_years"
         age_approximation = True
     else:
-        age_days = None
         age_days_source = "missing_adult_fallback"
         age_approximation = True
 
     raw_sex = _patient_value(features, "sex")
     normalized_sex = _normalize_sex(raw_sex)
-    age_missing = age_years is None and provided_days is None
+    age_missing = not resolved_age.known
     sex_missing = normalized_sex == "unknown"
     # NOTE ON CROSS-ENGINE DIVERGENCE: 18 years matches this engine's own
     # source, GAN Physician's Guide section 4.3.6 ("the patient is under 18

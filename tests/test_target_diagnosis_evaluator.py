@@ -158,3 +158,39 @@ def test_dataset_summary_reports_direct_and_all_mapped_metrics_separately() -> N
     assert summary["micro_tp"] == 5
     assert summary["micro_fp"] == 5
     assert summary["micro_fn"] == 3
+
+
+def test_target_resume_contract_tracks_source_and_extractor_config(tmp_path) -> None:
+    base = tmp_path / "record"
+    base.with_suffix(".hea").write_text("header", encoding="utf-8")
+    base.with_suffix(".dat").write_bytes(b"signal-v1")
+    row = {
+        "record": "record",
+        "record_path": str(base),
+        "age": 60,
+        "sex": "male",
+    }
+
+    initial = evaluator._target_extraction_contract(
+        row,
+        fs_internal=500,
+        enable_pacing=True,
+    )
+    assert initial is not None
+    assert initial != evaluator._target_extraction_contract(
+        row,
+        fs_internal=250,
+        enable_pacing=True,
+    )
+    assert initial != evaluator._target_extraction_contract(
+        row,
+        fs_internal=500,
+        enable_pacing=False,
+    )
+
+    base.with_suffix(".dat").write_bytes(b"signal-v2")
+    assert initial != evaluator._target_extraction_contract(
+        row,
+        fs_internal=500,
+        enable_pacing=True,
+    )

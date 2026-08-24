@@ -31,9 +31,20 @@ PY
 export CHAT_PROFILE="$PROFILE"
 export CHAT_BASE_URL="${CHAT_BASE_URL:-http://127.0.0.1:$P_PORT/v1}"
 
-HOST="${CHAT_UI_HOST:-0.0.0.0}"
+HOST="${CHAT_UI_HOST:-127.0.0.1}"
 PORT="${CHAT_UI_PORT:-$P_UI_PORT}"
 
-echo "$P_LABEL 聊天界面: http://localhost:$PORT   （模型服务: $CHAT_BASE_URL）"
+case "$HOST" in
+  127.0.0.1|::1|localhost) ;;
+  *)
+    AUTH_TOKEN="${CHAT_AUTH_TOKEN:-}"
+    if (( ${#AUTH_TOKEN} < 16 )); then
+      echo "拒绝在 $HOST 上启动未鉴权界面：请设置至少 16 字符的 CHAT_AUTH_TOKEN" >&2
+      exit 1
+    fi
+    ;;
+esac
+
+echo "$P_LABEL 聊天界面: http://$HOST:$PORT   （模型服务: $CHAT_BASE_URL）"
 
 exec "$PYTHON" -m uvicorn webchat.server:app --host "$HOST" --port "$PORT" "$@"

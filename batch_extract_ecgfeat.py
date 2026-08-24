@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 import argparse
+import gzip
+import hashlib
 import json
+import math
+import multiprocessing
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
@@ -24,7 +31,8 @@ class BatchJob:
 
 @dataclass
 class PatientMetaStub:
-    age: int | None = None
+    age: float | None = None
+    age_days: float | None = None
     sex: str | None = None
 
 
@@ -78,7 +86,34 @@ def load_pt(path: Path) -> Any:
             "Install torch in the runtime environment before running this script."
         ) from exc
 
-    return torch.load(path, map_location="cpu")
+    try:
+        payload = torch.load(path, map_location="cpu", weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "the installed PyTorch does not support safe weights-only loading; "
+            "upgrade PyTorch or convert the input to a non-pickle format"
+        ) from exc
+
+    def safe_value(value: Any) -> bool:
+        if torch.is_tensor(value) or value is None or isinstance(
+            value, (bool, int, float, str, bytes)
+        ):
+            return True
+        if isinstance(value, (list, tuple)):
+            return all(safe_value(item) for item in value)
+        if isinstance(value, Mapping):
+            return all(
+                isinstance(key, (bool, int, float, str, bytes))
+                and safe_value(item)
+                for key, item in value.items()
+            )
+        return False
+
+    if not safe_value(payload):
+        raise ValueError(
+            f"{path} contains unsupported object types; expected tensors and basic containers"
+        )
+    return payload
 
 
 def save_pt(path: Path, payload: Any) -> None:
@@ -178,6 +213,32 @@ def iter_jobs(input_dir: Path, output_dir: Path, sources: Sequence[str]) -> Iter
             )
 
 
+def _resolve_age_metadata(
+    metadata: Mapping[str, Any],
+) -> tuple[float | None, float | None]:
+    """Return a consistent year/day pair with fail-closed day precedence."""
+
+    raw_age_days = metadata.get("age_days")
+    if raw_age_days is None:
+        raw_age = metadata.get("age")
+        if raw_age is None or isinstance(raw_age, bool):
+            return None, None
+        try:
+            age_years = float(raw_age)
+        except (TypeError, ValueError, OverflowError):
+            return None, None
+        if not math.isfinite(age_years) or age_years < 0.0:
+            return None, None
+        return age_years, None
+    try:
+        age_days = float(raw_age_days)
+    except (TypeError, ValueError, OverflowError):
+        return None, None
+    if not math.isfinite(age_days) or age_days < 0.0:
+        return None, None
+    return age_days / 365.25, age_days
+
+
 def build_sample_header(
     disease_label: str,
     record_id: str,
@@ -189,11 +250,13 @@ def build_sample_header(
     metadata = metadata or {}
     label = metadata.get("label") or disease_label.upper()
     dataset = metadata.get("dataset", "unknown")
+    age, resolved_age_days = _resolve_age_metadata(metadata)
     return {
         "record": record_id,
         "fs": int(sampling_rate),
         "n_samples": int(n_points),
-        "age": metadata.get("age"),
+        "age": age,
+        "age_days": resolved_age_days,
         "sex": metadata.get("sex"),
         "dx": [str(label)],
         "rx": "Unknown",
@@ -202,8 +265,27 @@ def build_sample_header(
     }
 
 
+def opaque_record_id(job: BatchJob, sample_index: int) -> str:
+    """Build a stable identifier that does not expose the ground-truth label."""
+    identity = "\0".join(
+        (
+            str(job.input_path.resolve()),
+            job.disease_label,
+            job.source_name,
+            str(int(sample_index)),
+        )
+    )
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+    return f"ecg_{digest}"
+
+
 def _write_json(path: Path, payload: Any) -> None:
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    text = json.dumps(payload, indent=2, ensure_ascii=False, default=str)
+    if path.suffix == ".gz":
+        with gzip.open(path, "wt", encoding="utf-8") as handle:
+            handle.write(text)
+        return
+    path.write_text(text, encoding="utf-8")
 
 
 def process_job(
@@ -220,6 +302,9 @@ def process_job(
     skip_existing: bool = False,
     prepare_json_export_fn: Callable[..., Any] | None = None,
     include_beat_features: bool = False,
+    export_profile: str | None = None,
+    save_pt_output: bool = True,
+    gzip_json: bool = False,
 ) -> dict[str, Any]:
     raw_batch = load_pt_fn(job.input_path)
     batch = normalize_batch_ecg(raw_batch, job.input_path)
@@ -244,6 +329,9 @@ def process_job(
         "skipped": 0,
         "failed": 0,
         "annotated_plots": 0,
+        "export_profile": export_profile,
+        "pt_output_enabled": bool(save_pt_output),
+        "json_gzip_enabled": bool(gzip_json),
         "errors": [],
     }
 
@@ -252,12 +340,15 @@ def process_job(
             break
 
         sample_id = f"{sample_index:03d}"
-        feature_json_path = job.output_dir / f"{sample_id}_features.json"
+        json_suffix = ".json.gz" if gzip_json else ".json"
+        feature_json_path = job.output_dir / f"{sample_id}_features{json_suffix}"
         feature_pt_path = job.output_dir / f"{sample_id}_features.pt"
         report_path = job.output_dir / f"{sample_id}_report.txt"
         annotated_plot_path = job.output_dir / f"{sample_id}_ecg_annotated.png"
 
-        expected_paths = [feature_json_path, feature_pt_path, report_path]
+        expected_paths = [feature_json_path, report_path]
+        if save_pt_output:
+            expected_paths.append(feature_pt_path)
         if annotated_plot_writer is not None:
             expected_paths.append(annotated_plot_path)
         if skip_existing and all(path.exists() for path in expected_paths):
@@ -271,8 +362,13 @@ def process_job(
             continue
 
         try:
-            record_id = f"{job.disease_label}_{job.source_name}_{sample_id}"
-            patient_meta = patient_meta_factory(age=metadata.get("age"), sex=metadata.get("sex"))
+            record_id = opaque_record_id(job, sample_index)
+            age, age_days = _resolve_age_metadata(metadata)
+            patient_meta = patient_meta_factory(
+                age=age,
+                age_days=age_days,
+                sex=metadata.get("sex"),
+            )
             header = build_sample_header(
                 disease_label=job.disease_label,
                 record_id=record_id,
@@ -287,15 +383,21 @@ def process_job(
             if isinstance(clinical, dict) and clinical.get("ruleset_version"):
                 manifest["clinical_ruleset_version"] = clinical["ruleset_version"]
 
-            json_payload = (
-                prepare_json_export_fn(
-                    feature_payload, include_beat_features=include_beat_features
+            if prepare_json_export_fn is not None:
+                export_options: dict[str, Any] = {
+                    "include_beat_features": include_beat_features,
+                }
+                if export_profile is not None:
+                    export_options["profile"] = export_profile
+                json_payload = prepare_json_export_fn(
+                    feature_payload,
+                    **export_options,
                 )
-                if prepare_json_export_fn is not None
-                else feature_payload
-            )
+            else:
+                json_payload = feature_payload
             _write_json(feature_json_path, json_payload)
-            save_pt_fn(feature_pt_path, feature_payload)
+            if save_pt_output:
+                save_pt_fn(feature_pt_path, feature_payload)
             report_writer(record_id, header, ecg, result, report_path)
             if annotated_plot_writer is not None:
                 annotated_plot_writer(record_id, header, ecg, result, annotated_plot_path)
@@ -356,7 +458,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--skip-existing",
         action="store_true",
-        help="Skip samples whose feature JSON, feature PT, and report TXT already exist.",
+        help=(
+            "Skip samples whose artifacts enabled by the current options already "
+            "exist (JSON, report, optional PT, and optional annotated plot)."
+        ),
     )
     parser.add_argument(
         "--annotated-plots",
@@ -369,14 +474,58 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help=(
             "Keep the full per-beat/per-lead measurement detail (beat_features) in the "
             "exported feature JSON. Omitted by default to shrink the JSON artifact; the "
-            ".pt feature file always keeps the full detail regardless of this flag."
+            ".pt feature file, when enabled, keeps the full detail regardless of this flag."
         ),
+    )
+    parser.add_argument(
+        "--export-profile",
+        choices=("summary", "audit", "debug"),
+        default="summary",
+        help=(
+            "JSON detail level: summary removes repeated audit arrays, audit keeps "
+            "provenance, and debug keeps full per-beat features (default: summary)."
+        ),
+    )
+    parser.add_argument(
+        "--no-pt",
+        action="store_true",
+        help="Do not write the duplicate full-detail .pt feature artifact.",
+    )
+    parser.add_argument(
+        "--gzip-json",
+        action="store_true",
+        help=(
+            "Write feature JSON as .json.gz to reduce storage and I/O; the bundled "
+            "MedGemma batch diagnostics discover and read this form directly."
+        ),
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of disease/source jobs to process concurrently (default: 1).",
+    )
+    parser.add_argument(
+        "--blas-threads",
+        type=int,
+        default=1,
+        help="Numerical-library threads per worker (default: 1).",
     )
     return parser
 
 
-def run_batch(args: argparse.Namespace) -> int:
-    sources = parse_sources(args.sources)
+def _configure_numerical_threads(thread_count: int) -> None:
+    value = str(max(1, int(thread_count)))
+    for variable in (
+        "OPENBLAS_NUM_THREADS",
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+    ):
+        os.environ[variable] = value
+
+
+def _process_job_runtime(job: BatchJob, config: dict[str, Any]) -> dict[str, Any]:
     (
         ECGFeatureExtractor,
         to_dict_fn,
@@ -386,6 +535,40 @@ def run_batch(args: argparse.Namespace) -> int:
         prepare_json_export_fn,
     ) = _import_runtime_components()
     extractor = ECGFeatureExtractor(mains_freq=50)
+    return process_job(
+        job=job,
+        extractor=extractor,
+        to_dict_fn=to_dict_fn,
+        report_writer=report_writer,
+        sampling_rate=int(config["sampling_rate"]),
+        annotated_plot_writer=(
+            annotated_plot_writer if config["annotated_plots"] else None
+        ),
+        load_pt_fn=load_pt,
+        save_pt_fn=save_pt,
+        patient_meta_factory=patient_meta_factory,
+        limit=config["limit"],
+        skip_existing=bool(config["skip_existing"]),
+        prepare_json_export_fn=prepare_json_export_fn,
+        include_beat_features=bool(config["include_beat_features"]),
+        export_profile=str(config["export_profile"]),
+        save_pt_output=bool(config["save_pt_output"]),
+        gzip_json=bool(config["gzip_json"]),
+    )
+
+
+def run_batch(args: argparse.Namespace) -> int:
+    sources = parse_sources(args.sources)
+    workers = int(getattr(args, "workers", 1))
+    blas_threads = int(getattr(args, "blas_threads", 1))
+    if workers < 1:
+        raise ValueError("--workers must be at least 1")
+    if blas_threads < 1:
+        raise ValueError("--blas-threads must be at least 1")
+    serial_runtime = None
+    if workers == 1:
+        _configure_numerical_threads(blas_threads)
+        serial_runtime = _import_runtime_components()
 
     jobs = list(iter_jobs(args.input_dir, args.output_dir, sources))
     if not jobs:
@@ -395,24 +578,25 @@ def run_batch(args: argparse.Namespace) -> int:
     total_processed = 0
     total_failed = 0
     total_skipped = 0
+    include_beat_features = bool(getattr(args, "include_beat_features", False))
+    export_profile = (
+        "debug"
+        if include_beat_features
+        else str(getattr(args, "export_profile", "summary"))
+    )
+    config = {
+        "sampling_rate": int(args.sampling_rate),
+        "annotated_plots": bool(args.annotated_plots),
+        "limit": args.limit,
+        "skip_existing": bool(args.skip_existing),
+        "include_beat_features": include_beat_features,
+        "export_profile": export_profile,
+        "save_pt_output": not bool(getattr(args, "no_pt", False)),
+        "gzip_json": bool(getattr(args, "gzip_json", False)),
+    }
 
-    for job in jobs:
-        print(f"[process] {job.disease_label}/{job.source_name} -> {job.output_dir}")
-        summary = process_job(
-            job=job,
-            extractor=extractor,
-            to_dict_fn=to_dict_fn,
-            report_writer=report_writer,
-            sampling_rate=args.sampling_rate,
-            annotated_plot_writer=annotated_plot_writer if args.annotated_plots else None,
-            load_pt_fn=load_pt,
-            save_pt_fn=save_pt,
-            patient_meta_factory=patient_meta_factory,
-            limit=args.limit,
-            skip_existing=args.skip_existing,
-            prepare_json_export_fn=prepare_json_export_fn,
-            include_beat_features=args.include_beat_features,
-        )
+    def record_summary(job: BatchJob, summary: dict[str, Any]) -> None:
+        nonlocal total_processed, total_failed, total_skipped
         total_processed += int(summary["processed"])
         total_failed += int(summary["failed"])
         total_skipped += int(summary["skipped"])
@@ -420,6 +604,65 @@ def run_batch(args: argparse.Namespace) -> int:
             f"[done] {job.disease_label}/{job.source_name}: "
             f"processed={summary['processed']} skipped={summary['skipped']} failed={summary['failed']}"
         )
+
+    if workers == 1:
+        assert serial_runtime is not None
+        (
+            ECGFeatureExtractor,
+            to_dict_fn,
+            patient_meta_factory,
+            report_writer,
+            annotated_plot_writer,
+            prepare_json_export_fn,
+        ) = serial_runtime
+        extractor = ECGFeatureExtractor(mains_freq=50)
+        for job in jobs:
+            print(f"[process] {job.disease_label}/{job.source_name} -> {job.output_dir}")
+            summary = process_job(
+                job=job,
+                extractor=extractor,
+                to_dict_fn=to_dict_fn,
+                report_writer=report_writer,
+                sampling_rate=config["sampling_rate"],
+                annotated_plot_writer=(
+                    annotated_plot_writer if config["annotated_plots"] else None
+                ),
+                load_pt_fn=load_pt,
+                save_pt_fn=save_pt,
+                patient_meta_factory=patient_meta_factory,
+                limit=config["limit"],
+                skip_existing=config["skip_existing"],
+                prepare_json_export_fn=prepare_json_export_fn,
+                include_beat_features=config["include_beat_features"],
+                export_profile=config["export_profile"],
+                save_pt_output=config["save_pt_output"],
+                gzip_json=config["gzip_json"],
+            )
+            record_summary(job, summary)
+    else:
+        context = multiprocessing.get_context("spawn")
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=context,
+            initializer=_configure_numerical_threads,
+            initargs=(blas_threads,),
+        ) as executor:
+            futures = {}
+            for job in jobs:
+                print(f"[process] {job.disease_label}/{job.source_name} -> {job.output_dir}")
+                futures[executor.submit(_process_job_runtime, job, config)] = job
+            for future in as_completed(futures):
+                job = futures[future]
+                try:
+                    summary = future.result()
+                except Exception as exc:
+                    total_failed += 1
+                    print(
+                        f"[failed] {job.disease_label}/{job.source_name}: {exc}",
+                        file=sys.stderr,
+                    )
+                    continue
+                record_summary(job, summary)
 
     print(
         f"[summary] jobs={len(jobs)} processed={total_processed} "
@@ -433,7 +676,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return run_batch(args)
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 1
 

@@ -9,9 +9,15 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import hashlib
+import hmac
+import importlib.metadata as importlib_metadata
 import json
 import math
 import os
+import platform
+import secrets
+import stat
 import sys
 import tempfile
 import time
@@ -24,10 +30,12 @@ from concurrent.futures import (
     as_completed,
     wait,
 )
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .agent.protocol import DEFAULT_DIAGNOSTIC_PROTOCOL
+from .privacy import external_egress_error, resolve_backend_privacy
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +47,10 @@ DEFAULT_DATASET_DIR = PROJECT_ROOT / "data" / "ptb-xl" / "05000"
 DEFAULT_METADATA_DIR = PROJECT_ROOT / "data" / "ptb-xl-metadata"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "ptbxl_05000_ecgagent"
 DEFAULT_LOCAL_MAX_CONCURRENCY = 6
+EXTRACTION_ARTIFACT_SCHEMA_VERSION = "ecgagent.feature-artifact.v1"
+_EXTRACTION_PROVENANCE_KEY = "_ecgagent_extraction"
+PSEUDONYM_KEY_FILENAME = ".ecgagent_pseudonym_key"
+PSEUDONYM_STRATEGY = "hmac-sha256-output-key-v1"
 
 
 def _fatal_external_error(error: Any) -> bool:
@@ -61,6 +73,151 @@ def _fatal_external_error(error: Any) -> bool:
         "invalid api key",
     )
     return any(marker in text for marker in fatal_markers)
+
+
+@lru_cache(maxsize=1)
+def _runtime_fingerprint() -> str:
+    versions: dict[str, str | None] = {}
+    for distribution in (
+        "anthropic",
+        "openai",
+        "torch",
+        "transformers",
+        "vllm",
+    ):
+        try:
+            versions[distribution] = importlib_metadata.version(distribution)
+        except importlib_metadata.PackageNotFoundError:
+            versions[distribution] = None
+    payload = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "packages": versions,
+    }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def _agent_code_fingerprint() -> str:
+    digest = hashlib.sha256()
+    source_root = Path(__file__).resolve().parent
+    for path in sorted(source_root.rglob("*.py")):
+        digest.update(str(path.relative_to(source_root)).encode("utf-8"))
+        digest.update(b"\0")
+        _hash_file(path, digest)
+    return "sha256:" + digest.hexdigest()
+
+
+@lru_cache(maxsize=16)
+def _model_artifact_fingerprint(model: str) -> str | None:
+    """Cryptographically commit to every byte of a local model artifact."""
+
+    path = Path(model)
+    if not path.exists():
+        return None
+    digest = hashlib.sha256()
+    if path.is_file():
+        _hash_file(path, digest)
+        return "sha256:" + digest.hexdigest()
+    files = sorted(item for item in path.rglob("*") if item.is_file())
+    for item in files:
+        relative = str(item.relative_to(path))
+        before = item.stat()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(before.st_size).encode("ascii"))
+        digest.update(b"\0")
+        if item.is_symlink():
+            digest.update(os.readlink(item).encode("utf-8"))
+            digest.update(b"\0")
+        _hash_file(item, digest)
+        after = item.stat()
+        if (
+            before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns
+        ):
+            raise RuntimeError(
+                f"local model artifact changed while fingerprinting: {item}"
+            )
+    return "sha256:" + digest.hexdigest()
+
+
+def _model_provenance_fingerprint(
+    *,
+    backend: str,
+    model: str,
+    endpoint_fingerprint: str,
+    thinking: bool,
+    reasoning_effort: str,
+    model_max_len: int | None,
+    gpu_memory_utilization: float | None,
+) -> str:
+    """Commit to the local artifact or the complete remote model identity."""
+
+    if backend == "medgemma-local":
+        fingerprint = _model_artifact_fingerprint(model)
+        if not fingerprint:
+            raise RuntimeError(
+                "the medgemma-local model path does not exist and cannot be "
+                f"fingerprinted: {model}"
+            )
+        return fingerprint
+
+    payload = {
+        "schema_version": "ecgagent.remote-model-id.v1",
+        "provider": backend,
+        "model": model,
+        "endpoint_fingerprint": endpoint_fingerprint,
+        "config": {
+            "thinking": bool(thinking),
+            "reasoning_effort": reasoning_effort if thinking else None,
+            "model_max_len": model_max_len,
+            "gpu_memory_utilization": gpu_memory_utilization,
+        },
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return "remote-model-id:sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _fresh_model_provenance_fingerprint(**kwargs: Any) -> str:
+    """Fingerprint once per batch run, never once per long-lived process."""
+
+    if kwargs.get("backend") == "medgemma-local":
+        _model_artifact_fingerprint.cache_clear()
+    return _model_provenance_fingerprint(**kwargs)
+
+
+def _unused_model_commitment(
+    *,
+    backend: str,
+    model: str,
+    endpoint_fingerprint: str,
+) -> str:
+    """Record a non-null plan commitment when no record can reach a model."""
+
+    encoded = json.dumps(
+        {
+            "schema_version": "ecgagent.model-not-used.v1",
+            "backend": backend,
+            "model": model,
+            "endpoint_fingerprint": endpoint_fingerprint,
+            "reason": "no_eligible_feature_artifacts",
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def _json_dump_atomic(path: Path, payload: Any) -> None:
@@ -112,6 +269,74 @@ def _text_dump_atomic(path: Path, text: str) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+def _read_pseudonym_key(path: Path) -> bytes:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise RuntimeError(f"pseudonym key is not a regular file: {path}")
+        if stat.S_IMODE(info.st_mode) != 0o600:
+            raise RuntimeError(
+                f"pseudonym key must have mode 0600, found "
+                f"{stat.S_IMODE(info.st_mode):04o}: {path}"
+            )
+        key = os.read(descriptor, 64)
+    finally:
+        os.close(descriptor)
+    if len(key) != 32:
+        raise RuntimeError(f"pseudonym key has invalid length: {path}")
+    return key
+
+
+def _load_or_create_pseudonym_key(output_dir: Path) -> bytes:
+    """Atomically create one private HMAC key per output directory."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    key_path = output_dir / PSEUDONYM_KEY_FILENAME
+    try:
+        return _read_pseudonym_key(key_path)
+    except FileNotFoundError:
+        pass
+
+    key = secrets.token_bytes(32)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f"{PSEUDONYM_KEY_FILENAME}.",
+        suffix=".tmp",
+        dir=str(output_dir),
+    )
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = -1
+            handle.write(key)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, key_path)
+        except FileExistsError:
+            pass
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+    return _read_pseudonym_key(key_path)
+
+
+def _record_identity_audit(record_id: str, key: bytes) -> dict[str, Any]:
+    message = f"ecgagent:model-visible-record:v1\0{record_id}".encode("utf-8")
+    digest = hmac.new(key, message, hashlib.sha256).hexdigest()[:24]
+    return {
+        "model_visible_record_id": f"ecg_{digest}",
+        "strategy": PSEUDONYM_STRATEGY,
+        "key_scope": "output_directory",
+    }
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -291,6 +516,74 @@ def _load_wfdb_record(record_path: Path) -> tuple[Any, float]:
     return ecg, float(record.fs)
 
 
+def _hash_file(path: Path, digest: Any) -> None:
+    digest.update(path.name.encode("utf-8"))
+    digest.update(b"\0")
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+
+
+@lru_cache(maxsize=1)
+def _feature_code_fingerprint() -> str:
+    """Fingerprint the extractor implementation used by resumable artifacts."""
+
+    digest = hashlib.sha256()
+    source_root = FEATURE_ROOT / "ecgfeat"
+    for path in sorted(source_root.rglob("*.py")):
+        digest.update(str(path.relative_to(source_root)).encode("utf-8"))
+        digest.update(b"\0")
+        _hash_file(path, digest)
+    return "sha256:" + digest.hexdigest()
+
+
+def _source_record_fingerprint(record: Mapping[str, Any]) -> str | None:
+    base = Path(str(record.get("record_path") or ""))
+    candidates = sorted(
+        path
+        for path in base.parent.glob(base.name + ".*")
+        if path.is_file()
+    )
+    if not candidates:
+        return None
+    digest = hashlib.sha256()
+    for path in candidates:
+        _hash_file(path, digest)
+    metadata = {
+        "record": str(record.get("record") or ""),
+        "age": record.get("age"),
+        "age_days": record.get("age_days"),
+        "sex": record.get("sex"),
+    }
+    digest.update(
+        json.dumps(
+            metadata,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    return "sha256:" + digest.hexdigest()
+
+
+def _extraction_provenance(
+    record: Mapping[str, Any],
+    fs_internal: int,
+) -> dict[str, Any] | None:
+    source_fingerprint = _source_record_fingerprint(record)
+    if source_fingerprint is None:
+        return None
+    return {
+        "schema_version": EXTRACTION_ARTIFACT_SCHEMA_VERSION,
+        "source_fingerprint": source_fingerprint,
+        "extractor_code_fingerprint": _feature_code_fingerprint(),
+        "config": {
+            "fs_internal": int(fs_internal),
+            "mains_freq": 50,
+        },
+    }
+
+
 def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
     record, output_text, fs_internal = task
     output_dir = Path(output_text)
@@ -309,12 +602,20 @@ def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
         features = extractor.extract(
             ecg,
             fs=fs,
-            meta=PatientMeta(age=record.get("age"), sex=record.get("sex")),
+            meta=PatientMeta(
+                age=record.get("age"),
+                age_days=record.get("age_days"),
+                sex=record.get("sex"),
+            ),
         )
         payload = prepare_json_export(
             to_dict(features),
             include_beat_features=True,
         )
+        provenance = _extraction_provenance(record, fs_internal)
+        if provenance is None:
+            raise RuntimeError("could not fingerprint the source WFDB record")
+        payload[_EXTRACTION_PROVENANCE_KEY] = provenance
         _json_dump_atomic(feature_path, payload)
         return {
             "record": record["record"],
@@ -346,7 +647,38 @@ def _valid_existing(path: Path, required_key: str) -> bool:
     return required_key in payload
 
 
-def _reusable_diagnosis(
+def _reusable_feature(
+    path: Path,
+    record: Mapping[str, Any],
+    *,
+    fs_internal: int,
+) -> bool:
+    """Require an exact source, configuration, schema, and code match."""
+
+    if not _valid_existing(path, "clinical_interpretation"):
+        return False
+    try:
+        payload = _read_json(path)
+    except (OSError, ValueError, TypeError):
+        return False
+    saved = payload.get(_EXTRACTION_PROVENANCE_KEY)
+    if not isinstance(saved, Mapping):
+        # Legacy feature files lack enough information to prove reuse safety.
+        return False
+    expected = _extraction_provenance(record, fs_internal)
+    return expected is not None and dict(saved) == expected
+
+
+def _cache_int(value: Any) -> int | None:
+    try:
+        if isinstance(value, bool):
+            return None
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _diagnosis_signature_matches(
     payload: Mapping[str, Any],
     feature_path: Path,
     *,
@@ -359,14 +691,20 @@ def _reusable_diagnosis(
         DEFAULT_DIAGNOSTIC_PROTOCOL.knowledge.default_max_chunks
     ),
     diagnostic_workflow: str = "legacy",
+    endpoint_fingerprint: str | None = None,
+    endpoint_external: bool | None = None,
+    external_egress: Mapping[str, Any] | None = None,
+    record_identity: Mapping[str, Any] | None = None,
+    max_revisions: int | None = None,
+    record_retries: int | None = None,
+    model_provenance_fingerprint: str | None = None,
+    generation_request: Mapping[str, Any] | None = None,
 ) -> bool:
-    """Whether a verified result matches the current code, prompt and input.
+    """Whether an artifact matches the current code, prompt, input and I/O.
 
-    A bare `verified=true` is insufficient after an Agent enhancement: it
-    would silently preserve results produced under an older verifier or prompt.
+    This is deliberately independent of success state so ``--no-retry-failed``
+    can reuse only an explicitly failed artifact with the exact same signature.
     """
-    if not payload.get("verified"):
-        return False
     from .agent.diagnostic import (
         DIAGNOSTIC_AGENT_PROTOCOL_VERSION,
         DIAGNOSTIC_PROMPT_FINGERPRINT,
@@ -393,7 +731,7 @@ def _reusable_diagnosis(
     else:
         if navigation_audit.get("enabled") is not True:
             return False
-        if int(navigation_audit.get("max_chunks") or 0) != min(
+        if _cache_int(navigation_audit.get("max_chunks")) != min(
             int(knowledge_max_chunks),
             DEFAULT_DIAGNOSTIC_PROTOCOL.knowledge.navigation_ceiling,
         ):
@@ -404,8 +742,8 @@ def _reusable_diagnosis(
     )
     if bool(knowledge_audit.get("enabled")) != bool(knowledge_challenge):
         return False
-    if knowledge_challenge and int(
-        knowledge_audit.get("max_chunks") or 0
+    if knowledge_challenge and _cache_int(
+        knowledge_audit.get("max_chunks")
     ) != int(knowledge_max_chunks):
         return False
 
@@ -414,19 +752,117 @@ def _reusable_diagnosis(
     saved_backend = str(batch.get("backend") or "deepseek")
     if saved_backend != backend:
         return False
+    saved_egress = batch.get("external_egress")
+    saved_egress = saved_egress if isinstance(saved_egress, Mapping) else {}
+    saved_endpoint = saved_egress.get("endpoint")
+    saved_endpoint = saved_endpoint if isinstance(saved_endpoint, Mapping) else {}
+    if external_egress is not None:
+        expected_egress = dict(external_egress)
+        if dict(saved_egress) != expected_egress:
+            return False
+    else:
+        default_policy = resolve_backend_privacy(backend)
+        expected_endpoint_fingerprint = (
+            endpoint_fingerprint or default_policy.endpoint_fingerprint
+        )
+        expected_external = (
+            default_policy.external
+            if endpoint_external is None
+            else endpoint_external
+        )
+        if saved_endpoint.get("fingerprint") != expected_endpoint_fingerprint:
+            return False
+        if bool(saved_egress.get("external")) != bool(expected_external):
+            return False
+        if str(saved_egress.get("backend") or "") != backend:
+            return False
+    saved_identity = audit.get("record_identity")
+    saved_identity = saved_identity if isinstance(saved_identity, Mapping) else {}
+    if record_identity is not None and dict(saved_identity) != dict(record_identity):
+        return False
     if batch.get("model") != model or bool(batch.get("thinking")) != bool(thinking):
         return False
     if thinking and batch.get("reasoning_effort") != reasoning_effort:
         return False
+    if generation_request is not None:
+        saved_generation_request = batch.get("generation_request")
+        if not isinstance(saved_generation_request, Mapping):
+            return False
+        if dict(saved_generation_request) != dict(generation_request):
+            return False
+    if max_revisions is not None and _cache_int(
+        batch.get("max_revisions")
+    ) != int(max_revisions):
+        return False
+    if record_retries is not None and _cache_int(
+        batch.get("record_retries")
+    ) != int(record_retries):
+        return False
+    if batch.get("runtime_fingerprint") != _runtime_fingerprint():
+        return False
+    if batch.get("agent_code_fingerprint") != _agent_code_fingerprint():
+        return False
+    expected_model_provenance = model_provenance_fingerprint
+    if expected_model_provenance is None:
+        if backend == "medgemma-local":
+            expected_model_provenance = _model_artifact_fingerprint(model)
+        else:
+            default_policy = resolve_backend_privacy(backend)
+            expected_model_provenance = _model_provenance_fingerprint(
+                backend=backend,
+                model=model,
+                endpoint_fingerprint=(
+                    endpoint_fingerprint or default_policy.endpoint_fingerprint
+                ),
+                thinking=thinking,
+                reasoning_effort=reasoning_effort,
+                model_max_len=None,
+                gpu_memory_utilization=None,
+            )
+    if not expected_model_provenance:
+        return False
+    saved_model_provenance = batch.get("model_provenance_fingerprint")
+    if saved_model_provenance is None:
+        saved_model_provenance = batch.get("model_artifact_fingerprint")
+    if saved_model_provenance != expected_model_provenance:
+        return False
+
+    from .evidence.store import EvidenceStore
 
     try:
         feature = _read_json(feature_path)
-    except (OSError, ValueError, TypeError):
+        fingerprint = (
+            EvidenceStore.from_dict(feature).diagnostic_view().fingerprint()
+        )
+    except (OSError, ValueError, TypeError, KeyError):
         return False
-    from .evidence.store import EvidenceStore
-
-    fingerprint = EvidenceStore.from_dict(feature).diagnostic_view().fingerprint()
     return audit.get("input_fingerprint") == fingerprint
+
+
+def _reusable_diagnosis(
+    payload: Mapping[str, Any],
+    feature_path: Path,
+    **signature: Any,
+) -> bool:
+    """Reuse only a verified diagnosis with an exact current signature."""
+
+    return bool(payload.get("verified")) and _diagnosis_signature_matches(
+        payload,
+        feature_path,
+        **signature,
+    )
+
+
+def _explicit_failed_diagnosis(payload: Mapping[str, Any]) -> bool:
+    """Recognize a terminal failure, never a stale verified candidate."""
+
+    return (
+        payload.get("verified") is False
+        and (
+            payload.get("ok") is False
+            or bool(str(payload.get("error") or "").strip())
+        )
+    )
 
 
 def run_extraction(
@@ -441,7 +877,11 @@ def run_extraction(
     tasks: list[tuple[dict[str, Any], str, int]] = []
     for record in records:
         path = _feature_path(output_dir, str(record["record"]))
-        if reuse_existing and _valid_existing(path, "clinical_interpretation"):
+        if reuse_existing and _reusable_feature(
+            path,
+            record,
+            fs_internal=fs_internal,
+        ):
             results.append(
                 {
                     "record": record["record"],
@@ -523,9 +963,7 @@ def _source_summary(document: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _diagnose_one(
-    task: tuple[
-        dict[str, Any], str, str, int, int, bool, str, bool, bool, int, str
-    ],
+    task: tuple[Any, ...],
     *,
     backend_name: str = "deepseek",
     backend_override: Any = None,
@@ -535,6 +973,50 @@ def _diagnose_one(
         # their historical five-stage behavior while every public batch entry
         # point now supplies the explicit compact default.
         task = (*task, "legacy")
+    if len(task) == 11:
+        fallback_policy = resolve_backend_privacy(backend_name)
+        fallback_identity = _record_identity_audit(
+            str(task[0]["record"]),
+            secrets.token_bytes(32),
+        )
+        fallback_identity["key_scope"] = "ephemeral_private_call"
+        task = (
+            *task,
+            fallback_policy.audit(allowed=not fallback_policy.external),
+            fallback_identity,
+        )
+    if len(task) == 13:
+        fallback_egress = task[11]
+        fallback_endpoint = (
+            fallback_egress.get("endpoint", {}).get("fingerprint")
+            if isinstance(fallback_egress, Mapping)
+            else None
+        )
+        fallback_policy = resolve_backend_privacy(backend_name)
+        task = (
+            *task,
+            _model_provenance_fingerprint(
+                backend=backend_name,
+                model=str(task[2]),
+                endpoint_fingerprint=str(
+                    fallback_endpoint or fallback_policy.endpoint_fingerprint
+                ),
+                thinking=bool(task[5]),
+                reasoning_effort=str(task[6]),
+                model_max_len=None,
+                gpu_memory_utilization=None,
+            ),
+        )
+    if len(task) == 14:
+        task = (
+            *task,
+            {
+                "model_max_len": None,
+                "gpu_memory_utilization": None,
+            },
+        )
+    if len(task) != 15:
+        raise ValueError("diagnosis worker task has an unsupported shape")
     (
         record,
         output_text,
@@ -547,7 +1029,15 @@ def _diagnose_one(
         knowledge_challenge,
         knowledge_max_chunks,
         diagnostic_workflow,
+        external_egress_audit,
+        record_identity,
+        model_provenance_fingerprint,
+        generation_request,
     ) = task
+    external_egress_audit = dict(external_egress_audit)
+    record_identity = dict(record_identity)
+    generation_request = dict(generation_request)
+    model_visible_record_id = str(record_identity["model_visible_record_id"])
     output_dir = Path(output_text)
     feature_path = _feature_path(output_dir, str(record["record"]))
     diagnosis_path = _diagnosis_path(output_dir, str(record["record"]))
@@ -570,7 +1060,7 @@ def _diagnose_one(
 
             store = EvidenceStore.from_path(
                 feature_path,
-                record_id=str(record["record"]),
+                record_id=model_visible_record_id,
             )
             if backend_override is not None:
                 session_factory = getattr(backend_override, "new_session", None)
@@ -611,6 +1101,12 @@ def _diagnose_one(
                         progress_path,
                         {
                             **payload,
+                            "record_id": record["record"],
+                            "record_identity": record_identity,
+                            "external_egress": external_egress_audit,
+                            "model_provenance_fingerprint": (
+                                model_provenance_fingerprint
+                            ),
                             "attempt": attempt_number,
                             "progress_path": str(progress_path),
                         },
@@ -619,6 +1115,13 @@ def _diagnose_one(
             ).run()
             final_result = result
             final_payload = result.to_dict()
+            final_payload["record_id"] = record["record"]
+            final_payload["human_report"] = ""
+            final_payload["brief_report"] = ""
+            result_audit = final_payload.get("audit")
+            result_audit = dict(result_audit) if isinstance(result_audit, Mapping) else {}
+            result_audit["record_identity"] = record_identity
+            final_payload["audit"] = result_audit
             final_payload["source"] = _source_summary(store.document)
             final_payload["reference"] = {
                 "available": bool(record.get("reference_available")),
@@ -644,6 +1147,8 @@ def _diagnose_one(
                 "model": model,
                 "thinking": thinking,
                 "reasoning_effort": reasoning_effort if thinking else None,
+                "external_egress": external_egress_audit,
+                "model_provenance_fingerprint": model_provenance_fingerprint,
             }
             attempt_trace_reports.append(
                 (attempt + 1, result.render_trace(attempt_payload))
@@ -674,7 +1179,7 @@ def _diagnose_one(
             "verdict": None,
             "verification": None,
             "phases": [],
-            "audit": {},
+            "audit": {"record_identity": record_identity},
             "source": {},
             "reference": {
                 "available": bool(record.get("reference_available")),
@@ -695,6 +1200,14 @@ def _diagnose_one(
         "knowledge_challenge": bool(knowledge_challenge),
         "knowledge_max_chunks": int(knowledge_max_chunks),
         "diagnostic_workflow": diagnostic_workflow,
+        "max_revisions": int(max_revisions),
+        "record_retries": int(record_retries),
+        "runtime_fingerprint": _runtime_fingerprint(),
+        "agent_code_fingerprint": _agent_code_fingerprint(),
+        "model_artifact_fingerprint": model_provenance_fingerprint,
+        "model_provenance_fingerprint": model_provenance_fingerprint,
+        "generation_request": generation_request,
+        "external_egress": external_egress_audit,
     }
     from .trace import TRACE_FORMAT_VERSION, render_agent_trace
 
@@ -782,6 +1295,9 @@ def _diagnose_one(
             "verified": bool(final_payload.get("verified")),
             "error": final_payload.get("error"),
             "attempts": attempts,
+            "record_identity": record_identity,
+            "external_egress": external_egress_audit,
+            "model_provenance_fingerprint": model_provenance_fingerprint,
             "runtime_seconds": final_payload["batch"]["runtime_seconds"],
             "diagnosis_path": str(diagnosis_path),
             "report_path": str(report_path),
@@ -835,10 +1351,12 @@ def run_diagnosis(
     verbose: bool,
     reuse_existing: bool,
     retry_failed: bool,
-    backend: str = "deepseek",
+    backend: str = "medgemma-local",
+    allow_external_egress: bool = False,
     model_max_len: int | None = None,
     gpu_memory_utilization: float | None = None,
     qwen_base_url: str | None = None,
+    fs_internal: int = 500,
     knowledge_challenge: bool = False,
     knowledge_max_chunks: int = (
         DEFAULT_DIAGNOSTIC_PROTOCOL.knowledge.default_max_chunks
@@ -863,6 +1381,34 @@ def run_diagnosis(
             "batch diagnosis backend must be `deepseek`, `qwen-local` or "
             "`medgemma-local`"
         )
+    privacy_policy = resolve_backend_privacy(
+        backend,
+        qwen_base_url=qwen_base_url,
+    )
+    egress_error = external_egress_error(
+        backend,
+        allowed=bool(allow_external_egress),
+        qwen_base_url=(
+            privacy_policy.effective_endpoint
+            if backend == "qwen-local"
+            else None
+        ),
+    )
+    if egress_error:
+        raise RuntimeError(egress_error)
+    external_egress_audit = privacy_policy.audit(
+        allowed=bool(allow_external_egress)
+    )
+    generation_request = {
+        "model_max_len": (
+            int(model_max_len) if model_max_len is not None else None
+        ),
+        "gpu_memory_utilization": (
+            float(gpu_memory_utilization)
+            if gpu_memory_utilization is not None
+            else None
+        ),
+    }
     if backend == "deepseek" and not os.getenv("DEEPSEEK_API_KEY"):
         raise RuntimeError(
             "DEEPSEEK_API_KEY is not set; provide it through the process environment"
@@ -898,17 +1444,47 @@ def run_diagnosis(
         )
 
     results: list[dict[str, Any]] = []
-    prioritized_tasks: list[
-        tuple[
-            int,
-            tuple[
-                dict[str, Any], str, str, int, int, bool, str, bool, bool, int, str
-            ],
-        ]
-    ] = []
+    prioritized_tasks: list[tuple[int, tuple[Any, ...]]] = []
+    pseudonym_key = (
+        _load_or_create_pseudonym_key(output_dir) if records else None
+    )
+    feature_eligibility = {
+        str(record["record"]): _reusable_feature(
+            _feature_path(output_dir, str(record["record"])),
+            record,
+            fs_internal=int(fs_internal),
+        )
+        for record in records
+    }
+    has_eligible_features = any(feature_eligibility.values())
+    model_provenance_status = (
+        "fingerprinted" if has_eligible_features else "not_used_no_eligible_records"
+    )
+    model_provenance_fingerprint = (
+        _fresh_model_provenance_fingerprint(
+            backend=backend,
+            model=model,
+            endpoint_fingerprint=privacy_policy.endpoint_fingerprint,
+            thinking=thinking,
+            reasoning_effort=reasoning_effort,
+            model_max_len=model_max_len,
+            gpu_memory_utilization=gpu_memory_utilization,
+        )
+        if has_eligible_features
+        else _unused_model_commitment(
+            backend=backend,
+            model=model,
+            endpoint_fingerprint=privacy_policy.endpoint_fingerprint,
+        )
+    )
     for record in records:
+        assert pseudonym_key is not None
+        record_identity = _record_identity_audit(
+            str(record["record"]),
+            pseudonym_key,
+        )
         feature_path = _feature_path(output_dir, str(record["record"]))
-        if not _valid_existing(feature_path, "clinical_interpretation"):
+        if not feature_eligibility[str(record["record"])]:
             results.append(
                 {
                     "record": record["record"],
@@ -940,11 +1516,39 @@ def run_diagnosis(
                 knowledge_challenge=knowledge_challenge,
                 knowledge_max_chunks=knowledge_max_chunks,
                 diagnostic_workflow=diagnostic_workflow,
+                external_egress=external_egress_audit,
+                record_identity=record_identity,
+                max_revisions=max_revisions,
+                record_retries=record_retries,
+                model_provenance_fingerprint=model_provenance_fingerprint,
+                generation_request=generation_request,
             )
             if existing is not None
             else False
         )
-        if existing is not None and (reusable or not retry_failed):
+        reusable_failed = (
+            existing is not None
+            and not retry_failed
+            and _explicit_failed_diagnosis(existing)
+            and _diagnosis_signature_matches(
+                existing,
+                feature_path,
+                model=model,
+                thinking=thinking,
+                reasoning_effort=reasoning_effort,
+                backend=backend,
+                knowledge_challenge=knowledge_challenge,
+                knowledge_max_chunks=knowledge_max_chunks,
+                diagnostic_workflow=diagnostic_workflow,
+                external_egress=external_egress_audit,
+                record_identity=record_identity,
+                max_revisions=max_revisions,
+                record_retries=record_retries,
+                model_provenance_fingerprint=model_provenance_fingerprint,
+                generation_request=generation_request,
+            )
+        )
+        if existing is not None and (reusable or reusable_failed):
             report_path = _diagnosis_report_path(
                 output_dir,
                 str(record["record"]),
@@ -1027,8 +1631,6 @@ def run_diagnosis(
                     "status": (
                         "skipped_verified"
                         if reusable
-                        else "skipped_stale"
-                        if existing.get("verified")
                         else "skipped_failed"
                     ),
                     "runtime_seconds": 0.0,
@@ -1053,6 +1655,10 @@ def run_diagnosis(
             bool(knowledge_challenge),
             int(knowledge_max_chunks),
             diagnostic_workflow,
+            external_egress_audit,
+            record_identity,
+            model_provenance_fingerprint,
+            generation_request,
         )
         # On resume, retry prior fatal account/API failures first. This turns
         # the first worker-width into a safe account-state probe and prevents
@@ -1094,11 +1700,7 @@ def run_diagnosis(
         )
 
     fatal_error: str | None = None
-    deferred_tasks: list[
-        tuple[
-            dict[str, Any], str, str, int, int, bool, str, bool, bool, int, str
-        ]
-    ] = []
+    deferred_tasks: list[tuple[Any, ...]] = []
     shared_backend: Any = None
     if backend in {"qwen-local", "medgemma-local"} and tasks:
         from .backends import build_backend
@@ -1114,8 +1716,7 @@ def run_diagnosis(
             backend_kwargs["max_batch_size"] = workers
         else:
             backend_kwargs["thinking"] = bool(thinking)
-            if qwen_base_url:
-                backend_kwargs["base_url"] = qwen_base_url
+            backend_kwargs["base_url"] = privacy_policy.effective_endpoint
         shared_backend = build_backend(backend, **backend_kwargs)
 
     def invoke(task: tuple[Any, ...]) -> dict[str, Any]:
@@ -1199,6 +1800,14 @@ def run_diagnosis(
     manifest = {
         "backend": backend,
         "model": model,
+        "model_provenance_fingerprint": model_provenance_fingerprint,
+        "model_provenance_status": model_provenance_status,
+        "generation_request": generation_request,
+        "external_egress": external_egress_audit,
+        "record_identity": {
+            "strategy": PSEUDONYM_STRATEGY,
+            "key_scope": "output_directory",
+        },
         "diagnostic_workflow": diagnostic_workflow,
         "workers": workers,
         "record_count": len(records),
@@ -1343,6 +1952,43 @@ def reverify_results(
             continue
         row["previous_verified"] = bool(payload.get("verified"))
         if payload.get("verified"):
+            saved_verification = payload.get("verification")
+            if not (
+                payload.get("ok") is True
+                and not payload.get("error")
+                and isinstance(payload.get("verdict"), Mapping)
+                and bool(payload.get("verdict"))
+                and isinstance(saved_verification, Mapping)
+                and saved_verification.get("passed") is True
+            ):
+                row["status"] = "structural_invalid"
+                counts["structural_invalid"] += 1
+                rows.append(row)
+                continue
+            # A previously verified flag is not self-authenticating. Confirm
+            # that it still refers to the exact current diagnostic evidence
+            # before treating it as a successful no-op.
+            if not feature_path.exists():
+                row["status"] = "missing"
+                counts["missing"] += 1
+                rows.append(row)
+                continue
+            try:
+                feature = _read_json(feature_path)
+            except (OSError, ValueError, TypeError):
+                row["status"] = "invalid_json"
+                counts["invalid_json"] += 1
+                rows.append(row)
+                continue
+            verified_store = EvidenceStore.from_dict(
+                feature,
+                record_id=record_id,
+            ).diagnostic_view()
+            if saved_audit.get("input_fingerprint") != verified_store.fingerprint():
+                row["status"] = "stale"
+                counts["stale"] += 1
+                rows.append(row)
+                continue
             row["status"] = "skipped_verified"
             row["verified"] = True
             counts["skipped_verified"] += 1
@@ -1965,9 +2611,31 @@ def analyze_results(
     # A diagnosis run can be interrupted before its final manifest write. The
     # analysis pass has already inventoried every on-disk result, so use that
     # observed state to replace any stale partial/smoke manifest.
+    prior_diagnosis_manifest: dict[str, Any] = {}
+    diagnosis_manifest_path = output_dir / "diagnosis_manifest.json"
+    if diagnosis_manifest_path.exists():
+        try:
+            prior_diagnosis_manifest = _read_json(diagnosis_manifest_path)
+        except (OSError, ValueError, TypeError):
+            prior_diagnosis_manifest = {}
+    preserved_audit = {
+        key: prior_diagnosis_manifest[key]
+        for key in (
+            "backend",
+            "model",
+            "model_provenance_fingerprint",
+            "model_provenance_status",
+            "generation_request",
+            "external_egress",
+            "record_identity",
+            "diagnostic_workflow",
+        )
+        if key in prior_diagnosis_manifest
+    }
     _json_dump_atomic(
-        output_dir / "diagnosis_manifest.json",
+        diagnosis_manifest_path,
         {
+            **preserved_audit,
             "manifest_origin": "analysis_reconstruction",
             "record_count": len(records),
             "verified_or_skipped": execution.get("verified", 0),
@@ -2236,10 +2904,18 @@ def build_parser() -> argparse.ArgumentParser:
             "medgemma-local",
             "medgemma",
         ),
-        default="deepseek",
+        default="medgemma-local",
         help=(
             "diagnostic LLM backend; qwen-local uses a native-tool vLLM "
             "OpenAI server; medgemma-local reuses one in-process vLLM engine"
+        ),
+    )
+    parser.add_argument(
+        "--allow-external-egress",
+        action="store_true",
+        help=(
+            "explicitly authorize sending HMAC-pseudonymous record identifiers, "
+            "demographics and ECG measurements to the selected external endpoint"
         ),
     )
     parser.add_argument(
@@ -2341,6 +3017,27 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    diagnosis_egress: dict[str, Any] | None = None
+    if args.command in {"diagnose", "all"}:
+        privacy_policy = resolve_backend_privacy(
+            args.backend,
+            qwen_base_url=args.qwen_base_url,
+        )
+        egress_error = external_egress_error(
+            args.backend,
+            allowed=bool(args.allow_external_egress),
+            qwen_base_url=(
+                privacy_policy.effective_endpoint
+                if privacy_policy.backend == "qwen-local"
+                else None
+            ),
+        )
+        if egress_error:
+            print(f"[error] {egress_error}", file=sys.stderr)
+            return 2
+        diagnosis_egress = privacy_policy.audit(
+            allowed=bool(args.allow_external_egress)
+        )
     records = discover_records(
         args.dataset_dir.resolve(),
         args.metadata_dir.resolve(),
@@ -2353,6 +3050,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     _json_dump_atomic(
         output_dir / "record_manifest.json",
         {
+            "schema_version": "ecgagent.record-manifest.v2",
             "dataset_dir": str(args.dataset_dir.resolve()),
             "metadata_dir": str(args.metadata_dir.resolve()),
             "record_count": len(records),
@@ -2363,9 +3061,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 row["record"] for row in records if not row["reference_available"]
             ],
             "records": records,
+            "record_ids_sha256": "sha256:"
+            + hashlib.sha256(
+                json.dumps(
+                    sorted(str(row["record"]) for row in records),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+            "extraction_contract": {
+                "artifact_schema_version": EXTRACTION_ARTIFACT_SCHEMA_VERSION,
+                "extractor_code_fingerprint": _feature_code_fingerprint(),
+                "config": {
+                    "fs_internal": int(args.fs_internal),
+                    "mains_freq": 50,
+                },
+            },
+            "diagnosis_external_egress": diagnosis_egress,
         },
     )
 
+    exit_code = 0
     if args.command in {"extract", "all"}:
         extraction = run_extraction(
             records,
@@ -2376,6 +3092,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if any(row["status"] == "failed" for row in extraction):
             print("[warning] extraction has failures; diagnosis will skip those records")
+            exit_code = 2
 
     if args.command in {"diagnose", "all"}:
         backend_name = {
@@ -2394,7 +3111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if backend_name in {"deepseek", "qwen-local"}
             else False
         )
-        run_diagnosis(
+        diagnosis = run_diagnosis(
             records,
             output_dir,
             workers=max(1, args.agent_workers),
@@ -2407,9 +3124,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             reuse_existing=args.reuse_existing,
             retry_failed=args.retry_failed,
             backend=backend_name,
+            allow_external_egress=bool(args.allow_external_egress),
             model_max_len=args.model_max_len,
             gpu_memory_utilization=args.gpu_memory_utilization,
             qwen_base_url=args.qwen_base_url,
+            fs_internal=args.fs_internal,
             knowledge_challenge=args.knowledge_challenge,
             knowledge_max_chunks=max(
                 1,
@@ -2420,16 +3139,27 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             diagnostic_workflow=args.diagnostic_workflow,
         )
+        if any(
+            row.get("status") not in {"verified", "skipped_verified"}
+            for row in diagnosis
+        ):
+            exit_code = 2
 
     if args.command == "reverify":
         summary = reverify_results(records, output_dir)
         print(json.dumps(summary["counts"], ensure_ascii=False, indent=2))
+        if any(
+            row.get("status") not in {"recovered", "skipped_verified"}
+            for row in summary.get("records", [])
+        ):
+            exit_code = 2
 
     if args.command in {"analyze", "all"}:
         summary = analyze_results(records, output_dir)
         print(json.dumps(summary, ensure_ascii=False, indent=2))
-        return 0 if not summary["missing_or_invalid_results"] else 2
-    return 0
+        if summary["missing_or_invalid_results"]:
+            exit_code = 2
+    return exit_code
 
 
 if __name__ == "__main__":

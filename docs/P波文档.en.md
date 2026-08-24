@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](P%E6%B3%A2%E6%96%87%E6%A1%A3) | [English](P%E6%B3%A2%E6%96%87%E6%A1%A3.en.md) | [日本語](P%E6%B3%A2%E6%96%87%E6%A1%A3.ja.md)
+[中文](P%E6%B3%A2%E6%96%87%E6%A1%A3.md) | [English](P%E6%B3%A2%E6%96%87%E6%A1%A3.en.md) | [日本語](P%E6%B3%A2%E6%96%87%E6%A1%A3.ja.md)
 <!-- /i18n-nav -->
 
 > Translation note: This English version is provided for convenience. If it differs from the source document, the source document prevails.

@@ -78,3 +78,27 @@ def test_summary_checks_mean_sd_and_coverage_separately() -> None:
     assert summary["metrics"]["pr_interval"]["complete_on_reference_available"] is False
     assert summary["all_metrics_complete"] is False
     assert summary["proxy_verdict"] == "meets_numeric_limits_with_incomplete_coverage"
+
+
+def test_failed_requested_record_makes_operational_coverage_incomplete() -> None:
+    complete = {"record_id": "ok", "error": None}
+    for metric in (
+        "p_duration",
+        "pr_interval",
+        "qrs_duration",
+        "qt_interval",
+    ):
+        complete[f"algorithm_{metric}_ms"] = 100.0
+        complete[f"reference_{metric}_ms"] = 100.0
+        complete[f"diff_{metric}_ms"] = 0.0
+
+    summary = summarize_rows(
+        [complete, {"record_id": "failed", "error": "extractor error"}],
+        outlier_count=0,
+    )
+
+    assert summary["all_metrics_numeric_pass"] is True
+    assert summary["measurement_coverage_complete"] is True
+    assert summary["operational_coverage_complete"] is False
+    assert summary["all_metrics_complete"] is False
+    assert summary["proxy_verdict"] == "meets_numeric_limits_with_incomplete_coverage"

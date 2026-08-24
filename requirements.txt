@@ -8,6 +8,11 @@ wfdb>=4.0
 
 # Web UI
 gradio>=6.0
+fastapi>=0.115
+httpx>=0.27
+pydantic>=2.7
+python-multipart>=0.0.9
+uvicorn>=0.30
 
 # LLM inference (0.24 adds the StructuredOutputsParams path used by the
 # local MedGemma Agent tool-call and final-verdict schemas)

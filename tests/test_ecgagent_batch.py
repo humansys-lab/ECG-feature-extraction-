@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -13,7 +15,9 @@ from ecgagent.backends.mock import ScriptedBackend, text_response, tool_response
 from ecgagent.batch import (
     _audit_whitelist,
     _diagnosis_codes,
+    _extraction_provenance,
     _fatal_external_error,
+    _reusable_feature,
     _reusable_diagnosis,
 )
 from ecgagent.evidence.store import EvidenceStore
@@ -90,6 +94,16 @@ def test_reuse_requires_matching_protocol_prompt_model_and_input(tmp_path):
     diagnostic_fingerprint = (
         EvidenceStore.from_dict(feature).diagnostic_view().fingerprint()
     )
+    policy = batch.resolve_backend_privacy("deepseek")
+    model_provenance = batch._model_provenance_fingerprint(
+        backend="deepseek",
+        model="deepseek-v4-flash",
+        endpoint_fingerprint=policy.endpoint_fingerprint,
+        thinking=False,
+        reasoning_effort="high",
+        model_max_len=None,
+        gpu_memory_utilization=None,
+    )
     payload = {
         "verified": True,
         "audit": {
@@ -103,9 +117,15 @@ def test_reuse_requires_matching_protocol_prompt_model_and_input(tmp_path):
             },
         },
         "batch": {
+            "backend": "deepseek",
             "model": "deepseek-v4-flash",
             "thinking": False,
             "reasoning_effort": None,
+            "runtime_fingerprint": batch._runtime_fingerprint(),
+            "agent_code_fingerprint": batch._agent_code_fingerprint(),
+            "model_artifact_fingerprint": model_provenance,
+            "model_provenance_fingerprint": model_provenance,
+            "external_egress": policy.audit(allowed=True),
         },
     }
 
@@ -152,6 +172,482 @@ def test_reuse_requires_matching_protocol_prompt_model_and_input(tmp_path):
     )
 
 
+def test_feature_reuse_requires_source_config_schema_and_code_fingerprint(tmp_path):
+    record_base = tmp_path / "r1"
+    record_base.with_suffix(".hea").write_text("header", encoding="utf-8")
+    record_base.with_suffix(".dat").write_bytes(b"signal-v1")
+    record = {
+        "record": "r1",
+        "record_path": str(record_base),
+        "age": 42,
+        "sex": "female",
+    }
+    provenance = _extraction_provenance(record, 500)
+    assert provenance is not None
+    feature_path = tmp_path / "r1_features.json"
+    feature_path.write_text(
+        json.dumps(
+            {
+                "clinical_interpretation": {},
+                "_ecgagent_extraction": provenance,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert _reusable_feature(feature_path, record, fs_internal=500)
+    assert not _reusable_feature(feature_path, record, fs_internal=250)
+
+    record["age_days"] = 42 * 365.25 + 30
+    assert not _reusable_feature(feature_path, record, fs_internal=500)
+
+    record.pop("age_days")
+    record_base.with_suffix(".dat").write_bytes(b"signal-v2")
+    assert not _reusable_feature(feature_path, record, fs_internal=500)
+
+    feature_path.write_text(
+        json.dumps({"clinical_interpretation": {}}),
+        encoding="utf-8",
+    )
+    assert not _reusable_feature(feature_path, record, fs_internal=500)
+
+
+def _write_provenanced_feature(tmp_path, record_id="r1", *, fs_internal=500):
+    record_base = tmp_path / "source" / record_id
+    record_base.parent.mkdir(parents=True, exist_ok=True)
+    record_base.with_suffix(".hea").write_text("header", encoding="utf-8")
+    record_base.with_suffix(".dat").write_bytes(b"signal-v1")
+    record = {
+        "record": record_id,
+        "record_path": str(record_base),
+        "age": 50,
+        "sex": "female",
+        "reference_available": False,
+    }
+    provenance = _extraction_provenance(record, fs_internal)
+    assert provenance is not None
+    feature_path = tmp_path / "features" / f"{record_id}_features.json"
+    feature_path.parent.mkdir(parents=True, exist_ok=True)
+    feature_path.write_text(
+        json.dumps(
+            {
+                "clinical_interpretation": {},
+                "_ecgagent_extraction": provenance,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return record, feature_path, record_base
+
+
+def test_diagnosis_rejects_wrong_feature_provenance_before_model_call(
+    tmp_path,
+    monkeypatch,
+):
+    record, _, record_base = _write_provenanced_feature(tmp_path)
+
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("stale feature reached the model")
+
+    monkeypatch.setattr(batch, "_diagnose_one", unexpected_call)
+    wrong_fs = batch.run_diagnosis(
+        [record],
+        tmp_path,
+        workers=1,
+        model="served-qwen",
+        max_revisions=0,
+        record_retries=0,
+        thinking=False,
+        reasoning_effort="high",
+        verbose=False,
+        reuse_existing=True,
+        retry_failed=True,
+        backend="qwen-local",
+        fs_internal=250,
+    )
+    assert wrong_fs[0]["status"] == "missing_feature"
+
+    record_base.with_suffix(".dat").write_bytes(b"signal-v2")
+    changed_source = batch.run_diagnosis(
+        [record],
+        tmp_path,
+        workers=1,
+        model="served-qwen",
+        max_revisions=0,
+        record_retries=0,
+        thinking=False,
+        reasoning_effort="high",
+        verbose=False,
+        reuse_existing=True,
+        retry_failed=True,
+        backend="qwen-local",
+        fs_internal=500,
+    )
+    assert changed_source[0]["status"] == "missing_feature"
+
+
+def test_no_retry_failed_does_not_preserve_stale_verified_diagnosis(
+    tmp_path,
+    monkeypatch,
+):
+    record, _, _ = _write_provenanced_feature(tmp_path)
+    diagnosis_path = tmp_path / "diagnoses" / "r1.json"
+    diagnosis_path.parent.mkdir(parents=True, exist_ok=True)
+    diagnosis_path.write_text(
+        json.dumps(
+            {
+                "record_id": "r1",
+                "ok": True,
+                "verified": True,
+                "error": None,
+                "audit": {"prompt_fingerprint": "stale"},
+                "batch": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    calls = []
+
+    def fake_diagnose(task, **kwargs):
+        calls.append(task[0]["record"])
+        return {
+            "record": task[0]["record"],
+            "status": "verified",
+            "runtime_seconds": 0.01,
+            "attempts": 1,
+            "error": None,
+            "diagnosis_path": str(diagnosis_path),
+        }
+
+    import ecgagent.backends
+
+    monkeypatch.setattr(ecgagent.backends, "build_backend", lambda *a, **k: object())
+    monkeypatch.setattr(batch, "_diagnose_one", fake_diagnose)
+
+    rows = batch.run_diagnosis(
+        [record],
+        tmp_path,
+        workers=1,
+        model="served-qwen",
+        max_revisions=0,
+        record_retries=0,
+        thinking=False,
+        reasoning_effort="high",
+        verbose=False,
+        reuse_existing=True,
+        retry_failed=False,
+        backend="qwen-local",
+        fs_internal=500,
+    )
+
+    assert calls == ["r1"]
+    assert rows[0]["status"] == "verified"
+
+
+def test_batch_cli_returns_nonzero_for_each_operational_failure_stage(
+    tmp_path,
+    monkeypatch,
+):
+    record = {"record": "r1", "reference_available": False}
+    monkeypatch.setattr(batch, "discover_records", lambda *a, **k: [record])
+    monkeypatch.setattr(batch, "_feature_code_fingerprint", lambda: "sha256:test")
+
+    monkeypatch.setattr(
+        batch,
+        "run_extraction",
+        lambda *a, **k: [{"record": "r1", "status": "failed"}],
+    )
+    assert batch.main(
+        ["extract", "--output-dir", str(tmp_path / "extract")]
+    ) == 2
+
+    monkeypatch.setattr(
+        batch,
+        "run_diagnosis",
+        lambda *a, **k: [{"record": "r1", "status": "unverified"}],
+    )
+    assert batch.main(
+        ["diagnose", "--output-dir", str(tmp_path / "diagnose")]
+    ) == 2
+
+    monkeypatch.setattr(
+        batch,
+        "run_extraction",
+        lambda *a, **k: [{"record": "r1", "status": "ok"}],
+    )
+    monkeypatch.setattr(
+        batch,
+        "analyze_results",
+        lambda *a, **k: {"missing_or_invalid_results": []},
+    )
+    assert batch.main(
+        ["all", "--output-dir", str(tmp_path / "all")]
+    ) == 2
+
+    monkeypatch.setattr(
+        batch,
+        "reverify_results",
+        lambda *a, **k: {
+            "counts": {"still_unverified": 1},
+            "records": [{"record": "r1", "status": "still_unverified"}],
+        },
+    )
+    assert batch.main(
+        ["reverify", "--output-dir", str(tmp_path / "reverify")]
+    ) == 2
+
+
+def test_reverify_rejects_verified_artifact_with_stale_input(tmp_path):
+    record_id = "stale-verified"
+    feature_path = tmp_path / "features" / f"{record_id}_features.json"
+    diagnosis_path = tmp_path / "diagnoses" / f"{record_id}.json"
+    feature_path.parent.mkdir(parents=True)
+    diagnosis_path.parent.mkdir(parents=True)
+    feature_path.write_text(json.dumps(_payload()), encoding="utf-8")
+    diagnosis_path.write_text(
+        json.dumps(
+            {
+                "record_id": record_id,
+                "ok": True,
+                "verified": True,
+                "error": None,
+                "verdict": {"diagnoses": []},
+                "verification": {"passed": True},
+                "audit": {
+                    "agent_protocol": AGENT_PROTOCOL_VERSION,
+                    "prompt_fingerprint": PROMPT_FINGERPRINT,
+                    "input_fingerprint": "sha256:stale",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    summary = batch.reverify_results(
+        [{"record": record_id, "reference_available": False}],
+        tmp_path,
+    )
+
+    assert summary["counts"] == {"stale": 1}
+    assert summary["records"][0]["verified"] is False
+
+
+def test_pseudonym_key_is_atomic_private_and_stable(tmp_path):
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        keys = list(
+            pool.map(
+                lambda _: batch._load_or_create_pseudonym_key(tmp_path),
+                range(24),
+            )
+        )
+
+    assert all(key == keys[0] for key in keys)
+    assert len(keys[0]) == 32
+    key_path = tmp_path / batch.PSEUDONYM_KEY_FILENAME
+    assert os.stat(key_path).st_mode & 0o777 == 0o600
+    identity = batch._record_identity_audit("real-record", keys[0])
+    assert identity == batch._record_identity_audit("real-record", keys[0])
+    assert identity != batch._record_identity_audit("another-record", keys[0])
+    assert "real-record" not in json.dumps(identity)
+    assert keys[0].hex() not in json.dumps(identity)
+
+
+def test_remote_qwen_from_environment_requires_authorization_and_is_audited(
+    tmp_path,
+    monkeypatch,
+):
+    endpoint = "https://user:secret@qwen.example:9443/v1?token=hidden"
+    monkeypatch.setenv("QWEN_BASE_URL", endpoint)
+
+    with pytest.raises(RuntimeError, match="allow-external-egress"):
+        batch.run_diagnosis(
+            [],
+            tmp_path,
+            workers=1,
+            model="served-qwen",
+            max_revisions=0,
+            record_retries=0,
+            thinking=True,
+            reasoning_effort="high",
+            verbose=False,
+            reuse_existing=False,
+            retry_failed=True,
+            backend="qwen-local",
+        )
+
+    rows = batch.run_diagnosis(
+        [],
+        tmp_path,
+        workers=1,
+        model="served-qwen",
+        max_revisions=0,
+        record_retries=0,
+        thinking=True,
+        reasoning_effort="high",
+        verbose=False,
+        reuse_existing=False,
+        retry_failed=True,
+        backend="qwen-local",
+        allow_external_egress=True,
+    )
+    assert rows == []
+    manifest_text = (tmp_path / "diagnosis_manifest.json").read_text(
+        encoding="utf-8"
+    )
+    manifest = json.loads(manifest_text)
+    assert manifest["external_egress"]["external"] is True
+    assert manifest["external_egress"]["authorized"] is True
+    assert manifest["external_egress"]["endpoint"]["display"] == (
+        "https://qwen.example:9443"
+    )
+    assert "secret" not in manifest_text
+    assert "token" not in manifest_text
+
+
+def test_cache_signature_rejects_endpoint_generation_and_malformed_values(
+    tmp_path,
+):
+    feature_path = tmp_path / "record_features.json"
+    feature_path.write_text(
+        json.dumps({"clinical_interpretation": {}}),
+        encoding="utf-8",
+    )
+    feature = json.loads(feature_path.read_text(encoding="utf-8"))
+    input_fingerprint = EvidenceStore.from_dict(feature).diagnostic_view().fingerprint()
+    policy = batch.resolve_backend_privacy(
+        "qwen-local",
+        qwen_base_url="http://127.0.0.1:8000/v1",
+    )
+    egress = policy.audit(allowed=False)
+    model_provenance = batch._model_provenance_fingerprint(
+        backend="qwen-local",
+        model="served-qwen",
+        endpoint_fingerprint=policy.endpoint_fingerprint,
+        thinking=True,
+        reasoning_effort="high",
+        model_max_len=None,
+        gpu_memory_utilization=None,
+    )
+    identity = {
+        "model_visible_record_id": "ecg_deadbeefdeadbeefdeadbeef",
+        "strategy": batch.PSEUDONYM_STRATEGY,
+        "key_scope": "output_directory",
+    }
+    payload = {
+        "verified": True,
+        "audit": {
+            "agent_protocol": AGENT_PROTOCOL_VERSION,
+            "prompt_fingerprint": PROMPT_FINGERPRINT,
+            "input_fingerprint": input_fingerprint,
+            "diagnostic_workflow": "compact",
+            "knowledge_navigation": {"enabled": False},
+            "knowledge_challenge": {"enabled": False},
+            "record_identity": identity,
+        },
+        "batch": {
+            "backend": "qwen-local",
+            "model": "served-qwen",
+            "thinking": True,
+            "reasoning_effort": "high",
+            "max_revisions": 1,
+            "record_retries": 0,
+            "runtime_fingerprint": batch._runtime_fingerprint(),
+            "agent_code_fingerprint": batch._agent_code_fingerprint(),
+            "model_provenance_fingerprint": model_provenance,
+            "generation_request": {
+                "model_max_len": None,
+                "gpu_memory_utilization": None,
+            },
+            "external_egress": egress,
+        },
+    }
+    signature = {
+        "model": "served-qwen",
+        "thinking": True,
+        "reasoning_effort": "high",
+        "backend": "qwen-local",
+        "diagnostic_workflow": "compact",
+        "external_egress": egress,
+        "record_identity": identity,
+        "max_revisions": 1,
+        "record_retries": 0,
+        "model_provenance_fingerprint": model_provenance,
+        "generation_request": {
+            "model_max_len": None,
+            "gpu_memory_utilization": None,
+        },
+    }
+    assert batch._diagnosis_signature_matches(payload, feature_path, **signature)
+
+    changed = json.loads(json.dumps(payload))
+    changed["batch"]["generation_request"]["model_max_len"] = 4096
+    assert not batch._diagnosis_signature_matches(
+        changed, feature_path, **signature
+    )
+    changed = json.loads(json.dumps(payload))
+    changed["batch"]["external_egress"]["endpoint"]["fingerprint"] = (
+        "sha256:" + "0" * 64
+    )
+    assert not batch._diagnosis_signature_matches(
+        changed, feature_path, **signature
+    )
+    changed = json.loads(json.dumps(payload))
+    changed["batch"]["max_revisions"] = "malformed"
+    assert not batch._diagnosis_signature_matches(
+        changed, feature_path, **signature
+    )
+
+
+def test_local_model_provenance_is_fresh_for_each_batch_run(tmp_path):
+    model_dir = tmp_path / "model"
+    model_dir.mkdir()
+    weights = model_dir / "weights.bin"
+    weights.write_bytes(b"v1")
+    fingerprint_args = {
+        "backend": "medgemma-local",
+        "model": str(model_dir),
+        "endpoint_fingerprint": "local",
+        "thinking": False,
+        "reasoning_effort": "high",
+        "model_max_len": None,
+        "gpu_memory_utilization": None,
+    }
+
+    first = batch._fresh_model_provenance_fingerprint(**fingerprint_args)
+    weights.write_bytes(b"v2")
+    second = batch._fresh_model_provenance_fingerprint(**fingerprint_args)
+
+    assert first != second
+    for fingerprint in (first, second):
+        prefix, digest = fingerprint.split(":", 1)
+        assert prefix == "sha256"
+        assert len(digest) == 64
+        int(digest, 16)
+
+
+def test_batch_defaults_local_and_requires_explicit_cloud_egress(tmp_path):
+    args = batch.build_parser().parse_args(["diagnose"])
+    assert args.backend == "medgemma-local"
+    assert args.allow_external_egress is False
+
+    assert batch.main(["diagnose", "--backend", "deepseek"]) == 2
+    with pytest.raises(RuntimeError, match="allow-external-egress"):
+        batch.run_diagnosis(
+            [],
+            tmp_path,
+            workers=1,
+            model="cloud-model",
+            max_revisions=0,
+            record_retries=0,
+            thinking=False,
+            reasoning_effort="high",
+            verbose=False,
+            reuse_existing=False,
+            retry_failed=True,
+            backend="deepseek",
+        )
+
+
 def test_diagnosis_codes_excludes_withdrawn_findings():
     codes, statuses = _diagnosis_codes(
         {
@@ -194,7 +690,15 @@ def test_diagnose_one_saves_standalone_full_markdown_trace(tmp_path):
     record_id = "TRACE001_hr"
     feature_path = tmp_path / "features" / f"{record_id}_features.json"
     feature_path.parent.mkdir(parents=True, exist_ok=True)
-    feature_path.write_text(json.dumps(_payload()), encoding="utf-8")
+    feature = _payload()
+    feature["metadata"]["diagnostic_gate"] = {
+        "state": "pass",
+        "stop_reasons": [],
+        "partial_reasons": [],
+        "allowed_domains": ["all"],
+        "suppressed_domains": [],
+    }
+    feature_path.write_text(json.dumps(feature), encoding="utf-8")
     backend = ScriptedBackend(
         script=[
             tool_response(
@@ -254,6 +758,10 @@ def test_diagnose_one_saves_standalone_full_markdown_trace(tmp_path):
     ).rstrip()
     assert "# Brief ECG Diagnostic Report" in diagnosis["brief_report"]
     assert "## Recommendation" in diagnosis["brief_report"]
+    identity = diagnosis["audit"]["record_identity"]
+    assert identity["model_visible_record_id"].startswith("ecg_")
+    assert identity["model_visible_record_id"] != record_id
+    assert identity["strategy"] == batch.PSEUDONYM_STRATEGY
 
 
 def test_local_batch_microbatches_one_backend_without_deepseek_credentials(
@@ -301,6 +809,12 @@ def test_local_batch_microbatches_one_backend_without_deepseek_credentials(
 
     monkeypatch.setattr(ecgagent.backends, "build_backend", fake_build_backend)
     monkeypatch.setattr(batch, "_diagnose_one", fake_diagnose)
+    monkeypatch.setattr(batch, "_reusable_feature", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        batch,
+        "_fresh_model_provenance_fingerprint",
+        lambda **kwargs: "sha256:" + "a" * 64,
+    )
 
     result = batch.run_diagnosis(
         records,
@@ -367,6 +881,7 @@ def test_diagnosis_circuit_breaker_bounds_inflight_work(
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only")
     monkeypatch.setattr(batch, "_diagnose_one", fail_with_balance)
+    monkeypatch.setattr(batch, "_reusable_feature", lambda *args, **kwargs: True)
 
     with pytest.raises(RuntimeError, match="circuit breaker"):
         batch.run_diagnosis(
@@ -381,6 +896,8 @@ def test_diagnosis_circuit_breaker_bounds_inflight_work(
             verbose=False,
             reuse_existing=False,
             retry_failed=True,
+            backend="deepseek",
+            allow_external_egress=True,
         )
 
     assert len(calls) <= 2
@@ -526,6 +1043,7 @@ def test_resume_probes_prior_fatal_error_before_unverified_candidate(
 
     monkeypatch.setenv("DEEPSEEK_API_KEY", "test-only")
     monkeypatch.setattr(batch, "_diagnose_one", fail)
+    monkeypatch.setattr(batch, "_reusable_feature", lambda *args, **kwargs: True)
 
     with pytest.raises(RuntimeError, match="circuit breaker"):
         batch.run_diagnosis(
@@ -540,6 +1058,8 @@ def test_resume_probes_prior_fatal_error_before_unverified_candidate(
             verbose=False,
             reuse_existing=True,
             retry_failed=True,
+            backend="deepseek",
+            allow_external_egress=True,
         )
 
     assert calls == ["00002_hr"]

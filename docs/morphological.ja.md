@@ -1,5 +1,5 @@
 <!-- i18n-nav -->
-[中文](morphological) | [English](morphological.en.md) | [日本語](morphological.ja.md)
+[中文](morphological.md) | [English](morphological.en.md) | [日本語](morphological.ja.md)
 <!-- /i18n-nav -->
 
 > 翻訳に関する注意：この日本語版は参考用です。原文と相違がある場合は、原文を優先します。
