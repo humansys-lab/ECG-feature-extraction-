@@ -284,7 +284,9 @@ free-form label chosen by the serializer.
 ### Field registry
 
 Define one authoritative registry, proposed as
-`schemas/ecg-record/validation-evidence.toml`, keyed by stable ECG Record JSON pointer. Each
+`schemas/ecg-record/1.0/validation-evidence.json` (implemented as JSON rather than TOML: the
+supported Python 3.10 has no standard-library TOML reader; `tools/check_validation_registry.py`
+enforces the rule below), keyed by stable ECG Record JSON pointer. Each
 published measurement entry contains:
 
 - `validation_tier`: `validated`, `partially_validated`, or `unvalidated`;

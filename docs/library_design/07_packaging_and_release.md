@@ -390,7 +390,7 @@ documentation toolchain; do not hand-maintain duplicate signatures. Private
 the compatibility promise.
 
 The schema reference must be generated from the **same bundled schema files and
-`validation-evidence.toml` registry that the package ships**. CI builds the docs from the
+`validation-evidence.json` registry that the package ships**. CI builds the docs from the
 wheel candidate, extracts those resources, generates the reference, and fails if the generated
 schema pages differ from checked/generated documentation artifacts. This prevents the site
 from describing a field, validation tier, or schema version that the released wheel does not

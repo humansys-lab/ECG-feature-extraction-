@@ -190,6 +190,29 @@ Raw values total 7,680 + 4,560 + 5,520 + 2,880 + 960 = **21,600 bytes** before N
 
 The JSON sidecar reference records media type, relative URI, SHA-256 digest, axes, and schema version. The sidecar is optional: `summary` is self-contained for its promoted core fields, and consumers that need every published dense measurement opt into `measurement`.
 
+**Implemented sidecar protocol (schema 1.0.0).** Any profile may move its dense
+integer `["beat","lead"]` fields to one NPZ file (`serialize_record(record,
+sidecar_uri=...)`, CLI `measure --sidecar`):
+
+- `/artifacts/dense_measurements` = `{uri, media_type: "application/x-npz",
+  sha256, record_id, schema_version, axes: ["beat","lead"], shape, state_codes,
+  fields}`. `uri` is a plain file name in the record's own directory (no
+  scheme, no path separator); `sha256` covers the exact sidecar bytes;
+  `fields` lists every sidecar-backed field pointer.
+- A sidecar-backed field keeps its complete JSON entry (type, unit, axes,
+  validation, provenance, absence) with `values: null` and
+  `sidecar: {array_key, state_key, dtype: "int32"}`. The array is `int32`; the
+  state mask is `uint8` (0 measured, 1 plain null, 2 unmeasurable, 3 not
+  applicable) and must agree cell by cell with the JSON absence encoding, which
+  remains authoritative for reasons.
+- The NPZ carries `__identity__` (record id and schema version) so it cannot be
+  attached to another record. Zip members use a fixed timestamp and sorted
+  order, so identical records give identical sidecar bytes.
+- Strict loading verifies digest, identity, dtype, shape and state mask before
+  returning; `validate="schema"` verifies on first access. Queries read
+  sidecar cells transparently, `materialize_record()` restores the inline
+  record exactly, and the sidecar is never counted in the 24,000-byte budget.
+
 ## E. Field specification
 
 ### E.1 Root contract
@@ -295,6 +318,35 @@ For a dense `["beat","lead"]` field, `values` retains its fixed shape and explic
 ```
 
 A `null` at `b0001|II` plus the matching sparse map entry means unmeasurable. A null with no map entry is plain null. Keys in sparse state maps use the canonical `<beat_id>|<lead_name>` coordinate; `|` is forbidden in beat ids and lead names.
+
+A dense field may also carry one **field default state** so a reason shared by
+many cells is written once:
+
+```json
+{
+  "values": [[468, null], [null, null]],
+  "absence": {
+    "default": {"kind": "unmeasurable", "reason": "measurement_unavailable"},
+    "unmeasurable": {"b0002|II": "fiducial_order_violation"}
+  }
+}
+```
+
+A null cell listed in a sparse map takes that state; any other null cell takes
+the `default` state. A field with a `default` therefore has no plain-null
+cells, and a field without one keeps the plain-null meaning above. The
+producer uses the whole-field form when every cell shares one reason and
+otherwise makes the most frequent reason the default. This is lossless and
+was added before 1.0.0 was published: on real 10-beat records with frequent
+P-wave absence, per-cell repetition alone pushed `summary` to 32,851 bytes.
+
+The producer never publishes a value that violates a published invariant. An
+inverted P or QRS onset/offset pair, or an R peak before a present QRS onset
+or after a present QRS offset, becomes `unmeasurable(fiducial_order_violation)`
+for the affected landmarks and duration; any other negative per-beat interval
+becomes `unmeasurable(negative_interval)`; a converted sample outside the
+acquisition becomes `unmeasurable(sample_outside_acquisition)`. Strict reading
+rejects records that break these invariants.
 
 Reason codes are open enums within a schema major version. Consumers must preserve unknown codes and may display them as opaque strings. Adding a new reason code is therefore non-breaking.
 
