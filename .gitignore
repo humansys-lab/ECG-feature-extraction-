@@ -73,3 +73,9 @@ htmlcov/
 /ptbxl_*_ecgfeat/
 /ludb_delineation_plots/
 /p_wave_failure_plots/
+
+# Golden/benchmark caches (hashes live in benchmarks/golden and benchmarks/baselines)
+/benchmarks/_payloads/
+/benchmarks/_reports/
+/benchmarks/_raw/
+/benchmarks/_*.log

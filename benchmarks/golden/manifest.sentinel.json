@@ -1,0 +1,8051 @@
+{
+ "manifest_version": 1,
+ "tier": "sentinel",
+ "selection_rule": "ecg-records-golden-v1",
+ "window_seconds": 10.0,
+ "legacy_normalized_pointers": [
+  "/clinical_interpretation/generated_at",
+  "/metadata/clinical_interpretation/generated_at"
+ ],
+ "configs": {
+  "limited-default-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "limited",
+    "st_amplitude_source": "analysis",
+    "refinement": {}
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "limited",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "bd634794b90cec367358944c44b4762d4bf10c8a2fad65fda71a2b3071c596e0"
+  },
+  "refine-atrial_event_validation-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "atrial_event_validation": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": true
+    }
+   },
+   "resolved_sha256": "ed93237f01766c794fb9482c78763235fb751534a78f876c72dc73595bb72c8a"
+  },
+  "refine-grouping_outliers-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "grouping_outliers": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": true,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "cea0d970ec365a33b134aa101f04bd194aab6a9c016a8160f67ac8eaeff8897a"
+  },
+  "refine-p_boundary_correction-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "p_boundary_correction": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": true,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "c36d3bc5853176c403fc318085c797bce6f1fa107c6cead8db11c0a155321939"
+  },
+  "refine-p_model_arbitration-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "p_model_arbitration": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": true,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "8d85171de408c72e5953e38a2becc4656dc667f6fa0de10d91f59d5fb359d50e"
+  },
+  "refine-p_multiple_candidates-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "p_multiple_candidates": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": true,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "533077fc06bb9731394796606a6f935a6854b77f2fecb39ac2b5f4c7de73ae3b"
+  },
+  "refine-p_pathology_candidates-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "p_pathology_candidates": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": true,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "ff1b53cceaae946ca10eed2b5f5498aef31b072c248d0ff49437e76dc261ea7e"
+  },
+  "refine-p_phasor_candidates-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "p_phasor_candidates": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": true,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "6b3a6a8426a10fec516f04d8e8aa6b2a9a112bdb3dcd4066a58f664dd34c58a3"
+  },
+  "refine-qrs_adaptive_consensus-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "qrs_adaptive_consensus": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": true,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "b931d78b4860358f543450992caa700d107c7c048f879b72b611026b66faefbb"
+  },
+  "refine-qrs_quality_reference-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "qrs_quality_reference": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": true,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "9aa71c48bf1b8da9e25b43a283c90d2eb5cb8d32953527e17efd17aafec0f45d"
+  },
+  "refine-qrs_terminal_multiscale-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "qrs_terminal_multiscale": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": true,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "a60aab485fa3e98381ae001db8319b8df209ec19964d2a5ce44bfb29adf88f10"
+  },
+  "refine-representative_robust-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "representative_robust": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": true,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "d6887fe5a627e666b08bf95882ed8a1dd5005874f3b53f81383ae50331dc8a15"
+  },
+  "refine-t_bidirectional-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_bidirectional": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": true,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "3018098c2b76d5e0653fbe70f4d54ea72adafc984cbc0bfa19c323d5748cc77d"
+  },
+  "refine-t_boundary_projection-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_boundary_projection": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": true,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "ce8474efb4f0774d0efe778fe79c0ccc4dbb23074c51f3c190645a165ac066df"
+  },
+  "refine-t_correlated_fusion-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_correlated_fusion": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": true,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "04b1bb0a794d123666b9c8be717183c4fe0b65d2f53e120ac96816d4f7f767b4"
+  },
+  "refine-t_onset_change_point-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_onset_change_point": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": true,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "49b6e2586c3f970df495b196e14be977e6a6bf5d837a4b81753b6d13c05cce50"
+  },
+  "refine-t_projection_offset_only-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_projection_offset_only": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": true,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "1184d5caa4be87975225729bcdebd4df78781bac5876cadffc77879f2ed03716"
+  },
+  "refine-t_sequence_offset_only-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_sequence_offset_only": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": true,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "4e503650ea8e9ae4358a76601fe9362ca5b70052c5ac37d4fa20c53e2a17b6ba"
+  },
+  "refine-t_sequence_selection-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {
+     "t_sequence_selection": true
+    }
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": true,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "ec9a5ae43ada3f8d47f1d3ef4a4da2f1204e0ae9cae4057f299128a46040cbb9"
+  },
+  "st-adaptive-pr-tp-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "adaptive_pr_tp",
+    "refinement": {}
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "adaptive_pr_tp",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "e1dc9f2a49fe11336713e41c4e265fd689ef7de3b976522defe78cf0d4c9915d"
+  },
+  "st-calibrated-pr-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "calibrated_pr",
+    "refinement": {}
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "calibrated_pr",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "6dc9c8c24a97bca30de91d6b0fe1228d3caae703dd13e17bfbc8ad3554df8063"
+  },
+  "standard-default-v0": {
+   "spec": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "input_mode": "standard",
+    "st_amplitude_source": "analysis",
+    "refinement": {}
+   },
+   "resolved": {
+    "fs_internal": null,
+    "mains_freq": 50,
+    "lp_hz": 40.0,
+    "enable_pacing": true,
+    "enable_lead_reversal": true,
+    "compute_grouping": true,
+    "enable_hybrid_r_localization": true,
+    "enable_hybrid_wave_localization": true,
+    "enable_hybrid_st_measurement": true,
+    "enable_t_wave_refinement": true,
+    "st_amplitude_source": "analysis",
+    "input_mode": "standard",
+    "refinement": {
+     "p_model_arbitration": false,
+     "p_multiple_candidates": false,
+     "p_boundary_correction": false,
+     "t_onset_change_point": false,
+     "t_bidirectional": false,
+     "t_correlated_fusion": false,
+     "qrs_terminal_multiscale": false,
+     "qrs_quality_reference": false,
+     "representative_robust": false,
+     "grouping_outliers": false,
+     "p_phasor_candidates": false,
+     "t_boundary_projection": false,
+     "t_sequence_selection": false,
+     "t_projection_offset_only": false,
+     "t_sequence_offset_only": false,
+     "qrs_adaptive_consensus": false,
+     "p_pathology_candidates": false,
+     "atrial_event_validation": false
+    }
+   },
+   "resolved_sha256": "e862537704c78f35ffa644f3fb9e33f3f247057239266d9ca765e8d6611e4103"
+  }
+ },
+ "exclusions": [],
+ "cases": [
+  {
+   "case_id": "standard-default-v0/ludb/50",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/13",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "13"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/139",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "139"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/173",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "173"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/34",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "34"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/101",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "101"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/193",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "193"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/118",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "118"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/88",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "88"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/37",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "37"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/181",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "181"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/171",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "171"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/172",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "172"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/134",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "134"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/97",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "97"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/81",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "81"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/9",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "9"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/96",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "96"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/169",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "169"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/75",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "75"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/150",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "150"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/52",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "52"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/5",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "5"
+  },
+  {
+   "case_id": "standard-default-v0/ludb/40",
+   "config": "standard-default-v0",
+   "dataset": "ludb",
+   "record": "40"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel16265",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel17152",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel17152"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel821",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel821"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel48",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel48"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sele0411",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sele0411"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel37",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel37"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel102",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel102"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel52",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel52"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel847",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel847"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel14157",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel14157"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sele0124",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sele0124"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sele0509",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sele0509"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel17453",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel17453"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel872",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel872"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel808",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel808"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel34",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel34"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel35",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel35"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel853",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel853"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel50",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel50"
+  },
+  {
+   "case_id": "standard-default-v0/qtdb/sel16483",
+   "config": "standard-default-v0",
+   "dataset": "qtdb",
+   "record": "sel16483"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0303",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0303"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0403",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0403"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0112",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0112"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0818",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0818"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0612",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0612"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0306",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0306"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e1302",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e1302"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0704",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0704"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0126",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0126"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0162",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0162"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0203",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0203"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0212",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0212"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0604",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0604"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0302",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0302"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0127",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0127"
+  },
+  {
+   "case_id": "standard-default-v0/edb/e0170",
+   "config": "standard-default-v0",
+   "dataset": "edb",
+   "record": "e0170"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/08000/08238_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "08000/08238_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/02000/02828_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "02000/02828_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/07000/07255_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "07000/07255_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/07000/07740_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "07000/07740_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/09000/09546_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "09000/09546_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/08000/08032_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "08000/08032_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/01000/01885_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "01000/01885_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/06000/06086_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "06000/06086_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/09000/09097_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "09000/09097_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/07000/07194_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "07000/07194_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/02000/02819_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "02000/02819_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/05000/05662_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "05000/05662_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/06000/06710_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "06000/06710_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/06000/06965_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "06000/06965_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/09000/09617_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "09000/09617_hr"
+  },
+  {
+   "case_id": "standard-default-v0/ptbxl/08000/08767_hr",
+   "config": "standard-default-v0",
+   "dataset": "ptbxl",
+   "record": "08000/08767_hr"
+  },
+  {
+   "case_id": "standard-default-v0/but/10",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "10"
+  },
+  {
+   "case_id": "standard-default-v0/but/07",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "07"
+  },
+  {
+   "case_id": "standard-default-v0/but/25",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "25"
+  },
+  {
+   "case_id": "standard-default-v0/but/22",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "22"
+  },
+  {
+   "case_id": "standard-default-v0/but/16",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "16"
+  },
+  {
+   "case_id": "standard-default-v0/but/48",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "48"
+  },
+  {
+   "case_id": "standard-default-v0/but/27",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "27"
+  },
+  {
+   "case_id": "standard-default-v0/but/34",
+   "config": "standard-default-v0",
+   "dataset": "but",
+   "record": "34"
+  },
+  {
+   "case_id": "standard-default-v0/nstdb/118e_6",
+   "config": "standard-default-v0",
+   "dataset": "nstdb",
+   "record": "118e_6"
+  },
+  {
+   "case_id": "standard-default-v0/nstdb/119e06",
+   "config": "standard-default-v0",
+   "dataset": "nstdb",
+   "record": "119e06"
+  },
+  {
+   "case_id": "standard-default-v0/nstdb/118e12",
+   "config": "standard-default-v0",
+   "dataset": "nstdb",
+   "record": "118e12"
+  },
+  {
+   "case_id": "standard-default-v0/nstdb/118e18",
+   "config": "standard-default-v0",
+   "dataset": "nstdb",
+   "record": "118e18"
+  },
+  {
+   "case_id": "standard-default-v0/nstdb/119e00",
+   "config": "standard-default-v0",
+   "dataset": "nstdb",
+   "record": "119e00"
+  },
+  {
+   "case_id": "standard-default-v0/nstdb/119e18",
+   "config": "standard-default-v0",
+   "dataset": "nstdb",
+   "record": "119e18"
+  },
+  {
+   "case_id": "standard-default-v0/gudb/subject_23/sitting",
+   "config": "standard-default-v0",
+   "dataset": "gudb",
+   "record": "subject_23/sitting"
+  },
+  {
+   "case_id": "standard-default-v0/gudb/subject_00/maths",
+   "config": "standard-default-v0",
+   "dataset": "gudb",
+   "record": "subject_00/maths"
+  },
+  {
+   "case_id": "standard-default-v0/gudb/subject_05/sitting",
+   "config": "standard-default-v0",
+   "dataset": "gudb",
+   "record": "subject_05/sitting"
+  },
+  {
+   "case_id": "standard-default-v0/gudb/subject_07/walking",
+   "config": "standard-default-v0",
+   "dataset": "gudb",
+   "record": "subject_07/walking"
+  },
+  {
+   "case_id": "standard-default-v0/gudb/subject_23/walking",
+   "config": "standard-default-v0",
+   "dataset": "gudb",
+   "record": "subject_23/walking"
+  },
+  {
+   "case_id": "standard-default-v0/gudb/subject_22/maths",
+   "config": "standard-default-v0",
+   "dataset": "gudb",
+   "record": "subject_22/maths"
+  },
+  {
+   "case_id": "limited-default-v0/qtdb/sel16265",
+   "config": "limited-default-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "limited-default-v0/qtdb/sel17152",
+   "config": "limited-default-v0",
+   "dataset": "qtdb",
+   "record": "sel17152"
+  },
+  {
+   "case_id": "limited-default-v0/edb/e0303",
+   "config": "limited-default-v0",
+   "dataset": "edb",
+   "record": "e0303"
+  },
+  {
+   "case_id": "limited-default-v0/edb/e0403",
+   "config": "limited-default-v0",
+   "dataset": "edb",
+   "record": "e0403"
+  },
+  {
+   "case_id": "limited-default-v0/but/10",
+   "config": "limited-default-v0",
+   "dataset": "but",
+   "record": "10"
+  },
+  {
+   "case_id": "limited-default-v0/but/07",
+   "config": "limited-default-v0",
+   "dataset": "but",
+   "record": "07"
+  },
+  {
+   "case_id": "limited-default-v0/nstdb/118e_6",
+   "config": "limited-default-v0",
+   "dataset": "nstdb",
+   "record": "118e_6"
+  },
+  {
+   "case_id": "limited-default-v0/nstdb/119e06",
+   "config": "limited-default-v0",
+   "dataset": "nstdb",
+   "record": "119e06"
+  },
+  {
+   "case_id": "limited-default-v0/gudb/subject_23/sitting",
+   "config": "limited-default-v0",
+   "dataset": "gudb",
+   "record": "subject_23/sitting"
+  },
+  {
+   "case_id": "limited-default-v0/gudb/subject_00/maths",
+   "config": "limited-default-v0",
+   "dataset": "gudb",
+   "record": "subject_00/maths"
+  },
+  {
+   "case_id": "limited-default-v0/ludb/50",
+   "config": "limited-default-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "limited-default-v0/ludb/13",
+   "config": "limited-default-v0",
+   "dataset": "ludb",
+   "record": "13"
+  },
+  {
+   "case_id": "st-calibrated-pr-v0/edb/e0303",
+   "config": "st-calibrated-pr-v0",
+   "dataset": "edb",
+   "record": "e0303"
+  },
+  {
+   "case_id": "st-calibrated-pr-v0/edb/e0403",
+   "config": "st-calibrated-pr-v0",
+   "dataset": "edb",
+   "record": "e0403"
+  },
+  {
+   "case_id": "st-calibrated-pr-v0/edb/e0112",
+   "config": "st-calibrated-pr-v0",
+   "dataset": "edb",
+   "record": "e0112"
+  },
+  {
+   "case_id": "st-calibrated-pr-v0/ludb/50",
+   "config": "st-calibrated-pr-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "st-calibrated-pr-v0/ludb/13",
+   "config": "st-calibrated-pr-v0",
+   "dataset": "ludb",
+   "record": "13"
+  },
+  {
+   "case_id": "st-calibrated-pr-v0/ptbxl/08000/08238_hr",
+   "config": "st-calibrated-pr-v0",
+   "dataset": "ptbxl",
+   "record": "08000/08238_hr"
+  },
+  {
+   "case_id": "st-adaptive-pr-tp-v0/edb/e0303",
+   "config": "st-adaptive-pr-tp-v0",
+   "dataset": "edb",
+   "record": "e0303"
+  },
+  {
+   "case_id": "st-adaptive-pr-tp-v0/edb/e0403",
+   "config": "st-adaptive-pr-tp-v0",
+   "dataset": "edb",
+   "record": "e0403"
+  },
+  {
+   "case_id": "st-adaptive-pr-tp-v0/edb/e0112",
+   "config": "st-adaptive-pr-tp-v0",
+   "dataset": "edb",
+   "record": "e0112"
+  },
+  {
+   "case_id": "st-adaptive-pr-tp-v0/ludb/50",
+   "config": "st-adaptive-pr-tp-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "st-adaptive-pr-tp-v0/ludb/13",
+   "config": "st-adaptive-pr-tp-v0",
+   "dataset": "ludb",
+   "record": "13"
+  },
+  {
+   "case_id": "st-adaptive-pr-tp-v0/ptbxl/08000/08238_hr",
+   "config": "st-adaptive-pr-tp-v0",
+   "dataset": "ptbxl",
+   "record": "08000/08238_hr"
+  },
+  {
+   "case_id": "refine-p_model_arbitration-v0/ludb/50",
+   "config": "refine-p_model_arbitration-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-p_model_arbitration-v0/qtdb/sel16265",
+   "config": "refine-p_model_arbitration-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-p_multiple_candidates-v0/ludb/50",
+   "config": "refine-p_multiple_candidates-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-p_multiple_candidates-v0/qtdb/sel16265",
+   "config": "refine-p_multiple_candidates-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-p_boundary_correction-v0/ludb/50",
+   "config": "refine-p_boundary_correction-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-p_boundary_correction-v0/qtdb/sel16265",
+   "config": "refine-p_boundary_correction-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_onset_change_point-v0/ludb/50",
+   "config": "refine-t_onset_change_point-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_onset_change_point-v0/qtdb/sel16265",
+   "config": "refine-t_onset_change_point-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_bidirectional-v0/ludb/50",
+   "config": "refine-t_bidirectional-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_bidirectional-v0/qtdb/sel16265",
+   "config": "refine-t_bidirectional-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_correlated_fusion-v0/ludb/50",
+   "config": "refine-t_correlated_fusion-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_correlated_fusion-v0/qtdb/sel16265",
+   "config": "refine-t_correlated_fusion-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-qrs_terminal_multiscale-v0/ludb/50",
+   "config": "refine-qrs_terminal_multiscale-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-qrs_terminal_multiscale-v0/qtdb/sel16265",
+   "config": "refine-qrs_terminal_multiscale-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-qrs_quality_reference-v0/ludb/50",
+   "config": "refine-qrs_quality_reference-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-qrs_quality_reference-v0/qtdb/sel16265",
+   "config": "refine-qrs_quality_reference-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-representative_robust-v0/ludb/50",
+   "config": "refine-representative_robust-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-representative_robust-v0/qtdb/sel16265",
+   "config": "refine-representative_robust-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-grouping_outliers-v0/ludb/50",
+   "config": "refine-grouping_outliers-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-grouping_outliers-v0/qtdb/sel16265",
+   "config": "refine-grouping_outliers-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-p_phasor_candidates-v0/ludb/50",
+   "config": "refine-p_phasor_candidates-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-p_phasor_candidates-v0/qtdb/sel16265",
+   "config": "refine-p_phasor_candidates-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_boundary_projection-v0/ludb/50",
+   "config": "refine-t_boundary_projection-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_boundary_projection-v0/qtdb/sel16265",
+   "config": "refine-t_boundary_projection-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_sequence_selection-v0/ludb/50",
+   "config": "refine-t_sequence_selection-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_sequence_selection-v0/qtdb/sel16265",
+   "config": "refine-t_sequence_selection-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_projection_offset_only-v0/ludb/50",
+   "config": "refine-t_projection_offset_only-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_projection_offset_only-v0/qtdb/sel16265",
+   "config": "refine-t_projection_offset_only-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-t_sequence_offset_only-v0/ludb/50",
+   "config": "refine-t_sequence_offset_only-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-t_sequence_offset_only-v0/qtdb/sel16265",
+   "config": "refine-t_sequence_offset_only-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-qrs_adaptive_consensus-v0/ludb/50",
+   "config": "refine-qrs_adaptive_consensus-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-qrs_adaptive_consensus-v0/qtdb/sel16265",
+   "config": "refine-qrs_adaptive_consensus-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-p_pathology_candidates-v0/ludb/50",
+   "config": "refine-p_pathology_candidates-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-p_pathology_candidates-v0/qtdb/sel16265",
+   "config": "refine-p_pathology_candidates-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  },
+  {
+   "case_id": "refine-atrial_event_validation-v0/ludb/50",
+   "config": "refine-atrial_event_validation-v0",
+   "dataset": "ludb",
+   "record": "50"
+  },
+  {
+   "case_id": "refine-atrial_event_validation-v0/qtdb/sel16265",
+   "config": "refine-atrial_event_validation-v0",
+   "dataset": "qtdb",
+   "record": "sel16265"
+  }
+ ],
+ "inputs": {
+  "standard-default-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/13": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.hea",
+     "sha256": "b1a347954e2173ea4c8764c8524eb98846d79d1a34d872f61694a81bb3fb38bd"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.dat",
+     "sha256": "8052dc940203204d5928cdcf359b28a988cd969ac204c3f4fab95f579a82a15e"
+    }
+   ],
+   "signal_sha256": "7c4afefa21e0ec555b0805c5b031d240ef80263a64e77c438687c9aa194bf249",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/139": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/139.hea",
+     "sha256": "4fddf87e5a39dac065362a13e345d87ea872b3f53f48eb46e1f3256cee56c882"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/139.dat",
+     "sha256": "e80db252fe81545743a7d854bbb02654fc5f289ded9477140e4add5a63b440d1"
+    }
+   ],
+   "signal_sha256": "d5295520dd6f04d7425481596c166bc177f107f7306649a3fb378738323caee9",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/173": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/173.hea",
+     "sha256": "50f2f7265d4981cbd61c9f43dd007d91c0c947c555375e5b747c76205c8965d5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/173.dat",
+     "sha256": "c2376b2c4bd63eaf2b9b1877d2fb5754cd2bcac266af61ee07300187a383e3fa"
+    }
+   ],
+   "signal_sha256": "5e286ea0b0b33103115c3b9f5283ec39af8b677d75211933b99beb59201b557f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/34": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/34.hea",
+     "sha256": "3cf37523184588fe70f6a0f2876603032c536ba3ece9cf62895cd302e90aa3d1"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/34.dat",
+     "sha256": "8ac13742d607d00cf5e37e50d842aa80d780393a37cae67c698317bc9a16c659"
+    }
+   ],
+   "signal_sha256": "6e930576a299bb60fc0d70b5a8e119518f5997f2d49296f814308ece92b22154",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/101": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/101.hea",
+     "sha256": "d397afb828ff0a3ff4d600eed6c7cff4b7bbf2b1777014f0c39a8e5d9c002eba"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/101.dat",
+     "sha256": "0dc6dcabaf4e583e8ef56cf2118c81b20b0b979c386274b2be4a0de82b0eff07"
+    }
+   ],
+   "signal_sha256": "14e8ba28f2466c8fea5060db702cb5da12fdbd8818b8627fce3c73b333b3b789",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/193": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/193.hea",
+     "sha256": "0d9053d0d518ae5171d7ffd3f605ae5a3fdd24093e88509f2a504a804e2eb673"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/193.dat",
+     "sha256": "f40342b534a650c16be98450338edc644fc56354965511e83da8b4675e00cca0"
+    }
+   ],
+   "signal_sha256": "5228e4ca87f808ebafccda9fa940ecf2d4d4f134c429fa8af2634fd92bbe31ff",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/118": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/118.hea",
+     "sha256": "0b14e19cd1e73f5c744cb7ea2a62b1e82433618752208788445514fb816972a7"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/118.dat",
+     "sha256": "af0e6e8f17a0f5f20a6fff917a570cce9b6de5e7b92b60e87293283182e41357"
+    }
+   ],
+   "signal_sha256": "b69ce6a31a9bb4492a94b23a7b5d9e00535815be522a35445e91cab3a435fffa",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/88": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/88.hea",
+     "sha256": "ecbef96dfec37ba472d25eb698126d0e1dc368c388f2360059266e2132d72ffd"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/88.dat",
+     "sha256": "114aac46cc76a77a8133d469e29bf09fc062e8e37ae873b9a04bb984a0d3e782"
+    }
+   ],
+   "signal_sha256": "b19d3fa0ae53c97410a204392e9d882c2cbc47cb474e881856eba5fc140124b7",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/37": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/37.hea",
+     "sha256": "ebd5a046dafda7e74b3b9eda9b9176ae6726a6c217d9aad1ef1ac24e8794f240"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/37.dat",
+     "sha256": "05ebf489af6736f9db31b087d6304ad7ea4bd1ea60ed54c7c316c44efa350217"
+    }
+   ],
+   "signal_sha256": "78f377f09ac9944690b5efccab46b7825d181ba58e6a2290e0cc7712e509aa71",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/181": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/181.hea",
+     "sha256": "228984e951437d93a032b4bac5a26f2d4d8a4991b58ad84bc09a3462657805a1"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/181.dat",
+     "sha256": "d6665b9c55e5b253fb824861289ba9bc366439ed1b03515faa64054fc1143852"
+    }
+   ],
+   "signal_sha256": "a8471663f644966a353e1a8bdc5bd1f5999f3fdcad719306ddbae4a3f4a4ac5f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/171": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/171.hea",
+     "sha256": "4cbe46167cd64150ffa2c9d49fcb958c1749a3f430ff1b136ae23c51ee9468c1"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/171.dat",
+     "sha256": "1b1d022d04debb16302919a876323dfac5a65e0d28b15265feec5e66774464b9"
+    }
+   ],
+   "signal_sha256": "2099203ca2ccc78b64e738d7da648aaba7613251bb456b1dbaa90a5e8b28708d",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/172": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/172.hea",
+     "sha256": "e8a10311c14587466371260218b33b528df55b40b099a446ef1213d0b7dc237f"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/172.dat",
+     "sha256": "ba7ab9de6306580defc89a0fc250ef9020f816d87d29fa56b3075653cdf233a5"
+    }
+   ],
+   "signal_sha256": "2587b166f13b9541a8011e9cca41332249284e695b4af980fc9d097faca862f3",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/134": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/134.hea",
+     "sha256": "a4a20f150630dcdac724d155e66304378b6d2dfa358f45832a2dfd1e1fe30443"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/134.dat",
+     "sha256": "90648c9e105dd1414bab27e6a9b807fa6c4be281872d5cc4a2fee9e01f81b847"
+    }
+   ],
+   "signal_sha256": "56b1e14c7e1552413a21654ddf4f64d24fb5dd158440b350d04abc4984110548",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/97": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/97.hea",
+     "sha256": "e65b25fd14d0eece3a45eaacf3dcef7a210b5438df32d73c70f45ef01f4b1073"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/97.dat",
+     "sha256": "f65c978bf90e5376cdc8855bd6d6863b3e45f5caf8f56eb67c3b4a2316b491b0"
+    }
+   ],
+   "signal_sha256": "a4b69656ec0f1aaae7dd106afbcb09aec0b8d9a3c56e918d9e53cd72ffe93ad8",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/81": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/81.hea",
+     "sha256": "9f38416d3029173548c206160b5d5e63b70aea0530f3a66235598631f576be9e"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/81.dat",
+     "sha256": "98e55c24b9cc0b8736e83111c8234c8c0c6a220175c9458c5f243cb20f52765a"
+    }
+   ],
+   "signal_sha256": "65a2b991c59080af5718f2077534cfacdf8725e6ac42c3726b3202a9572a10e9",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/9": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/9.hea",
+     "sha256": "ddf830c12707b0954bd7d32c5ff13ebb8ad2c52569837972a02a76ce7cf2aa27"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/9.dat",
+     "sha256": "4ccda6669fde390debd8c7a11171439245738fc71de945537b22bfb10e06c01e"
+    }
+   ],
+   "signal_sha256": "e37ca4c51346c9c1137817444d8cdc91e89c62c365be9a3b742ca7297ae42b0e",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/96": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/96.hea",
+     "sha256": "69f65005ad3fda1c8310fb45cfbca0b64316bc17cb49b3cf70d26ab5f967ecb6"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/96.dat",
+     "sha256": "ae9621e82f7b842d039a733f774745b8dd6e9a9ea5e2af0f61d5a36f6c206381"
+    }
+   ],
+   "signal_sha256": "32f9524ea0a46b8636b118ecd8a8c7d3e1972a0e9d935c837294400c435e6983",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/169": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/169.hea",
+     "sha256": "0fe83fbccd8a5826f36c51da30e3a7c23574bc194977520ab0fd9695ec81f92f"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/169.dat",
+     "sha256": "15ee973cca0796e73edeadaa58c1b71e5c74b0879993edf600be87da5932423f"
+    }
+   ],
+   "signal_sha256": "a0e48f82144c38ee9364dde1b663c156a63caccc1d4dfd8c5262aea59ea0e671",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/75": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/75.hea",
+     "sha256": "96831463a87ea847546c7d0864f98a2712295cc58793b42fb69659d433c77dc5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/75.dat",
+     "sha256": "bca87fd2833581c1e9319638a491f0b44db9a94087b9bbc2a3a34125aade746a"
+    }
+   ],
+   "signal_sha256": "7fa2817a2ec0ab2a918c4a390dcf054f25fb2a1597be6f1e9fa979d085494f59",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/150": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/150.hea",
+     "sha256": "3828be075d364fc8d8f78d0203a204c3ab909806fb3dc33348f11da3e66002ce"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/150.dat",
+     "sha256": "f8a352b5fd0b3ca0c638d6c149374dc90dc1d249aeed356988dd39536791ae52"
+    }
+   ],
+   "signal_sha256": "29e3411e4ea140373140d8fcd75593a57730fca1dda16fdc9c5ccdc4263b2832",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/52": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/52.hea",
+     "sha256": "54364ded66078e938eec1497c5903392ed01065b16665e8e5decf9041f8c090d"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/52.dat",
+     "sha256": "44c35fc93d614a40f227df95668ad3d370b985bc4ca872e086abe36f9dd547d7"
+    }
+   ],
+   "signal_sha256": "5a37e49948f41315c8ce8150d68b2e5365233ca0668e007191a32d1fad192158",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/5": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/5.hea",
+     "sha256": "1717cefd502a3ad15fd05fbeb0bbcae6f14c9eaaef58a4deb880e2569a35bb57"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/5.dat",
+     "sha256": "2b708aba671d23b60a41b814ea698200b9b7583a2405839c41a724e22eb4f251"
+    }
+   ],
+   "signal_sha256": "22769823b75ef9fa46253beb8b3d4afd8dfb0b5654d5e26db365594eb76637f9",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ludb/40": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/40.hea",
+     "sha256": "24b4ee271d3a087596b5be57bbfc547f348658a712302a7586621262f4ae6d60"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/40.dat",
+     "sha256": "89da0a061b772694cafa3c1f024ecbfe96fd38dc2a421e78da5725c52de59738"
+    }
+   ],
+   "signal_sha256": "8d0f49e3726a937944c4a7072ca0eacdd341f48a7eecf47073472c73c51d97db",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel17152": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149634,
+    152134
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel17152.hea",
+     "sha256": "a210aa50943a5ed25b23f9fb5a10bc78137b39ae3c7d165861d4f07c3186c25b"
+    },
+    {
+     "path": "qtdb/sel17152.dat",
+     "sha256": "912bc4f9dc2c791d05acb838f83f007278e341c52139fc7f6e05ab69498a4160"
+    },
+    {
+     "path": "qtdb/sel17152.q1c",
+     "sha256": "b2e4df6ebc09a303079fbbe9c92c1123c651c980edd9ea0cba7e54163d53a444"
+    }
+   ],
+   "signal_sha256": "fc8eec4d8be98b4a66a11962744bd094d10179c75366b0ed6d6b9ee5e1c1fe14",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel821": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149652,
+    152152
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel821.hea",
+     "sha256": "c3f9907c48c106bbb5429b370529f6cf57178674e865b526d3d14c563c813d99"
+    },
+    {
+     "path": "qtdb/sel821.dat",
+     "sha256": "4f98d2d7937e121c43bbbd9ef1a29e1f81c37121713be52fd67c077b2df9cfcf"
+    },
+    {
+     "path": "qtdb/sel821.q1c",
+     "sha256": "3389e343756da09e8a9a411f75312c509ea67a5ad4a3575dda5e5c9b3477e558"
+    }
+   ],
+   "signal_sha256": "add2d8b31afbc6daa492b6cbc2e8fc0d02de4d4c37d06efe7ded1391fa97a661",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel48": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149616,
+    152116
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel48.hea",
+     "sha256": "56a5656ed01af6804f94f1e29b4e4e5e23105e9cd5bc8f2cca455869bcf0d7d2"
+    },
+    {
+     "path": "qtdb/sel48.dat",
+     "sha256": "81a6e52b5ab9de45caf7a9804b199ef1c66d52d34e0fb84f617a72dd4203f401"
+    },
+    {
+     "path": "qtdb/sel48.q1c",
+     "sha256": "242742619b939fa9686a71ae2e7c01cf9aa0095eab4c7429dcaad55ae57804bd"
+    }
+   ],
+   "signal_sha256": "a2fa1d9b4d2a7dd855dd9dd1b481a1a339280550e5b8d7dc20e0d711fb49effe",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sele0411": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149699,
+    152199
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sele0411.hea",
+     "sha256": "9752886a20a42323c22ad5f739f04e2f71064349cb0bca7f183410bd01056bcb"
+    },
+    {
+     "path": "qtdb/sele0411.dat",
+     "sha256": "270acb73c7a53905f31a17c0405d184e0771efc3e4e4a1e4a875d40f441b4563"
+    },
+    {
+     "path": "qtdb/sele0411.q1c",
+     "sha256": "dc90b9bd824460cf015551e83f33fc2c3ac6c6c3ff51592a2437bf75842f26a8"
+    }
+   ],
+   "signal_sha256": "1f36b89839e3d30117350f4b81d63d370a22030ed1d2bb696cd029e68f080e89",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel37": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    150105,
+    152605
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel37.hea",
+     "sha256": "34cc53e828bf6b1be44bfa2adfe5f7fa22c33300a26c416a2004d2413f0dbc0e"
+    },
+    {
+     "path": "qtdb/sel37.dat",
+     "sha256": "2264abd77d4a7a662e1ce2bf8e3f7857edb0bf2fa8f8e204b234e4c7918f369e"
+    },
+    {
+     "path": "qtdb/sel37.q1c",
+     "sha256": "62fba119247c31da4da56bf3ca0144c364de073a181394eb5c02512c8243964e"
+    }
+   ],
+   "signal_sha256": "ca6ef2a317f961c34c4466d4cacca135df329a4ab3828b9ae102d1b0880838e3",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel102": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149729,
+    152229
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel102.hea",
+     "sha256": "1f4455ba71be5fe4fcb9a59b7c5aebdbb37bfd937ec33361273b91852cf06cc7"
+    },
+    {
+     "path": "qtdb/sel102.dat",
+     "sha256": "f28baa63880045c72dbadfceac931a5b72bb48e49f316e3783b7cc0b498a8763"
+    },
+    {
+     "path": "qtdb/sel102.q1c",
+     "sha256": "179c11a3c466c3e6fee1d48d9679ef12657d76deb91658f44e53cae053b8e0a6"
+    }
+   ],
+   "signal_sha256": "1966058197d83ac6f2568fb3d7f1b24386625836940a2a3343a9d29d4da4dbe9",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel52": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149743,
+    152243
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel52.hea",
+     "sha256": "1b3dcb05e8daee0b370fae3de941e9ade2321b5554bbc92007c24b3065643114"
+    },
+    {
+     "path": "qtdb/sel52.dat",
+     "sha256": "4e06fe46d35e24431c5ff78a6a676b21ef8f6c5649765817f4d11c5180027dd7"
+    },
+    {
+     "path": "qtdb/sel52.q1c",
+     "sha256": "e42e9c4aade9e3b38f58da4f66801b16eeeff429879fd3d61aaf9f141545d629"
+    }
+   ],
+   "signal_sha256": "5aa0cfb6bfe321eeab242f34de2c2210184b213d7c8d701f7061d71ef1cf1bf1",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel847": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149722,
+    152222
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel847.hea",
+     "sha256": "2440d895be180fba82e1721f5988e4b95550d9d899e187df2474361c3c73e660"
+    },
+    {
+     "path": "qtdb/sel847.dat",
+     "sha256": "204e1511f2026347be4c627519cc4c1f0110e5a399f77b0acccf56479d945094"
+    },
+    {
+     "path": "qtdb/sel847.q1c",
+     "sha256": "62a3fab14fd283306d2f1e8cc3c7b2a82565f26d60c36dafa0e85c44f4733226"
+    }
+   ],
+   "signal_sha256": "d87228787c8fd1dfd7e003912a45a92c22bb675f457a5a8a4acca914eda55848",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel14157": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    150170,
+    152670
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel14157.hea",
+     "sha256": "86d31951a4c1ed5011d8ec3d3cd4191a89590b09d9440b34cb21f2ff8c99a6b4"
+    },
+    {
+     "path": "qtdb/sel14157.dat",
+     "sha256": "cbd3c9b1af7e314923b94554d009526e5f67727b917cec1d088170d2a644248e"
+    },
+    {
+     "path": "qtdb/sel14157.q1c",
+     "sha256": "e8be7eceee4dcbb88aee6e5f760254d8ec9f43dfdc66b3b928a59db9141d4b1d"
+    }
+   ],
+   "signal_sha256": "a1c565e86d72c8f21588d3d7e530c3e325fd2a5eebbb7adf1a493d4584027b92",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sele0124": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149817,
+    152317
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sele0124.hea",
+     "sha256": "34a0fdcff135cf6ec043e7a3663ed5384a2e263f652fff6f5a121e7248c162b9"
+    },
+    {
+     "path": "qtdb/sele0124.dat",
+     "sha256": "30788109131b431ebbfb48c47b2dff22cddddd3ef0d784b1b3b40dda9e5aeadd"
+    },
+    {
+     "path": "qtdb/sele0124.q1c",
+     "sha256": "2bf1249aab71e9faecc666b5e1ab60b04b70cddfc33ed23bde7f7f6a34b03ef0"
+    }
+   ],
+   "signal_sha256": "0ed884b1b19c0180f9d83edde3c6d36d547af798954c933c21087c03eb957415",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sele0509": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149698,
+    152198
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sele0509.hea",
+     "sha256": "4e944e25d43acfdca038c7e7b9c3bac12e5c03f744c8c2b6862ccdcad15999ef"
+    },
+    {
+     "path": "qtdb/sele0509.dat",
+     "sha256": "aeca82ae572db13041e6adc8fbf3a529e213658f876e8c61f3fc198370de00c0"
+    },
+    {
+     "path": "qtdb/sele0509.q1c",
+     "sha256": "28e100ae403df52e6057a4e3149dcd809eef13a194bba3cc933058039b22452f"
+    }
+   ],
+   "signal_sha256": "404f019a8f790535979337ddb9f8aef8be6f8a07542ac3f226ff4428b04cce1d",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel17453": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149727,
+    152227
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel17453.hea",
+     "sha256": "bcf15322efb58f64a182c414c4b91b24fbbc3c4fec39b596edfd66040699db1c"
+    },
+    {
+     "path": "qtdb/sel17453.dat",
+     "sha256": "80270211d860714258397e66bdf44c6911dfd0929afb33076fa5e53f4793c5ec"
+    },
+    {
+     "path": "qtdb/sel17453.q1c",
+     "sha256": "f90c208b94ddb54bf6c9a76a8e443b25626423550fc4892518f66fae0d9e8fee"
+    }
+   ],
+   "signal_sha256": "67035fdacfc792288ae69585b9fbf026f85ed0dcec9c4da97a7d4f9dbf2d09a3",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel872": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149689,
+    152189
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel872.hea",
+     "sha256": "418d21f0fa4edab92626937e17151ccd4e20cee93a3b940b6ad3b658759ad7bf"
+    },
+    {
+     "path": "qtdb/sel872.dat",
+     "sha256": "2c803f0d7de4e74bfeefa060fabbb1e4c981ffadea3e3aa181dd02325634d5ae"
+    },
+    {
+     "path": "qtdb/sel872.q1c",
+     "sha256": "955c6d57aead840127220b4c75e466849f8ab0928af3c79300bbfd55f2ebb4a1"
+    }
+   ],
+   "signal_sha256": "640cbd9addec3cfd3983410c946b81ac3cbae248d23899eee4719b39ea8beb1c",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel808": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149718,
+    152218
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel808.hea",
+     "sha256": "93bb1564ffadd01fda997509e0e492d409b8193bbe2512e31e7d5723d484656b"
+    },
+    {
+     "path": "qtdb/sel808.dat",
+     "sha256": "2f90f89fc8d8e07778712f6ff58cc01daf6a3a4ff7332edb84ebb4347524b3a5"
+    },
+    {
+     "path": "qtdb/sel808.q1c",
+     "sha256": "ac3168ac9a3aa1be533f34995642cc2b8011ef2ef66d3c81c19656fe3fd5b266"
+    }
+   ],
+   "signal_sha256": "dd1bb772a07caa1360be0ce0e2c646db713590c9c0d087eba5b1aad8151d6439",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel34": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149710,
+    152210
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel34.hea",
+     "sha256": "01b9affd57dccd1d3d2cc0eb1c422acfbe96d511b005febd78bd531fe82110a8"
+    },
+    {
+     "path": "qtdb/sel34.dat",
+     "sha256": "25fb234067aeba7f64f6efa8aaa0242a07f3a07f3191d5f608c9781eb0751536"
+    },
+    {
+     "path": "qtdb/sel34.q1c",
+     "sha256": "8cc8bfe43e476ee852a58f87becd3f1d6859ce345c4ad5512c8bcc6b213019f3"
+    }
+   ],
+   "signal_sha256": "a042e7f00316ab02a4fe6f6b02db13a6867c968e065e8196c1df105002f00fc6",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel35": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    150474,
+    152974
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel35.hea",
+     "sha256": "f7d225a8beed301deb5d92d024842b29c7d63ae30009c4bb385d75cb63c66721"
+    },
+    {
+     "path": "qtdb/sel35.dat",
+     "sha256": "c06aa9e21bbb4f6c7ec3e98f83bff693ec9aadb7ac43a6a8cdc07df128a9c4d5"
+    },
+    {
+     "path": "qtdb/sel35.q1c",
+     "sha256": "dadf85c93f1aef2adfca8027869ad9477fa5bc81a1f95479bb410036adc16484"
+    }
+   ],
+   "signal_sha256": "6f1ac4f1e87a03de8aa8fa25752f8e471dfa9a334a744e3bcd4a73c6b9e442e7",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel853": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149736,
+    152236
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel853.hea",
+     "sha256": "d21c7ed6dd3c3adef234908815f7738979eb257d8218b13bcc3824c663017102"
+    },
+    {
+     "path": "qtdb/sel853.dat",
+     "sha256": "c4dd5cc131a7478a3f3c118d9a08cd766f8d074d346b1e9adae1ca2ff933873f"
+    },
+    {
+     "path": "qtdb/sel853.q1c",
+     "sha256": "74d402dc57bd6f9886f65af0184ce8714d1a7cb5d642dd2653843b4f35c944d1"
+    }
+   ],
+   "signal_sha256": "d94278eb6aaafda8787b5e99b9a5ae73715424f46f0af6f7bbda3854df6970d1",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel50": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    150093,
+    152593
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel50.hea",
+     "sha256": "007f85307cc9b14a53fa2922834061b1c362baad6dbfd8797f2649558256cc06"
+    },
+    {
+     "path": "qtdb/sel50.dat",
+     "sha256": "1d458656fe077618d9a3ba3e24ad45442b68268999aed80bbb3cbc907f259f7b"
+    },
+    {
+     "path": "qtdb/sel50.q1c",
+     "sha256": "48047984802001cab9a9acc7577302f8b84c748db4ced5bb62fbfb87e4e83ae7"
+    }
+   ],
+   "signal_sha256": "b234b85fdcaf1b672a01de21094d9c0ff3d6320c0c3ef5c1368727fe4b3851b8",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/qtdb/sel16483": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149750,
+    152250
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16483.hea",
+     "sha256": "4e0d6a227acf6e7ae1b3d60fa4e36f2fac6599234e27beef247861fdb1b7dd3f"
+    },
+    {
+     "path": "qtdb/sel16483.dat",
+     "sha256": "e16d386c7c373e16cb0df16782e0d5089f59cd378d15220a3e7da5219593afca"
+    },
+    {
+     "path": "qtdb/sel16483.q1c",
+     "sha256": "9ac0e15e52f3e1940fc945bc5d2517000974f3b04b12e035ffbfa5240c0d5367"
+    }
+   ],
+   "signal_sha256": "a7726798ef65412aba0d945bdf0ddd53d99123cc5ad7e29aa1ea8aa7e9b16419",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0303": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0303.hea",
+     "sha256": "5fe96c14576ca6ed85d577197e9ee9776e811f765c123aeb55fcac252129b2db"
+    },
+    {
+     "path": "edb/e0303.dat",
+     "sha256": "6ef7de2c3fd6b105efd809376acb7a35451509a49928393f36db22eb677bda47"
+    }
+   ],
+   "signal_sha256": "954f33eaaf201e45a2c81f41237d6cc343dbda53838a6ff0c136ff8db4c66b04",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0403": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0403.hea",
+     "sha256": "f35a39a0c8793196e7393f25b287cf721e91dc44a8c7f6752731d81aeb733d66"
+    },
+    {
+     "path": "edb/e0403.dat",
+     "sha256": "4d8f354da16bb7fbe3fd39066a67ec9412ec5159b956f87be7dd28c0ce04437d"
+    }
+   ],
+   "signal_sha256": "f1194157790f81c242aaddf1ace4df75405ddc7344cf506f35b8087b1f45d1e7",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0112": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0112.hea",
+     "sha256": "b69751f025232b6172d61584cf056595a901219a17dabacfe852e42d73bbfb92"
+    },
+    {
+     "path": "edb/e0112.dat",
+     "sha256": "9df853627b82529e6b831c9a421bd569cba9f07ebd96c8c9c6a5f56870d0ee5e"
+    }
+   ],
+   "signal_sha256": "d82bb293b8650826028495acf281ee4bb36744c3e6cc1253cc4ce44f74862458",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0818": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0818.hea",
+     "sha256": "64ffd30ce6ea8384336cdfe86974dc0bafacc70ae1c5004b8fcd1ebd747dd846"
+    },
+    {
+     "path": "edb/e0818.dat",
+     "sha256": "e7484068b1279afb6bc22ccd30e23e5d5ae0491904babeb95eb93342abd72bf0"
+    }
+   ],
+   "signal_sha256": "04052bb482817af91a3042d9282c213d70e19d05f0061811e105cee08bfd63de",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0612": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0612.hea",
+     "sha256": "49ac1052d86d19931d690effdcece3ea08f92a66dab05552347e5f9122f0293f"
+    },
+    {
+     "path": "edb/e0612.dat",
+     "sha256": "f19eb04466abb045a9a4d0a569211811f45dfacfadca16150d2e67be897e865f"
+    }
+   ],
+   "signal_sha256": "1b27454d53b55d258b2f194ffcfe50ea780f986987bd794de944f22f68181d37",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0306": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0306.hea",
+     "sha256": "3dc34d11fe3c7311c6633c4a885a7c79810b9b93e61555e78fe047c4a322a505"
+    },
+    {
+     "path": "edb/e0306.dat",
+     "sha256": "1bae374ab9c41c40fb0e194413e3a30c014cef29dde5b3491d7d9953d58bd932"
+    }
+   ],
+   "signal_sha256": "37db5f505ffbe58071a81b4a1b44a7bfb86559b4346ee206d974850b4e08eac8",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e1302": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e1302.hea",
+     "sha256": "0fb5d67a0a2d799ddcfaba32883bcf30a6e3e9576dde5429a9abbdd834a44aa2"
+    },
+    {
+     "path": "edb/e1302.dat",
+     "sha256": "2b2aaa2f357b0e0e23dea1299197cd863e26ab9d9c8b0f11bd9c21112bc3b549"
+    }
+   ],
+   "signal_sha256": "1ad0632c9551625312661e19248cab5f2d3cdd6fa446dfb5852415ea26229476",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0704": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0704.hea",
+     "sha256": "7626d3945c6aa546b09d808921aab510cb11e4256beeb7f09f235922218dbd67"
+    },
+    {
+     "path": "edb/e0704.dat",
+     "sha256": "91bb3219e51ab637456e9f5a602b89e18959a8a0654f358813149dcfa1c61ce4"
+    }
+   ],
+   "signal_sha256": "d2939adda85bd7d53d3b86c495dba1b942deeee4281bde49ba9d95ab617f020e",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0126": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0126.hea",
+     "sha256": "acc8f59b166eb200f423f3cda685df05888f324a4d100429cd508adfa8222f91"
+    },
+    {
+     "path": "edb/e0126.dat",
+     "sha256": "1fb8cf7814bfd9c60b26b5917e28c38f6fa173bd1dc835bdeeaa6390b8af933d"
+    }
+   ],
+   "signal_sha256": "bc57b4eb0015ccfb113deb9725cccd0a17cb5a70649e36610459daf9cb5ee4c5",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0162": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0162.hea",
+     "sha256": "3b1ac598b8bbb61ec4ddd5dd760e79969bdf0078fb178d5f5bc55247738b736a"
+    },
+    {
+     "path": "edb/e0162.dat",
+     "sha256": "c0b90a88dd6c78c7744fe6883a4a8f0c95ed2b60bfc1c0df973b28cb393a7415"
+    }
+   ],
+   "signal_sha256": "1042b4165147e8d38d786adf8ecf84615184ab9bdf558a95585f4afe8a19b061",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0203": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0203.hea",
+     "sha256": "2a6d236b7c2c15a17aa4087accc7540debf0630903dde56196d8a7024b2adab4"
+    },
+    {
+     "path": "edb/e0203.dat",
+     "sha256": "675cc881c004577a8c716e5aa5aae1f659005d167e03409c9b91600a8ea9b3a6"
+    }
+   ],
+   "signal_sha256": "cbc22bc4dc95d13a6a6392428f7f0ca242387f397483a72341800ab2a9fcf373",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0212": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0212.hea",
+     "sha256": "b378b31f0b40fd57f1fb09945963a4888769f0e46076951161f2ad1626db3e51"
+    },
+    {
+     "path": "edb/e0212.dat",
+     "sha256": "bef507e95414e5a4f6dc7533e39ed68c6475fbfebfdcdcc24d93c6b5e0e88a81"
+    }
+   ],
+   "signal_sha256": "3fefe8a8dbd638837399f2e319886d56fbcbea1c614e717a649fd3fb0b5d7875",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0604": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0604.hea",
+     "sha256": "a30e8d7f3137ac3e7b7e29cd6ca87d6e3b3f7a1b60a96b701f5f360a4f1d07a9"
+    },
+    {
+     "path": "edb/e0604.dat",
+     "sha256": "9c70f2cbe0ed7d5d636397d6c685a8dfbf100a28abc1df8e36fae863b324be6f"
+    }
+   ],
+   "signal_sha256": "a8f3b2a83d255ca304fbaa14ed1cba92b0dbe6ce83fe59c85ea907b780c7ef70",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0302": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0302.hea",
+     "sha256": "a273bffdd7f3369e6bb3c40e23e7928c2454681a08c1b187a06aa05ca73df734"
+    },
+    {
+     "path": "edb/e0302.dat",
+     "sha256": "18a710561ca0605c56d9732c42dce0dee87a93f1a032eaac5163b8989ab8bf60"
+    }
+   ],
+   "signal_sha256": "b9a5749adda40f7df9af7936bd563b76825ece7f5a2aadff7ae3367de3837fcf",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0127": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0127.hea",
+     "sha256": "6cca4288afebe07e70099c4cd40221efa5db8e8a2d36ec6a95796e80e32593c1"
+    },
+    {
+     "path": "edb/e0127.dat",
+     "sha256": "128902a3d73a1050555cee283515d0343572712f8cbb8341b4a66f03961e64d1"
+    }
+   ],
+   "signal_sha256": "20a60f4559457a256ed43fc24965ff761f6bb36c56990c135104204fccf3b55c",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/edb/e0170": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0170.hea",
+     "sha256": "2dabf4d35b57297fa150b2b0f439c538c589abdb8bd80e602d4515973fbb9edd"
+    },
+    {
+     "path": "edb/e0170.dat",
+     "sha256": "93b0bd16ee3f0d46a10970671f79c5c4f13a9e8545d3e11600390744b362c755"
+    }
+   ],
+   "signal_sha256": "ca47faed8043b085493eb59aba26a3a5fadcbfcb28dbdb65d78cc4899d4959cb",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/ptbxl/08000/08238_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/08000/08238_hr.hea",
+     "sha256": "8e14fc4d0323912d27333928b3c7d66c429d905b1bbff3a0b3ed3cfbdd40b9f0"
+    },
+    {
+     "path": "ptb-xl/08000/08238_hr.dat",
+     "sha256": "34d8ecf8926e4bba87eade77cfe840e57dc56c20db8cff358ce5f49886522281"
+    }
+   ],
+   "signal_sha256": "e596b76dde4a46b15b58ab1d2cf0087fd077079e8f00d0a92cc3f9829ada9b0f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/02000/02828_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/02000/02828_hr.hea",
+     "sha256": "8ac32d57763386fa57d9faf894e6a0a9ae150e746bb18dbefc27262603c52dc9"
+    },
+    {
+     "path": "ptb-xl/02000/02828_hr.dat",
+     "sha256": "df94ce2c436307f4dc4fd47f5830ac63f98c7a89a013f362f4c734b6e2aa62cb"
+    }
+   ],
+   "signal_sha256": "a3df466c4be5422cd9d9fa3144424d3720a2c97b17679dc4a6881b00165eab1f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/07000/07255_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/07000/07255_hr.hea",
+     "sha256": "43538c534c77c6fac4388f2a7fa23884d40389ec9e2fa15ae7b596726034856e"
+    },
+    {
+     "path": "ptb-xl/07000/07255_hr.dat",
+     "sha256": "f1051cfd61854227f97a4105ebf5d13de57518fd025b6a3ba2136685abb6ab40"
+    }
+   ],
+   "signal_sha256": "374be7e004b56306279a37cfbf209e6af93cc261293be5fa63279d676ce07f94",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/07000/07740_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/07000/07740_hr.hea",
+     "sha256": "91184d8ca345cd985874f6062d3eb7707adedf0f4bc5936d2b34345659af4044"
+    },
+    {
+     "path": "ptb-xl/07000/07740_hr.dat",
+     "sha256": "62709ae9dbbd726f629b26af0b0f2e59aae5359c42b47b480cf59b71ae6b69bf"
+    }
+   ],
+   "signal_sha256": "99b616701234a0898366e034fd27732ac022d85bc7bb716c08f8da83b1bfa6d6",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/09000/09546_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/09000/09546_hr.hea",
+     "sha256": "45e26233c630a95a4419bdeb8869bf166e78dcd3881b2ed152e09b38700df0a4"
+    },
+    {
+     "path": "ptb-xl/09000/09546_hr.dat",
+     "sha256": "98ba46ba0ddaadffa607a88b978d68be44f27368ab28fc555900e7063c137d87"
+    }
+   ],
+   "signal_sha256": "1cfe3b8e908126e76adb24c0ae539a41bc10f688455b630ff534d984ea3c2638",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/08000/08032_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/08000/08032_hr.hea",
+     "sha256": "9768d2c0dfb6cd84abc855a0d0e5e7753acb6c184834b91ba8d121437db20552"
+    },
+    {
+     "path": "ptb-xl/08000/08032_hr.dat",
+     "sha256": "87b19ea8fc20e1e1d43bcd86e1a4b21acfc215ab9ae769793cee6207681e18b9"
+    }
+   ],
+   "signal_sha256": "93edf17a27c19efc6ded7414fe858b75677828b78b1c0c0159dee3ceafababe3",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/01000/01885_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/01000/01885_hr.hea",
+     "sha256": "a7a087a55305963a4f57d8b07c30fe4034ef3d039e93f51331f0dca6a78b13c3"
+    },
+    {
+     "path": "ptb-xl/01000/01885_hr.dat",
+     "sha256": "fe5d78ffe2a1f4de69e164b0bf51d38d89ec9b8ee69c4e6e84ec01442cc11fe9"
+    }
+   ],
+   "signal_sha256": "f5c92ab2550bf2377c62bfdcfa43ba9d24e3844a5ae4635ca1e9572ca53a8354",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/06000/06086_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/06000/06086_hr.hea",
+     "sha256": "43c1cbd058cc4a63778d19eaf39015d5ae9e170cc74154ab6f05e7dc64602b10"
+    },
+    {
+     "path": "ptb-xl/06000/06086_hr.dat",
+     "sha256": "63e6c5a0fea6d2f110d1cd3bc50bd63382fab4c58b1e37482b3ff54be601313e"
+    }
+   ],
+   "signal_sha256": "90bd7e31f8ad4920e1c459bd32dec54e02d588dc52ff2afe5b9998018bd39072",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/09000/09097_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/09000/09097_hr.hea",
+     "sha256": "41f5a4b470d7291d2a020c6e6de83edb4703a7afbdd4f6ed23d496336aead58c"
+    },
+    {
+     "path": "ptb-xl/09000/09097_hr.dat",
+     "sha256": "09ff8d6406db6363f188a543ecf4c06cff527043dfba1e64fae12952d2289a8c"
+    }
+   ],
+   "signal_sha256": "ad7f51f4518ca6138c769dda8591534ea845986ff508a3acdadfca3bf30b29b6",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/07000/07194_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/07000/07194_hr.hea",
+     "sha256": "6720289b51a83232477bd4b5dad11e1a7be59cae4f531058b9084654eebe5d5e"
+    },
+    {
+     "path": "ptb-xl/07000/07194_hr.dat",
+     "sha256": "2219556de62612a0c3f38eb6ab1bd2ec3c7d16963cc0673f803bb527dfb67fd5"
+    }
+   ],
+   "signal_sha256": "c6e0ee122b1eabd0289d8763cfaef8b8a664f98d86811049d74d8314636e7281",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/02000/02819_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/02000/02819_hr.hea",
+     "sha256": "e4ced814e6a6fa92ddc9b7c669b341c2bd4c6bf4ce176e2a8fba92d46e1faa04"
+    },
+    {
+     "path": "ptb-xl/02000/02819_hr.dat",
+     "sha256": "b35794bfc1cec646d0b5f6a476195c35f70d248a6e41ae43de1d0f2776676d22"
+    }
+   ],
+   "signal_sha256": "4e0d859de4514415c12cf686d38e5fc0e7ede2392b0f6b69bdb89bf8cff5db18",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/05000/05662_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/05000/05662_hr.hea",
+     "sha256": "a042b603caadb93bdf2263effb5398303baa81aa89fb1bf094aaab3e3c74a454"
+    },
+    {
+     "path": "ptb-xl/05000/05662_hr.dat",
+     "sha256": "e0f53960d506e366db05356ec5d8a95618e578ba1f51b6c3db3bcb90e9387ec6"
+    }
+   ],
+   "signal_sha256": "d4701ab64cad26aa3dcfeccbc575ca937f08ecc8c848f51cf4b59392550f92e4",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/06000/06710_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/06000/06710_hr.hea",
+     "sha256": "e2b454203f9132f083fd73f207bfe96c97c10c0e83345ef132ce9d01a90ae62e"
+    },
+    {
+     "path": "ptb-xl/06000/06710_hr.dat",
+     "sha256": "f50a4e18f3c01817de9302909b9d0ad295ade005a490e5ff72735abf803cbcf7"
+    }
+   ],
+   "signal_sha256": "86c74de8c92bc9aae2ad95f86e360fd27eb6111d5c110d097b325a37901c4802",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/06000/06965_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/06000/06965_hr.hea",
+     "sha256": "70c8f42a9c46236388a742c4fdd8c867a0dd3954e111c5b33ca44b83efd1f3f3"
+    },
+    {
+     "path": "ptb-xl/06000/06965_hr.dat",
+     "sha256": "c4890ef6caf5d71dc2b73ff08f683f97f27608f4dacb88d8e3c05b56b998052c"
+    }
+   ],
+   "signal_sha256": "ba83be2fa77522f28c893bad837e2ba3cd83bd1b5cba844fd9105496b9d1e024",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/09000/09617_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/09000/09617_hr.hea",
+     "sha256": "bee9beea32547745f3d575a2575059390f0798fdeaf9bec35221318654111b2f"
+    },
+    {
+     "path": "ptb-xl/09000/09617_hr.dat",
+     "sha256": "5e34ebb1cada6a102142c669512fdca0d9f75085f9a73d86d7f6778b44eb1ee7"
+    }
+   ],
+   "signal_sha256": "c2469f8ac01e85c95630770451ef93d85a1ef45ac48a31f78f4133b817e14adc",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/ptbxl/08000/08767_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/08000/08767_hr.hea",
+     "sha256": "5b73b6cca66686dbf3db99a16726d5c59f079e1e3a9f350adaa124c229bac324"
+    },
+    {
+     "path": "ptb-xl/08000/08767_hr.dat",
+     "sha256": "3b19b5ff1d5dbb1c57980d7503d6b11ddfbda911acff07bedb7237072c7c239a"
+    }
+   ],
+   "signal_sha256": "8d054448a9bf9a0e55de1e9e9e41eae3d8bdef574d9d95faa3bd29a931f16f2f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "standard-default-v0/but/10": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/10.hea",
+     "sha256": "ce0ef9e5ead282afdd860172f7832ced3d2946920260b35475983dcaff3f7e4c"
+    },
+    {
+     "path": "external_ecg/but-pdb/10.dat",
+     "sha256": "258ccd732902aa8fca24039ae107dae974454e0fe457d642df631f53c5d5c956"
+    }
+   ],
+   "signal_sha256": "e8056bc6689b1d13f81b24a415030800d0225faec9dbf57ec1beb492dbe8ea80",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/but/07": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/07.hea",
+     "sha256": "18fba153c2ae0cf4c577859712d1822522a78efce7380d156e33944ef8198e40"
+    },
+    {
+     "path": "external_ecg/but-pdb/07.dat",
+     "sha256": "5f5e6b15eeef5dc419021e5b2ac371c1354c64ca0799934c959879dfc26d761b"
+    }
+   ],
+   "signal_sha256": "5a86d95ed6b3553bb05a5ca6cb7b96bcb68b8f56e588b08241da8a83f1fbfbb6",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/but/25": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/25.hea",
+     "sha256": "0fd867ed812baa557909646abc14fb1fc083a017acf2821e32199b90fea4c376"
+    },
+    {
+     "path": "external_ecg/but-pdb/25.dat",
+     "sha256": "97742cc43c76c84aa3c37818617bf9b3305af5c6d94f5a51b09c64f65aad1c59"
+    }
+   ],
+   "signal_sha256": "bbff228395cf2ca5ecd9d6a7f633fd8d4034f501d2c8b105f5c30939c164ae0e",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/but/22": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/22.hea",
+     "sha256": "18a444c673eccc824a33ee71db458c60616cf26baf97bf8c092e1b9b3c09df0e"
+    },
+    {
+     "path": "external_ecg/but-pdb/22.dat",
+     "sha256": "ec66e23ba3f911e90c31db568bf8284b69f176f17e1dc90c399943d3d9a49391"
+    }
+   ],
+   "signal_sha256": "3b19650f224ab8bec5994437842ae0c062922a4a44401c232accb3e1122f5928",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/but/16": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/16.hea",
+     "sha256": "01195dbd0a3dc02ac2dd5a3ca29ae28f856e9f00cf62b8cf6eb60a1e4a266c2a"
+    },
+    {
+     "path": "external_ecg/but-pdb/16.dat",
+     "sha256": "a96e91f0fc68ee334b7441aaddf4fb89fb05ff0ce3db369abaa3286bf669c51b"
+    }
+   ],
+   "signal_sha256": "c93dee72cba5978b2b42e063c5182b5689b32dc4467c150bcb7af90332b708c6",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/but/48": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    1280
+   ],
+   "fs": 128.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    1280
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/48.hea",
+     "sha256": "973b22b039e240188fc256d6959e2caabaeff5399d14755e3bd75221301f9cce"
+    },
+    {
+     "path": "external_ecg/but-pdb/48.dat",
+     "sha256": "ef29d24763bcc8336581ef54d997d71726297764de345c57e7615efea38f5a92"
+    }
+   ],
+   "signal_sha256": "ce693122f67bf0094e9a56a0381a90b61423a30fe014ed8f6cba380bd9dfaa59",
+   "signal_meta_sha256": "6cf8dff610d4e59d1ae5f6688e6ffadc7642215667194367e6ce2ccdb7b44f51"
+  },
+  "standard-default-v0/but/27": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/27.hea",
+     "sha256": "b67d724c1fc385ddff352c42a88697c2b6b9b4fe41a8423f0c2db21b17286330"
+    },
+    {
+     "path": "external_ecg/but-pdb/27.dat",
+     "sha256": "ac60b6e39c1fa8ad11543a56c49f1fe9ae1824cc7250e1f64c38b914ae47dece"
+    }
+   ],
+   "signal_sha256": "8441c297334863a53db06761a3c0143200dbc540843eca7d13e4829ed24bcc1a",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/but/34": {
+   "adapter": "but-sparse-II-V2-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/34.hea",
+     "sha256": "8ef989ceefc8adbe339ba49928da5c487c38bddee5d6ce6730e2116f0700c823"
+    },
+    {
+     "path": "external_ecg/but-pdb/34.dat",
+     "sha256": "239c6687ec0aaa2d73c967febde44986775564bf03ffc4c309d9205f170160a8"
+    }
+   ],
+   "signal_sha256": "dbf4aff169c6315a366b1b917288ea20ddabf325bbf694c1199574593f0e8dd0",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/nstdb/118e_6": {
+   "adapter": "nstdb-sparse-II-V2-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/118e_6.hea",
+     "sha256": "f9c5fb86ecf3a8cd40d2b3f9f4b59d02afea3ea45eba3b448eed492aa1467ab4"
+    },
+    {
+     "path": "external_ecg/nstdb/118e_6.dat",
+     "sha256": "6cd17f65bf51bec446cefd3daf6bea9b285d280298fc3abae7c3661a34cb442e"
+    }
+   ],
+   "signal_sha256": "ec5ffcf24966fbd252a53340c49a375b0574c9abf74eaa4d88e8d6810f89c5b2",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/nstdb/119e06": {
+   "adapter": "nstdb-sparse-II-V2-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/119e06.hea",
+     "sha256": "91536e9f794ea4a947e05bcea761fff8b4f444be2a11920f36f49d44eff5d30d"
+    },
+    {
+     "path": "external_ecg/nstdb/119e06.dat",
+     "sha256": "08866e9afb2dc7e0dbcca61044b3da60d1361983f12a7155d77461a0639f0319"
+    }
+   ],
+   "signal_sha256": "b4368971a41b1a0f18f8c0f810de36b72ffd9b687a158fd1d15d10405f834800",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/nstdb/118e12": {
+   "adapter": "nstdb-sparse-II-V2-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/118e12.hea",
+     "sha256": "3d4bb4b96d47a7b3900bf2207eefbe9f1e294901dcbddbb470ae190fb7f1b0b4"
+    },
+    {
+     "path": "external_ecg/nstdb/118e12.dat",
+     "sha256": "7d25e59e68400aa40b435caed153b32f0333f2445f2f21d7409c612c0dc3761c"
+    }
+   ],
+   "signal_sha256": "3ed0f8021982bf9e0703fdd7053761c40235d38d50d2ec378e92038fabaa0e4e",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/nstdb/118e18": {
+   "adapter": "nstdb-sparse-II-V2-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/118e18.hea",
+     "sha256": "8274159d47e8f4f57dccb0b2de015ff8927a9f6975563e3fb9703903fd5dea71"
+    },
+    {
+     "path": "external_ecg/nstdb/118e18.dat",
+     "sha256": "d0e5b78460e1b2fbcd6ca7435fa64b102ce747d3fdc4685f6761f6cf79cac9d8"
+    }
+   ],
+   "signal_sha256": "fcc483f2c1cf8c440707fd698183473d7e47cd9bcc7cf37ccd716cbb81a72d45",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/nstdb/119e00": {
+   "adapter": "nstdb-sparse-II-V2-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/119e00.hea",
+     "sha256": "e2957931f2e0a356f3c1e7dae1bc24795a4a574f86535c0c16ccdc2e3323f98d"
+    },
+    {
+     "path": "external_ecg/nstdb/119e00.dat",
+     "sha256": "776efbffe8a4f3ec2dc86d4cd0c82c2fc659c911412df4b1581d9dd09430d720"
+    }
+   ],
+   "signal_sha256": "bd7fc40c71c47ab7ad2fd01a1b8133fecc1661d0148f23da0799e7cbeade77b1",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/nstdb/119e18": {
+   "adapter": "nstdb-sparse-II-V2-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/119e18.hea",
+     "sha256": "50607b7b8f60487964832bc2b607d6203cd3e37487b07391be275adc0928b862"
+    },
+    {
+     "path": "external_ecg/nstdb/119e18.dat",
+     "sha256": "0d879b564d94bfbf7f8f57e2fe3adb5e2d9f58210aa22c9e16b68b2e112d8129"
+    }
+   ],
+   "signal_sha256": "8e865c4c125435ab9a1d119a3d0e8e2bb04ed88916ccc350e65eaaf6efd5740b",
+   "signal_meta_sha256": "dbc74373aad91f5c134b676c711defde7b2318a232d9d622f8a2d8220ffb3d11"
+  },
+  "standard-default-v0/gudb/subject_23/sitting": {
+   "adapter": "gudb-cables-sparse-II-V2-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_23/sitting/ECG.tsv",
+     "sha256": "f18006620952d6c935da90ee86f0e59252212ca25a461d3d176241123eb37112"
+    }
+   ],
+   "signal_sha256": "609adab37df7da32999fb44df31eb61b8a9f54b38967276db1a94478d79a7ed2",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/gudb/subject_00/maths": {
+   "adapter": "gudb-cables-sparse-II-V2-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_00/maths/ECG.tsv",
+     "sha256": "b38cbdc732fe6b40f23d6cf3f84fa819965a306b68ff50db215a52ff058a6918"
+    }
+   ],
+   "signal_sha256": "284cf6cecf6f73437761649192f13d3ae2a03bec429bf5284f8730f9e123f7af",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/gudb/subject_05/sitting": {
+   "adapter": "gudb-cables-sparse-II-V2-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_05/sitting/ECG.tsv",
+     "sha256": "dad8d9ecdad3d3a8560c9ca695808052246d639c090c8acc132f63ae001f7b6b"
+    }
+   ],
+   "signal_sha256": "bfb43a4923484deec3d4c63e1b5d65fdd8aeaa218dca69f2f7162f3005edd810",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/gudb/subject_07/walking": {
+   "adapter": "gudb-cables-sparse-II-V2-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_07/walking/ECG.tsv",
+     "sha256": "5bc6cb6e85e8a0c756a9ba8d257d8275e71caf0b3859e6a5335f998874399ef0"
+    }
+   ],
+   "signal_sha256": "625d0a99bf740fd818869bff0144ca146d9b5b0306776e3aeaa37fa159a79953",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/gudb/subject_23/walking": {
+   "adapter": "gudb-cables-sparse-II-V2-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_23/walking/ECG.tsv",
+     "sha256": "cd0bcb8e97884bd27b7cdf9b0c62c1847862010f41321ffb91602a845470567c"
+    }
+   ],
+   "signal_sha256": "267f23cb22d32eef52c7b96c7f14c46a6a151d5f514b25d6be642a57ffaca8e4",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "standard-default-v0/gudb/subject_22/maths": {
+   "adapter": "gudb-cables-sparse-II-V2-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_22/maths/ECG.tsv",
+     "sha256": "c6fd67580d030feb25cdf92311f3d4fca474249a53ddd51e3357f9570422785a"
+    }
+   ],
+   "signal_sha256": "cbc5588f05bffbed8fd653868ace7cbb6fb372cc73d4fc8b368f10c3d6180ab9",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "limited-default-v0/qtdb/sel16265": {
+   "adapter": "qtdb-limited-header-names-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "ECG1",
+    "ECG2"
+   ],
+   "shape": [
+    2,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "2cc047e42ad14373d3118d1ea29d3ea3db1303c6a2b4445600f174538de67eca",
+   "signal_meta_sha256": "58f6621f3b2fd350e5e2543bd16b521964c4489f32bf276d5f2c752e24a61099"
+  },
+  "limited-default-v0/qtdb/sel17152": {
+   "adapter": "qtdb-limited-header-names-10s-v1",
+   "window": [
+    149634,
+    152134
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "ECG1",
+    "ECG2"
+   ],
+   "shape": [
+    2,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel17152.hea",
+     "sha256": "a210aa50943a5ed25b23f9fb5a10bc78137b39ae3c7d165861d4f07c3186c25b"
+    },
+    {
+     "path": "qtdb/sel17152.dat",
+     "sha256": "912bc4f9dc2c791d05acb838f83f007278e341c52139fc7f6e05ab69498a4160"
+    },
+    {
+     "path": "qtdb/sel17152.q1c",
+     "sha256": "b2e4df6ebc09a303079fbbe9c92c1123c651c980edd9ea0cba7e54163d53a444"
+    }
+   ],
+   "signal_sha256": "590d488463b24dae7c81cff2f976715207f41b95c00dffd428929de9e259ae86",
+   "signal_meta_sha256": "58f6621f3b2fd350e5e2543bd16b521964c4489f32bf276d5f2c752e24a61099"
+  },
+  "limited-default-v0/edb/e0303": {
+   "adapter": "edb-limited-header-names-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "V2",
+    "V5"
+   ],
+   "shape": [
+    2,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0303.hea",
+     "sha256": "5fe96c14576ca6ed85d577197e9ee9776e811f765c123aeb55fcac252129b2db"
+    },
+    {
+     "path": "edb/e0303.dat",
+     "sha256": "6ef7de2c3fd6b105efd809376acb7a35451509a49928393f36db22eb677bda47"
+    }
+   ],
+   "signal_sha256": "47ccb69840dd1ef6b4caca11e9b9843d37d263ec6618ca45fb7de0f270a4460c",
+   "signal_meta_sha256": "9814f054268e146894e8e2e5c9780220964279029724686518a1895eeae66b09"
+  },
+  "limited-default-v0/edb/e0403": {
+   "adapter": "edb-limited-header-names-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "V5",
+    "V1"
+   ],
+   "shape": [
+    2,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0403.hea",
+     "sha256": "f35a39a0c8793196e7393f25b287cf721e91dc44a8c7f6752731d81aeb733d66"
+    },
+    {
+     "path": "edb/e0403.dat",
+     "sha256": "4d8f354da16bb7fbe3fd39066a67ec9412ec5159b956f87be7dd28c0ce04437d"
+    }
+   ],
+   "signal_sha256": "0688e597a1c603b5d37364b665a3472fbf5c8064fb7c1124c9491d8c16098dbd",
+   "signal_meta_sha256": "5a2a0019cf6597663fca988884f058cf9869df23b371e9f1e59af7b055542284"
+  },
+  "limited-default-v0/but/10": {
+   "adapter": "but-limited-header-names-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "\\muV 0 0 -8688 -22741 0",
+    "\\muV 0 0 7263 17856 0"
+   ],
+   "shape": [
+    2,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/10.hea",
+     "sha256": "ce0ef9e5ead282afdd860172f7832ced3d2946920260b35475983dcaff3f7e4c"
+    },
+    {
+     "path": "external_ecg/but-pdb/10.dat",
+     "sha256": "258ccd732902aa8fca24039ae107dae974454e0fe457d642df631f53c5d5c956"
+    }
+   ],
+   "signal_sha256": "944b8c8805aa83894ee04b51cc852aa974093a34e580384c7ee5386251ed598b",
+   "signal_meta_sha256": "eca9dd686d8bc393b96344a32e363de101cc58dcdea9cc98446ea2f5d04d11c5"
+  },
+  "limited-default-v0/but/07": {
+   "adapter": "but-limited-header-names-10s-v1",
+   "window": [
+    0,
+    3600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "\\muV 0 0 -11269 25523 0",
+    "\\muV 0 0 18129 -28502 0"
+   ],
+   "shape": [
+    2,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/but-pdb/07.hea",
+     "sha256": "18fba153c2ae0cf4c577859712d1822522a78efce7380d156e33944ef8198e40"
+    },
+    {
+     "path": "external_ecg/but-pdb/07.dat",
+     "sha256": "5f5e6b15eeef5dc419021e5b2ac371c1354c64ca0799934c959879dfc26d761b"
+    }
+   ],
+   "signal_sha256": "31b0923297c18dfe44fe74c93c5728a91bb3b373dae9fa159a44207aef1205e9",
+   "signal_meta_sha256": "515d89d401d57efad0dadb83f763e1842f342614b4c7eab6e7c7bec4d8134490"
+  },
+  "limited-default-v0/nstdb/118e_6": {
+   "adapter": "nstdb-limited-header-names-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "MLII",
+    "V1"
+   ],
+   "shape": [
+    2,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/118e_6.hea",
+     "sha256": "f9c5fb86ecf3a8cd40d2b3f9f4b59d02afea3ea45eba3b448eed492aa1467ab4"
+    },
+    {
+     "path": "external_ecg/nstdb/118e_6.dat",
+     "sha256": "6cd17f65bf51bec446cefd3daf6bea9b285d280298fc3abae7c3661a34cb442e"
+    }
+   ],
+   "signal_sha256": "ff9e3e3f5a5d14a08bfbeb6e2ed2b71ad47ef69a709ffd329a208e9dfc91a038",
+   "signal_meta_sha256": "08121daef093e506dd3c5c6f74405916b920b60e42e506c2bd497f81ee63e32c"
+  },
+  "limited-default-v0/nstdb/119e06": {
+   "adapter": "nstdb-limited-header-names-10s-v1",
+   "window": [
+    108000,
+    111600
+   ],
+   "fs": 360.0,
+   "units": "mV",
+   "lead_names": [
+    "MLII",
+    "V1"
+   ],
+   "shape": [
+    2,
+    3600
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/nstdb/119e06.hea",
+     "sha256": "91536e9f794ea4a947e05bcea761fff8b4f444be2a11920f36f49d44eff5d30d"
+    },
+    {
+     "path": "external_ecg/nstdb/119e06.dat",
+     "sha256": "08866e9afb2dc7e0dbcca61044b3da60d1361983f12a7155d77461a0639f0319"
+    }
+   ],
+   "signal_sha256": "1667fda151ae14cd82de2b7c22dcb3db6aa233a82c169eba7f630e43b51a6f7c",
+   "signal_meta_sha256": "08121daef093e506dd3c5c6f74405916b920b60e42e506c2bd497f81ee63e32c"
+  },
+  "limited-default-v0/gudb/subject_23/sitting": {
+   "adapter": "gudb-cables-limited-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "cables_1",
+    "cables_2"
+   ],
+   "shape": [
+    2,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_23/sitting/ECG.tsv",
+     "sha256": "f18006620952d6c935da90ee86f0e59252212ca25a461d3d176241123eb37112"
+    }
+   ],
+   "signal_sha256": "5d3c732e8077ff60a1ab78db8f3b384348ae1905da853ef902ed4cefab81db30",
+   "signal_meta_sha256": "41183f2e466140ca7d7dde106061e46c6650b8a24afaed44da8d818aaa9d955b"
+  },
+  "limited-default-v0/gudb/subject_00/maths": {
+   "adapter": "gudb-cables-limited-10s-v1",
+   "window": [
+    7500,
+    10000
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "cables_1",
+    "cables_2"
+   ],
+   "shape": [
+    2,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "external_ecg/gudb/berndporr-ECG-GUDB-5d05f88/docs/experiment_data/subject_00/maths/ECG.tsv",
+     "sha256": "b38cbdc732fe6b40f23d6cf3f84fa819965a306b68ff50db215a52ff058a6918"
+    }
+   ],
+   "signal_sha256": "70d144fd45ca7f3e82c9c25f580ba4f91c6ac9003a38c4462ccfaa07a38609f2",
+   "signal_meta_sha256": "41183f2e466140ca7d7dde106061e46c6650b8a24afaed44da8d818aaa9d955b"
+  },
+  "limited-default-v0/ludb/50": {
+   "adapter": "ludb-limited-I-II-V2-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "V2"
+   ],
+   "shape": [
+    3,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "b811fd59c052ebd4cbf11ca53a8b84d8d5923049ee7b06277e587b25759244aa",
+   "signal_meta_sha256": "b7db1c67c162c145187a7454af9607aac6b3722eac30bd8ba46c5bf3a1247c41"
+  },
+  "limited-default-v0/ludb/13": {
+   "adapter": "ludb-limited-I-II-V2-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "V2"
+   ],
+   "shape": [
+    3,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.hea",
+     "sha256": "b1a347954e2173ea4c8764c8524eb98846d79d1a34d872f61694a81bb3fb38bd"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.dat",
+     "sha256": "8052dc940203204d5928cdcf359b28a988cd969ac204c3f4fab95f579a82a15e"
+    }
+   ],
+   "signal_sha256": "62f8b66f42719ffadceab6baac20799da9c4ac868542f20da1ce3a82b7ff7088",
+   "signal_meta_sha256": "b7db1c67c162c145187a7454af9607aac6b3722eac30bd8ba46c5bf3a1247c41"
+  },
+  "st-calibrated-pr-v0/edb/e0303": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0303.hea",
+     "sha256": "5fe96c14576ca6ed85d577197e9ee9776e811f765c123aeb55fcac252129b2db"
+    },
+    {
+     "path": "edb/e0303.dat",
+     "sha256": "6ef7de2c3fd6b105efd809376acb7a35451509a49928393f36db22eb677bda47"
+    }
+   ],
+   "signal_sha256": "954f33eaaf201e45a2c81f41237d6cc343dbda53838a6ff0c136ff8db4c66b04",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "st-calibrated-pr-v0/edb/e0403": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0403.hea",
+     "sha256": "f35a39a0c8793196e7393f25b287cf721e91dc44a8c7f6752731d81aeb733d66"
+    },
+    {
+     "path": "edb/e0403.dat",
+     "sha256": "4d8f354da16bb7fbe3fd39066a67ec9412ec5159b956f87be7dd28c0ce04437d"
+    }
+   ],
+   "signal_sha256": "f1194157790f81c242aaddf1ace4df75405ddc7344cf506f35b8087b1f45d1e7",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "st-calibrated-pr-v0/edb/e0112": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0112.hea",
+     "sha256": "b69751f025232b6172d61584cf056595a901219a17dabacfe852e42d73bbfb92"
+    },
+    {
+     "path": "edb/e0112.dat",
+     "sha256": "9df853627b82529e6b831c9a421bd569cba9f07ebd96c8c9c6a5f56870d0ee5e"
+    }
+   ],
+   "signal_sha256": "d82bb293b8650826028495acf281ee4bb36744c3e6cc1253cc4ce44f74862458",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "st-calibrated-pr-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "st-calibrated-pr-v0/ludb/13": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.hea",
+     "sha256": "b1a347954e2173ea4c8764c8524eb98846d79d1a34d872f61694a81bb3fb38bd"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.dat",
+     "sha256": "8052dc940203204d5928cdcf359b28a988cd969ac204c3f4fab95f579a82a15e"
+    }
+   ],
+   "signal_sha256": "7c4afefa21e0ec555b0805c5b031d240ef80263a64e77c438687c9aa194bf249",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "st-calibrated-pr-v0/ptbxl/08000/08238_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/08000/08238_hr.hea",
+     "sha256": "8e14fc4d0323912d27333928b3c7d66c429d905b1bbff3a0b3ed3cfbdd40b9f0"
+    },
+    {
+     "path": "ptb-xl/08000/08238_hr.dat",
+     "sha256": "34d8ecf8926e4bba87eade77cfe840e57dc56c20db8cff358ce5f49886522281"
+    }
+   ],
+   "signal_sha256": "e596b76dde4a46b15b58ab1d2cf0087fd077079e8f00d0a92cc3f9829ada9b0f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "st-adaptive-pr-tp-v0/edb/e0303": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0303.hea",
+     "sha256": "5fe96c14576ca6ed85d577197e9ee9776e811f765c123aeb55fcac252129b2db"
+    },
+    {
+     "path": "edb/e0303.dat",
+     "sha256": "6ef7de2c3fd6b105efd809376acb7a35451509a49928393f36db22eb677bda47"
+    }
+   ],
+   "signal_sha256": "954f33eaaf201e45a2c81f41237d6cc343dbda53838a6ff0c136ff8db4c66b04",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "st-adaptive-pr-tp-v0/edb/e0403": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0403.hea",
+     "sha256": "f35a39a0c8793196e7393f25b287cf721e91dc44a8c7f6752731d81aeb733d66"
+    },
+    {
+     "path": "edb/e0403.dat",
+     "sha256": "4d8f354da16bb7fbe3fd39066a67ec9412ec5159b956f87be7dd28c0ce04437d"
+    }
+   ],
+   "signal_sha256": "f1194157790f81c242aaddf1ace4df75405ddc7344cf506f35b8087b1f45d1e7",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "st-adaptive-pr-tp-v0/edb/e0112": {
+   "adapter": "edb-sparse-II-V2-10s-v1",
+   "window": [
+    75000,
+    77500
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "edb/e0112.hea",
+     "sha256": "b69751f025232b6172d61584cf056595a901219a17dabacfe852e42d73bbfb92"
+    },
+    {
+     "path": "edb/e0112.dat",
+     "sha256": "9df853627b82529e6b831c9a421bd569cba9f07ebd96c8c9c6a5f56870d0ee5e"
+    }
+   ],
+   "signal_sha256": "d82bb293b8650826028495acf281ee4bb36744c3e6cc1253cc4ce44f74862458",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "st-adaptive-pr-tp-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "st-adaptive-pr-tp-v0/ludb/13": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.hea",
+     "sha256": "b1a347954e2173ea4c8764c8524eb98846d79d1a34d872f61694a81bb3fb38bd"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/13.dat",
+     "sha256": "8052dc940203204d5928cdcf359b28a988cd969ac204c3f4fab95f579a82a15e"
+    }
+   ],
+   "signal_sha256": "7c4afefa21e0ec555b0805c5b031d240ef80263a64e77c438687c9aa194bf249",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "st-adaptive-pr-tp-v0/ptbxl/08000/08238_hr": {
+   "adapter": "ptbxl-12lead-hr-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "ptb-xl/08000/08238_hr.hea",
+     "sha256": "8e14fc4d0323912d27333928b3c7d66c429d905b1bbff3a0b3ed3cfbdd40b9f0"
+    },
+    {
+     "path": "ptb-xl/08000/08238_hr.dat",
+     "sha256": "34d8ecf8926e4bba87eade77cfe840e57dc56c20db8cff358ce5f49886522281"
+    }
+   ],
+   "signal_sha256": "e596b76dde4a46b15b58ab1d2cf0087fd077079e8f00d0a92cc3f9829ada9b0f",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-p_model_arbitration-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-p_model_arbitration-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-p_multiple_candidates-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-p_multiple_candidates-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-p_boundary_correction-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-p_boundary_correction-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_onset_change_point-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_onset_change_point-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_bidirectional-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_bidirectional-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_correlated_fusion-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_correlated_fusion-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-qrs_terminal_multiscale-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-qrs_terminal_multiscale-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-qrs_quality_reference-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-qrs_quality_reference-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-representative_robust-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-representative_robust-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-grouping_outliers-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-grouping_outliers-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-p_phasor_candidates-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-p_phasor_candidates-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_boundary_projection-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_boundary_projection-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_sequence_selection-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_sequence_selection-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_projection_offset_only-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_projection_offset_only-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-t_sequence_offset_only-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-t_sequence_offset_only-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-qrs_adaptive_consensus-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-qrs_adaptive_consensus-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-p_pathology_candidates-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-p_pathology_candidates-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  },
+  "refine-atrial_event_validation-v0/ludb/50": {
+   "adapter": "ludb-12lead-10s-v1",
+   "window": [
+    0,
+    5000
+   ],
+   "fs": 500.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    5000
+   ],
+   "source_files": [
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.hea",
+     "sha256": "227e21dbdcbad8993795d0cb5540919049e479d9f892aaa681d39ba1cac065c5"
+    },
+    {
+     "path": "lobachevsky-university-electrocardiography-database-1.0.1/data/50.dat",
+     "sha256": "3123b700148c311db6599dec426f11786591611922fbc652dbc02119c238f62e"
+    }
+   ],
+   "signal_sha256": "98d0121d5449abb735c8ad8366bdc2304a51f59900a34fa14ad5b38e17f92994",
+   "signal_meta_sha256": "ca61c1d27a6aa72f5b16b32cc088d41d48614a0c230dfe9bea114ad9e66da02c"
+  },
+  "refine-atrial_event_validation-v0/qtdb/sel16265": {
+   "adapter": "qtdb-sparse-II-V2-10s-v1",
+   "window": [
+    149883,
+    152383
+   ],
+   "fs": 250.0,
+   "units": "mV",
+   "lead_names": [
+    "I",
+    "II",
+    "III",
+    "aVR",
+    "aVL",
+    "aVF",
+    "V1",
+    "V2",
+    "V3",
+    "V4",
+    "V5",
+    "V6"
+   ],
+   "shape": [
+    12,
+    2500
+   ],
+   "source_files": [
+    {
+     "path": "qtdb/sel16265.hea",
+     "sha256": "4f18443a8dd4d8a89d5b88853f4614851366e3c8fe8fc088f7d5d06f96eb2c3d"
+    },
+    {
+     "path": "qtdb/sel16265.dat",
+     "sha256": "a0b1d867207719c1fa469287400a939fd67777165ebd82377ae1a93728404793"
+    },
+    {
+     "path": "qtdb/sel16265.q1c",
+     "sha256": "1b7c2ed1f74e26495fc7895efc45e63e621e338bbbecbd8a67b0cf87cff61c69"
+    }
+   ],
+   "signal_sha256": "1046e425891ff974d84dbca574282472d97282c71ef4d65ade41f848e68b0290",
+   "signal_meta_sha256": "720e862979167c011feccbccf0515ec6e616bbbdf702a7c012f118f2d7440a46"
+  }
+ }
+}

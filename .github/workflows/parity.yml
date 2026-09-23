@@ -1,0 +1,55 @@
+# Authoritative full-data parity and evaluator gates (document 05 section B).
+# Runs only on the controlled self-hosted runner with datasets mounted read-only.
+name: parity
+
+on:
+  workflow_dispatch:
+    inputs:
+      baseline:
+        description: golden/evaluator baseline id
+        default: phase0-52a339c
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  full-golden:
+    runs-on: [self-hosted, ecg-datasets]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip install -e ./feature_extraction --no-deps
+      - name: Full-tier legacy-bytes parity
+        run: >
+          python snapshot_regression.py --data-root "$ECG_DATA_ROOT" --workers 12
+          check --tier full --baseline-id "${{ inputs.baseline || 'phase0-52a339c' }}"
+          --mode legacy-bytes --with-record --report full-golden-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-golden-report
+          path: full-golden-report.json
+
+  evaluators:
+    runs-on: [self-hosted, ecg-datasets]
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install
+        run: |
+          python -m pip install -r requirements-ci.txt -r requirements-ludb-compare.txt
+          python -m pip install -e ./feature_extraction --no-deps
+      - name: Run pinned evaluators and compare with frozen tolerances
+        run: |
+          python -m benchmarks.harness run --repo-root . --baseline-id candidate --out benchmarks/_candidate
+          python -m benchmarks.harness compare --baseline "benchmarks/baselines/${{ inputs.baseline || 'phase0-52a339c' }}" --candidate benchmarks/_candidate --report evaluator-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluator-report
+          path: evaluator-report.json

@@ -1,3 +1,16 @@
+"""Golden parity harness front end and legacy snapshot comparison helper.
+
+Command line (document 05, section B)::
+
+    python snapshot_regression.py freeze --tier sentinel --baseline-id <id>
+    python snapshot_regression.py check  --tier sentinel --baseline-id <id> \
+        --mode {legacy-bytes,record-bytes,record-crosswalk,canonical-document}
+
+The comparison logic lives in :mod:`benchmarks.golden`; this file stays the
+stable entry point used by CI and release checks.  ``compare_snapshots`` is the
+older row-level drift helper and is kept for its existing callers.
+"""
+
 from __future__ import annotations
 
 from math import isfinite
@@ -88,3 +101,17 @@ def compare_snapshots(
             ),
         }
     return result
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from benchmarks.golden.cli import main as golden_main
+
+    return golden_main(list(argv) if argv is not None else None)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
