@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import numpy as np
 
-from ....models import LeadBeatFeatures, RepresentativeLeadFeatures
+from ...foundation.models import LeadBeatFeatures, RepresentativeLeadFeatures
 
 
 TWELVE_SL_PROFILE_VERSION = "12sl_measurement_profile_v1"

@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 
-from ...models import BeatAnnotation
+from ..foundation.models import BeatAnnotation
 
 
 @dataclass

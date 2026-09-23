@@ -8,7 +8,7 @@ from scipy.ndimage import maximum_filter1d, minimum_filter1d
 from scipy.signal import find_peaks, welch
 
 from ...clinical_rules.config import DEFAULT_DIAGNOSTIC_CONFIG
-from ...models import LeadQuality, STANDARD_12_LEADS
+from ..foundation.models import LeadQuality, STANDARD_12_LEADS
 from ..foundation.numeric import trapezoid
 from ..preprocess import bandpass_filter, highpass_filter, lowpass_filter
 

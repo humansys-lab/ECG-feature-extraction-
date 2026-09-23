@@ -5,7 +5,7 @@ from typing import Iterable, Optional, Sequence
 import numpy as np
 from scipy.signal import find_peaks
 
-from ...models import QRSDetectorResult, QRSCandidateWindow, STANDARD_12_LEADS
+from ..foundation.models import QRSDetectorResult, QRSCandidateWindow, STANDARD_12_LEADS
 from ..preprocess import bandpass_filter, zscore
 
 

@@ -5,7 +5,7 @@ from typing import Dict, Iterable, List, Optional, Tuple
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from ...models import STANDARD_12_LEADS
+from ..foundation.models import STANDARD_12_LEADS
 
 
 _MIN_DELAY_TO_CORRECT_MS = 8.0

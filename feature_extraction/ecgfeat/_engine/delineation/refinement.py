@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from ...models import STANDARD_12_LEADS, WaveBounds
+from ..foundation.models import STANDARD_12_LEADS, WaveBounds
 from ..foundation.numeric import trapezoid
 from ..atrial.p_morphology import measure_p_components
 

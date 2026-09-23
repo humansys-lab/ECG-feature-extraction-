@@ -10,7 +10,7 @@ from typing import Sequence
 
 import numpy as np
 
-from ...models import LeadBeatFeatures, STANDARD_12_LEADS
+from ..foundation.models import LeadBeatFeatures, STANDARD_12_LEADS
 from ..preprocess import notch_filter
 
 

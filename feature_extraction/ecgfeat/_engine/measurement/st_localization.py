@@ -5,7 +5,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from ...models import LeadBeatFeatures, STANDARD_12_LEADS
+from ..foundation.models import LeadBeatFeatures, STANDARD_12_LEADS
 from ..foundation.numeric import trapezoid
 
 

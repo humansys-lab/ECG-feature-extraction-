@@ -7,7 +7,7 @@ import numpy as np
 
 from .dispersion import QTDispersion, summarize_qt_dispersion
 from .paths import build_qt_path_decision
-from ...models import (
+from ..foundation.models import (
     GlobalFeatures,
     GroupFeatures,
     LeadBeatFeatures,

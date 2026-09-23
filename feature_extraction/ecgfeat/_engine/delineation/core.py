@@ -7,7 +7,7 @@ import numpy as np
 
 from ..atrial.core import _composite_raw_p_detection
 from ..measurement.profiles.glasgow import measure_glasgow_profile
-from ...models import LeadBeatFeatures, WaveBounds, STANDARD_12_LEADS
+from ..foundation.models import LeadBeatFeatures, WaveBounds, STANDARD_12_LEADS
 from ..foundation.numeric import trapezoid
 from ..atrial.p_morphology import measure_p_components
 from ..preprocess import bandpass_filter, lowpass_filter

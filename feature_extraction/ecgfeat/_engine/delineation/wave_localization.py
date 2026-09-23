@@ -6,7 +6,7 @@ from typing import Any, Sequence
 import numpy as np
 from scipy.signal import find_peaks
 
-from ...models import LeadBeatFeatures, STANDARD_12_LEADS
+from ..foundation.models import LeadBeatFeatures, STANDARD_12_LEADS
 
 
 @dataclass(frozen=True)

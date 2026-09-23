@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import math
 from typing import Dict, Iterable, Mapping, Optional
 
-from ...models import RepresentativeLeadFeatures
+from ..foundation.models import RepresentativeLeadFeatures
 
 
 HEXAXIAL_ANGLES: Dict[str, float] = {

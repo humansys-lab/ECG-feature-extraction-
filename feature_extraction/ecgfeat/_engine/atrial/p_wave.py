@@ -6,7 +6,7 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 
-from ...models import (
+from ..foundation.models import (
     PWaveBeatAssessment,
     PWaveLeadBoundary,
     STANDARD_12_LEADS,

@@ -6,7 +6,7 @@ infer absent P from RR irregularity, so ectopy/AV block is not equated to AF.
 from __future__ import annotations
 import numpy as np
 
-from ...models import STANDARD_12_LEADS
+from ..foundation.models import STANDARD_12_LEADS
 from ..preprocess import lowpass_filter
 
 

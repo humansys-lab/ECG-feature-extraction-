@@ -6,7 +6,7 @@ from typing import Mapping, Sequence
 import numpy as np
 from scipy.signal import savgol_filter
 
-from ...models import LeadBeatFeatures, LeadQuality, STANDARD_12_LEADS, WaveBounds
+from ..foundation.models import LeadBeatFeatures, LeadQuality, STANDARD_12_LEADS, WaveBounds
 from ..foundation.numeric import trapezoid
 from ..preprocess import lowpass_filter
 from ...refinement import RefinementConfig

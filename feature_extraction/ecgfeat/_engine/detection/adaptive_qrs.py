@@ -9,7 +9,7 @@ import numpy as np
 from scipy.ndimage import uniform_filter1d
 
 from ..preprocess import bandpass_filter
-from ...models import QRSDetectorResult, QRSCandidateWindow, STANDARD_12_LEADS
+from ..foundation.models import QRSDetectorResult, QRSCandidateWindow, STANDARD_12_LEADS
 
 
 def _nearest_distances(values, reference):
