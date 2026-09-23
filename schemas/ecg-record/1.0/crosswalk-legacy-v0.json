@@ -1,0 +1,449 @@
+{
+  "crosswalk_version": 1,
+  "record_schema_version": "1.0.0",
+  "legacy_payload": "prepare_json_export(to_dict(features, profile='debug'), profile='debug', round_ndigits=None) from ecgfeat.compat.export_v0 (frozen in benchmarks/golden)",
+  "oracle_independence": "benchmarks/golden/crosswalk.py re-implements these rules from this file; it imports neither ecgfeat.pipeline.record_builder nor ecgfeat.compat.export_v0.",
+  "axes": {
+    "beats": "record /axes/beats[i] <-> legacy /beats[i] (same order); legacy cells are keyed by (beat_id, lead)",
+    "leads": "record lead name -> legacy slot via /metadata/input_contract/lead_slot_map, else /metadata/limited_lead_capabilities/channel_to_slot, else identity"
+  },
+  "transforms": {
+    "native_sample": "round_half_even(v * acquisition.sample_rate_hz / legacy fs); a result outside [0, sample_count) -> unmeasurable(sample_outside_acquisition)",
+    "round_half_even": "round_half_even(v)",
+    "mv_to_uv": "round_half_even(v * 1000)",
+    "mv_internal_sample_to_uv_ms": "round_half_even(v * 1_000_000 / legacy fs)"
+  },
+  "absence": {
+    "legacy_null_or_nonfinite": {
+      "kind": "unmeasurable",
+      "reason": "measurement_unavailable"
+    },
+    "invariants": [
+      {
+        "when": "p_onset > p_offset (both present)",
+        "withhold": [
+          "p_onset",
+          "p_offset",
+          "p_duration_ms"
+        ],
+        "reason": "fiducial_order_violation"
+      },
+      {
+        "when": "qrs_onset > qrs_offset (both present)",
+        "withhold": [
+          "qrs_onset",
+          "qrs_offset",
+          "qrs_duration_ms"
+        ],
+        "reason": "fiducial_order_violation"
+      },
+      {
+        "when": "qrs_onset <= qrs_offset and r_peak outside [qrs_onset, qrs_offset]",
+        "withhold": [
+          "qrs_onset",
+          "r_peak",
+          "qrs_offset",
+          "qrs_duration_ms"
+        ],
+        "reason": "fiducial_order_violation"
+      },
+      {
+        "when": "any remaining per-beat interval < 0",
+        "withhold": [
+          "<that interval>"
+        ],
+        "reason": "negative_interval"
+      }
+    ],
+    "encoding": "a field whose every cell is absent with one reason uses {kind, reason}; otherwise a sparse {unmeasurable: {<beat_id>|<lead>: reason}} map"
+  },
+  "dense_fields": [
+    {
+      "record": "/delineation/fiducials/p_onset",
+      "legacy_cell_member": "p/onset",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/delineation/fiducials/p_offset",
+      "legacy_cell_member": "p/offset",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/delineation/fiducials/qrs_onset",
+      "legacy_cell_member": "qrs/onset",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/delineation/fiducials/r_peak",
+      "legacy_cell_member": "r_peak_index",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/delineation/fiducials/qrs_offset",
+      "legacy_cell_member": "qrs/offset",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/delineation/fiducials/j_point",
+      "legacy_cell_member": "j_index",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/delineation/fiducials/t_offset",
+      "legacy_cell_member": "t/offset",
+      "transform": "native_sample",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/intervals/p_duration_ms",
+      "legacy_cell_member": "p_dur_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/intervals/pr_interval_ms",
+      "legacy_cell_member": "pr_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/intervals/qrs_duration_ms",
+      "legacy_cell_member": "qrs_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/intervals/qt_interval_ms",
+      "legacy_cell_member": "qt_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/intervals/tpeak_tend_ms",
+      "legacy_cell_member": "tpe_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/intervals/jt_interval_ms",
+      "legacy_cell_member": "jt_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/amplitudes/p_amplitude_uv",
+      "legacy_cell_member": "p_amp_mv",
+      "transform": "mv_to_uv",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/amplitudes/r_amplitude_uv",
+      "legacy_cell_member": "r_amp_mv",
+      "transform": "mv_to_uv",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/amplitudes/s_amplitude_uv",
+      "legacy_cell_member": "s_amp_mv",
+      "transform": "mv_to_uv",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/amplitudes/st_80ms_uv",
+      "legacy_cell_member": "st_80ms_mv",
+      "transform": "mv_to_uv",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/amplitudes/t_amplitude_uv",
+      "legacy_cell_member": "t_amp_mv",
+      "transform": "mv_to_uv",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/amplitudes/u_amplitude_uv",
+      "legacy_cell_member": "u_amp_signed_mv",
+      "transform": "mv_to_uv",
+      "profiles": [
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/areas/qrs_signed_area_uv_ms",
+      "legacy_cell_member": "qrs_signed_area",
+      "transform": "mv_internal_sample_to_uv_ms",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    }
+  ],
+  "scalar_fields": [
+    {
+      "record": "/measurements/global/heart_rate_bpm",
+      "legacy": "/global_features/heart_rate_bpm",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ]
+    },
+    {
+      "record": "/measurements/global/frontal_qrs_axis_deg",
+      "legacy": "/global_features/qrs_axis_deg",
+      "transform": "round_half_even",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "limited": {
+        "kind": "not_applicable",
+        "reason": "input_mode_limited"
+      }
+    },
+    {
+      "record": "/measurements/global/qtc_bazett_ms",
+      "legacy": "/global_features/qtc_bazett_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "all",
+        "debug"
+      ],
+      "limited": {
+        "kind": "not_applicable",
+        "reason": "input_mode_limited"
+      }
+    },
+    {
+      "record": "/measurements/global/qrs_wide_ms",
+      "legacy": "/global_features/qrs_wide_ms",
+      "transform": "round_half_even",
+      "profiles": [
+        "all",
+        "debug"
+      ]
+    }
+  ],
+  "other_mapped": [
+    {
+      "record": "/axes/beats/*/r_sample",
+      "legacy": "/beats/*/r_index",
+      "transform": "native_sample"
+    },
+    {
+      "record": "/quality/record/grade",
+      "legacy": "/metadata/record_quality/record_grade",
+      "transform": "identity"
+    },
+    {
+      "record": "/quality/record/status",
+      "legacy": "/metadata/record_quality/record_grade",
+      "transform": "grade_in_Q0_Q1_usable_else_limited"
+    },
+    {
+      "record": "/quality/leads/<lead>/status",
+      "legacy": "/quality/<slot>/reliable",
+      "transform": "true_usable_else_limited(reason quality_gate)"
+    },
+    {
+      "record": "/provenance/internal_sample_rate_hz",
+      "legacy": "/fs",
+      "transform": "float"
+    },
+    {
+      "record": "/provenance/mains_frequency_hz",
+      "legacy": "/metadata/mains_frequency_hz",
+      "transform": "identity"
+    },
+    {
+      "record": "/debug/legacy_metadata/<key>",
+      "legacy": "/metadata/<key>",
+      "transform": "json_safe",
+      "keys": [
+        "input_contract",
+        "limited_lead_capabilities",
+        "record_quality",
+        "mains_frequency_hz",
+        "refinement_config"
+      ],
+      "profiles": [
+        "debug"
+      ],
+      "call_dependent_members": {
+        "input_contract": [
+          "lead_mode",
+          "supplied_lead_names"
+        ]
+      },
+      "call_dependent_reason": "The record path always passes explicit lead names to the engine (ecg_prepare requires them); the frozen legacy call omits them, as legacy consumers do. Only these two input-contract labels depend on that; every measurement leaf is compared."
+    }
+  ],
+  "record_only": {
+    "/schema_version, /profile, /record_id, /intended_use": "record identity; contract-tested",
+    "/acquisition/*": "input contract (native rate, sample count, leads, unit, capabilities); contract-tested",
+    "/provenance/* (except mapped members)": "reproducibility metadata; contract-tested",
+    "/artifacts/raw_signal": "SHA-256 of little-endian float64 C-order input bytes; contract-tested"
+  },
+  "legacy_section_dispositions": {
+    "fs": "mapped: /provenance/internal_sample_rate_hz (engine rate); native rate is /acquisition/sample_rate_hz",
+    "quality": "partially mapped: per-lead reliability -> /quality/leads/<lead>/status; detailed quality diagnostics are not in record 1.0",
+    "beats": "mapped: beat axis /axes/beats (ids b0001.., r_sample in native samples)",
+    "beat_features": "partially mapped: the 18 summary + 2 all-profile per-beat/per-lead fields above; the other legacy per-beat keys are unpublished in 1.0 (debug/provenance/implementation per document 02 section C)",
+    "representative_leads": "not in record 1.0: implementation intermediate (document 02 section B); legacy consumers read it through ecgfeat.compat.export_v0 during the compatibility window",
+    "groups": "not in record 1.0: implementation intermediate",
+    "global_features": "partially mapped: heart_rate_bpm, qrs_axis_deg, qtc_bazett_ms, qrs_wide_ms; other global values are unpublished in 1.0",
+    "p_wave_assessments": "not in record 1.0: intermediate assessment (document 02 section A.1)",
+    "metadata": "partially mapped: record_quality grade, mains_frequency_hz, and (debug profile) input_contract, limited_lead_capabilities, refinement_config; pacing/QT policy metadata becomes structured policy provenance in the staged pipeline",
+    "interpretation": "removed: interpretation document (separate schema/distribution)",
+    "clinical_interpretation": "removed: interpretation document (separate schema/distribution)",
+    "statement_engine": "removed: interpretation document (separate schema/distribution)",
+    "rhythm_inputs": "not in record 1.0: implementation input for interpretation (document 02 section B)",
+    "morphology_inputs": "not in record 1.0: implementation input for interpretation (document 02 section B)",
+    "reference_metadata": "not in record 1.0: provenance of the legacy exporter"
+  },
+  "ecgagent_consumed_metadata_keys": {
+    "keys": [
+      "acquisition_qc",
+      "algorithm_version",
+      "diagnostic_gate",
+      "duration_sec",
+      "ecgfeat_version",
+      "feature_extraction_version",
+      "global_measurement_paced",
+      "global_p_duration",
+      "global_qt",
+      "initial_measurement_beat_ids",
+      "initial_measurement_group_id",
+      "input_contract",
+      "input_fs",
+      "internal_fs",
+      "lead_order",
+      "lead_reversal",
+      "mains_frequency_hz",
+      "measurement_beat_ids",
+      "measurement_group_paced",
+      "measurement_group_reselect_reason",
+      "measurement_group_reselected",
+      "measurement_pacing_state",
+      "measurement_representative_beat_meta",
+      "metadata_contract",
+      "n_beats",
+      "n_reliable_qt_leads",
+      "p_wave_contract",
+      "paced_beat_fraction",
+      "paced_beat_ids",
+      "pacing_capture_confirmed",
+      "pacing_detection_state",
+      "pacing_evidence_by_beat",
+      "pacing_evidence_quality",
+      "pacing_measurement_effect",
+      "pacing_qrs_rescue",
+      "pacing_qt_rescue_source",
+      "pacing_rescue_applied",
+      "pacing_rescue_capture_fraction",
+      "pacing_rescue_prominence_uv",
+      "pacing_rescue_reason",
+      "pacing_segmentation_effect",
+      "pacing_spike_beat_ids",
+      "pacing_spike_offsets_ms",
+      "pacing_state",
+      "patient_meta",
+      "qrs_detector",
+      "qrs_detector_agreement",
+      "qrs_tail_settling_rescue",
+      "quality_stages",
+      "r_localization",
+      "record_quality",
+      "reliable_qt_leads",
+      "representative_beat_meta",
+      "representative_group_id",
+      "st_measurement",
+      "t_axis_profile_backfill",
+      "t_wave_refinement",
+      "twelve_sl_measurement_profile",
+      "wave_localization"
+    ],
+    "disposition": "not in record 1.0 except record_quality and mains_frequency_hz; ecgagent keeps reading the legacy export through ecgfeat.compat during the compatibility window (see docs/library_design/08_implementation_status.md, consumer migration)"
+  }
+}

@@ -87,3 +87,58 @@ def test_pointer_diff_reports_changed_added_removed():
     report = compare.pointer_diff({"a": 1, "b": {"c": 2}}, {"a": 2, "b": {"d": 2}})
     assert (report["changed"], report["removed"], report["added"]) == (1, 1, 1)
     assert json.dumps(report)
+
+
+def _crosswalk_pair():
+    from tests.test_library_design_review import measured_fixture
+    from feature_extraction.ecgfeat import ecg_emit
+
+    measurements = measured_fixture()
+    features = measurements.legacy_features
+    cell = features.beat_features[0]
+    legacy = {
+        "fs": features.fs,
+        "beats": [{"beat_id": 0, "r_index": 400}],
+        "beat_features": [{
+            "beat_id": 0, "lead": "II", "p": {"onset": 260, "offset": 300}, "qrs": {"onset": 380, "offset": 430},
+            "t": {"offset": 600}, "r_peak_index": cell.r_peak_index, "j_index": 430, "p_dur_ms": 80, "pr_ms": 240,
+            "qrs_ms": 100, "qt_ms": 440, "tpe_ms": 70, "p_amp_mv": .1, "r_amp_mv": 1.2, "s_amp_mv": -.2,
+            "st_80ms_mv": None, "t_amp_mv": .3, "qrs_signed_area": 5.0, "jt_ms": 340, "u_amp_signed_mv": None}],
+        "global_features": {"heart_rate_bpm": 60, "qrs_axis_deg": 40, "qtc_bazett_ms": 440, "qrs_wide_ms": 110},
+        "quality": {"II": {"reliable": True}},
+        "metadata": dict(features.metadata),
+    }
+    records = {p: json.loads(json.dumps(ecg_emit(measurements, profile=p).as_dict())) for p in ("summary", "all", "debug")}
+    return legacy, records
+
+
+def test_crosswalk_accepts_a_faithful_record():
+    from benchmarks.golden.crosswalk import compare_with_crosswalk
+
+    legacy, records = _crosswalk_pair()
+    assert compare_with_crosswalk(legacy, records) == []
+
+
+@pytest.mark.parametrize("mutation", ["value", "reason", "missing_field", "lead_quality"])
+def test_crosswalk_detects_mutations(mutation):
+    from benchmarks.golden.crosswalk import compare_with_crosswalk
+
+    legacy, records = _crosswalk_pair()
+    summary = records["summary"]
+    if mutation == "value":
+        summary["measurements"]["intervals"]["qrs_duration_ms"]["values"][0][0] += 1
+    elif mutation == "reason":
+        summary["measurements"]["amplitudes"]["st_80ms_uv"]["absence"] = {"kind": "unmeasurable", "reason": "low_snr"}
+    elif mutation == "missing_field":
+        del summary["delineation"]["fiducials"]["j_point"]
+    else:
+        summary["quality"]["leads"]["sensor"] = {"status": "limited", "reason": "quality_gate"}
+    assert compare_with_crosswalk(legacy, records)
+
+
+def test_crosswalk_oracle_is_independent_of_builder_and_exporter():
+    from pathlib import Path
+
+    source = Path("benchmarks/golden/crosswalk.py").read_text()
+    assert "record_builder" not in source.split('"""', 2)[2]
+    assert "export_v0" not in source.split('"""', 2)[2]
