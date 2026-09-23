@@ -5,28 +5,10 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ._engine.atrial.core import (
-    _classify_af_afl,
-    build_qrst_subtracted_residual,
-    compute_organized_p_ratio,
-    compute_pr_dispersion_ms,
-    extract_atrial_events,
-)
-from ._engine.atrial.p_wave import (
-    PWaveConfig,
-    backfill_missing_p_from_robust_engine,
-    build_p_wave_assessments,
-    finalize_p_wave_states,
-    summarize_p_wave_assessments,
-)
-from ._engine.beats.grouping import build_beat_annotations, cluster_beats
+from ._engine.atrial.p_wave import finalize_p_wave_states, summarize_p_wave_assessments
 from ._engine.beats.representative import build_representative_beats_with_meta
-from ._engine.delineation.core import apply_systematic_qrs_tail_settling_rescue, delineate_beats
-from ._engine.delineation.r_localization import apply_hybrid_r_localization
-from ._engine.delineation.refinement import correct_p_boundaries
+from ._engine.delineation.core import delineate_beats
 from ._engine.delineation.t_refinement import refine_t_wave_boundaries
-from ._engine.delineation.wave_localization import apply_hybrid_wave_localization
-from ._engine.detection.qrs import detect_qrs_multilead_with_meta
 from ._engine.foundation.numeric import _finite_float
 from ._engine.measurement.features import (
     _axis_delta_deg,
@@ -42,14 +24,12 @@ from ._engine.measurement.features import (
 from ._engine.measurement.profiles.twelve_sl import apply_twelve_sl_measurement_profile
 from ._engine.measurement.st_baseline import adaptive_st_signal, calibrated_st_signal
 from ._engine.measurement.st_localization import apply_hybrid_st_measurement
-from ._engine.preprocess import lowpass_filter
-from ._engine.quality.acquisition import apply_channel_delay_compensation, assess_acquisition_chain
+from ._engine.quality.acquisition import apply_channel_delay_compensation
 from ._engine.quality.signal import (
     build_diagnostic_gate,
     compute_adjacent_precordial_correlations,
     compute_qrs_detector_agreement,
     remove_pacing_spikes,
-    validate_pacing_spikes_against_qrs,
 )
 from .clinical_rules.engine import analyze_clinical
 from .interpret import interpret
@@ -68,7 +48,6 @@ from .pipeline.policies.lead_integrity import (
     _probable_limb_lead_reversal,
 )
 from .pipeline.policies.pacing import (
-    _PACING_QRS_RESCUE_MIN_CAPTURE_BEATS,
     _borderline_paced_qrs_wide_offset_override_ms,
     _build_pacing_evidence_by_beat,
     _dominant_paced_wide_qrs_override_ms,
@@ -80,26 +59,16 @@ from .pipeline.policies.pacing import (
     _overwide_paced_qrs_raw_consensus_override_ms,
     _overwide_pacing_qrs_override_ms,
     _overwide_qrs_pacing_like_context,
-    _paced_beat_fraction,
-    _pacing_capture_alignment_confirmed,
     _pacing_measurement_effect,
-    _pacing_qrs_cleaned_single_lead_rescue,
-    _pacing_qrs_rescue_evidence,
     _pacing_segmentation_effect,
     _raw_pacing_qrs_underestimate_override_ms,
     _secondary_paced_wide_group_qrs_override_ms,
-    _selected_group_paced_majority,
-    _try_attenuated_pacing_rescue,
     _wide_qrs_pacing_like_context,
 )
 from .pipeline.policies.qt import (
     _apply_qt_reject_gate,
     _rescue_intermittent_paced_qt_from_native,
     _rescue_qt_after_qrs_tail_settling,
-)
-from .pipeline.stages.beats import (
-    _refine_measurement_group_after_delineation,
-    _select_measurement_group,
 )
 from .pipeline.stages.measurement import (
     _REGULAR_NARROW_PR_CORE_MAX_MS,
@@ -114,12 +83,10 @@ from .pipeline.stages.measurement import (
 )
 from .refinement import RefinementConfig
 from .rhythm_rules import (
-    assess_pacing_evidence_quality,
     build_measurement_availability,
     classify_pacing_context,
     classify_post_pause_or_interpolated_beats,
     detect_av_block_availability_flags,
-    detect_pacing_failures,
     detect_pauses_and_av_block,
     detect_preexcitation,
     select_measurement_beat_ids,
@@ -197,465 +164,58 @@ class ECGFeatureExtractor:
             amplitude_unit=amplitude_unit,
             gain_uv_per_lsb=gain_uv_per_lsb,
             prior_features=prior_features,
-            stop_after='quality',
+            stop_after='atrial',
         ).context
-        ecg_an = context.input.ecg_an
-        ecg_det = context.input.ecg_det
-        pacing_result = context.quality.pacing_result
+        paced_beat_ids = context.ventricular.paced_beat_ids
+        measurement_group_paced = context.beats.measurement_group_paced
+        beat_features = context.delineation.beat_features
+        measurement_beat_ids = context.beats.measurement_beat_ids
+        dominant_group_id = context.beats.dominant_group_id
+        ecg_measure = context.ventricular.ecg_measure
+        r_locs = context.ventricular.r_locs
         fs_run = context.input.fs_run
-        qrs_options = context.quality.qrs_options
-        quality = context.quality.quality
-        ecg_rs = context.input.ecg_rs
-        pacing_detection_cache = context.quality.pacing_detection_cache
-        input_contract = context.input.input_contract
         representative_options = context.quality.representative_options
         rep_left_ms = context.quality.rep_left_ms
+        pacing_capture_confirmed = context.ventricular.pacing_capture_confirmed
         refinement_kwargs = context.quality.refinement_kwargs
-        available_leads = context.input.available_leads
+        ecg_rs = context.input.ecg_rs
+        pacing_result = context.ventricular.pacing_result
+        acquisition_qc = context.ventricular.acquisition_qc
+        approved_delays = context.ventricular.approved_delays
         mains_freq_run = context.input.mains_freq_run
+        quality = context.quality.quality
+        available_leads = context.input.available_leads
+        beat_groups = context.beats.beat_groups
+        confirmed_pacing_context = context.beats.confirmed_pacing_context
+        measurement_reselect_reason = context.beats.measurement_reselect_reason
+        qrs_tail_settling_rescue = context.delineation.qrs_tail_settling_rescue
+        paced_fraction = context.beats.paced_fraction
+        af_afl_summary = context.atrial.af_afl_summary
+        atrial_residual = context.atrial.atrial_residual
+        p_wave_assessments = context.atrial.p_wave_assessments
+        pristine_p_wave_states = context.atrial.pristine_p_wave_states
+        beats = context.beats.beats
+        atrial_events = context.atrial.atrial_events
+        pacing_evidence_quality = context.ventricular.pacing_evidence_quality
+        rr_ms = context.atrial.rr_ms
         lead_reversal = context.quality.lead_reversal
+        paced_qrs_floor_beat_ids = context.beats.paced_qrs_floor_beat_ids
+        segmentation_paced_beat_ids = context.beats.segmentation_paced_beat_ids
+        pacing_spike_beat_ids = context.ventricular.pacing_spike_beat_ids
+        pacing_spike_offsets_samples = context.ventricular.pacing_spike_offsets_samples
+        ecg_detect = context.ventricular.ecg_detect
         record_quality = context.quality.record_quality
+        input_contract = context.input.input_contract
         raw_record_quality = context.quality.raw_record_quality
-        ecg_measure = ecg_an
-        ecg_detect = ecg_det
-        pre_despike_qrs_result = None
-        if pacing_result["spike_times"]:
-            if (
-                bool(pacing_result.get("paced", False))
-                and str(pacing_result.get("state") or "off") == "on"
-                and len(pacing_result["spike_times"]) >= _PACING_QRS_RESCUE_MIN_CAPTURE_BEATS
-            ):
-                pre_despike_qrs_result = detect_qrs_multilead_with_meta(ecg_det, fs_run, **qrs_options)
-            ecg_measure = remove_pacing_spikes(ecg_an, pacing_result["spike_times"], fs_run)
-            ecg_detect = lowpass_filter(ecg_measure, fs_run, cutoff_hz=self.lp_hz, order=4)
-
-        qrs_result = detect_qrs_multilead_with_meta(ecg_detect, fs_run, **qrs_options)
-        r_locs = np.asarray(qrs_result.r_locs, dtype=int)
-        pacing_qrs_rescue = _pacing_qrs_rescue_evidence(
-            pacing_result=pacing_result,
-            pre_despike_qrs_result=pre_despike_qrs_result,
-            despiked_qrs_result=qrs_result,
-            fs=fs_run,
-        )
-        if pacing_qrs_rescue["applied"]:
-            rescued_qrs_result, rescue_detail = _pacing_qrs_cleaned_single_lead_rescue(
-                ecg_detect=ecg_detect,
-                fs=fs_run,
-                quality=quality,
-                pacing_result=pacing_result,
-                pre_despike_qrs_result=pre_despike_qrs_result,
-            )
-            if rescued_qrs_result is None:
-                pacing_qrs_rescue = {
-                    **pacing_qrs_rescue,
-                    "applied": False,
-                    "reason": "no_regular_cleaned_single_lead_confirmation",
-                }
-            else:
-                pacing_qrs_rescue = {**pacing_qrs_rescue, **rescue_detail}
-                qrs_result = rescued_qrs_result
-                r_locs = np.asarray(qrs_result.r_locs, dtype=int)
-        if pacing_result["spike_times"]:
-            raw_spike_times = [int(s) for s in pacing_result["spike_times"]]
-            pacing_result = validate_pacing_spikes_against_qrs(
-                ecg_rs,
-                fs_run,
-                raw_spike_times,
-                r_locs,
-                pacing_result,
-            )
-            validated_spike_times = [int(s) for s in pacing_result.get("spike_times", [])]
-            if (
-                pacing_result.get("rejection_reason") == "qrs_edge_artifact"
-                and validated_spike_times != raw_spike_times
-            ):
-                ecg_measure = ecg_an
-                ecg_detect = ecg_det
-                if validated_spike_times:
-                    ecg_measure = remove_pacing_spikes(ecg_an, validated_spike_times, fs_run)
-                    ecg_detect = lowpass_filter(ecg_measure, fs_run, cutoff_hz=self.lp_hz, order=4)
-                qrs_result = detect_qrs_multilead_with_meta(ecg_detect, fs_run, **qrs_options)
-                r_locs = np.asarray(qrs_result.r_locs, dtype=int)
-                if not validated_spike_times:
-                    pacing_qrs_rescue = {
-                        **pacing_qrs_rescue,
-                        "applied": False,
-                        "reason": "pacing_validation_rejected_qrs_edge_artifact",
-                    }
-        if self.enable_pacing:
-            (
-                pacing_result,
-                ecg_measure,
-                ecg_detect,
-                qrs_result,
-                r_locs,
-            ) = _try_attenuated_pacing_rescue(
-                ecg_rs=ecg_rs,
-                ecg_an=ecg_an,
-                fs_run=fs_run,
-                lp_hz=self.lp_hz,
-                current_pacing_result=pacing_result,
-                current_ecg_measure=ecg_measure,
-                current_ecg_detect=ecg_detect,
-                current_qrs_result=qrs_result,
-                current_r_locs=r_locs,
-                pacing_detection_cache=pacing_detection_cache,
-            )
-        acquisition_qc = assess_acquisition_chain(
-            ecg_rs,
-            fs_run,
-            r_locs,
-            quality,
-            # The swap detector has no `severely_inconsistent` key, so passing
-            # it here silently disabled the LEAD_CONFIGURATION_INVALID reject.
-            # The limb-equation residual lives in the input contract.
-            limb_lead_consistency=input_contract.get("limb_lead_consistency"),
-        )
-        acquisition_qc["automatic_compensation_applied"] = False
-        acquisition_qc["automatic_compensation_rejected_reason"] = None
-        approved_delays = dict(
-            acquisition_qc.get("approved_delay_samples") or {}
-        )
-        if approved_delays and not pacing_result.get("spike_times"):
-            compensated_measure, applied_measure = apply_channel_delay_compensation(
-                ecg_measure,
-                approved_delays,
-            )
-            compensated_detect, _ = apply_channel_delay_compensation(
-                ecg_detect,
-                approved_delays,
-            )
-            compensated_qrs = detect_qrs_multilead_with_meta(
-                compensated_detect,
-                fs_run,
-                **qrs_options,
-            )
-            compensated_r = np.asarray(compensated_qrs.r_locs, dtype=int)
-            qrs_alignment_ms = None
-            if compensated_r.size == r_locs.size and r_locs.size:
-                qrs_alignment_ms = float(
-                    np.percentile(
-                        np.abs(compensated_r - r_locs),
-                        95,
-                    )
-                    * 1000.0
-                    / float(fs_run)
-                )
-            if (
-                applied_measure
-                and compensated_r.size == r_locs.size
-                and qrs_alignment_ms is not None
-                and qrs_alignment_ms <= 12.0
-            ):
-                ecg_measure = compensated_measure
-                ecg_detect = compensated_detect
-                qrs_result = compensated_qrs
-                r_locs = compensated_r
-                acquisition_qc["automatic_compensation_applied"] = True
-                acquisition_qc["automatic_compensation_leads"] = sorted(
-                    applied_measure
-                )
-                acquisition_qc["post_compensation_qrs_p95_shift_ms"] = (
-                    qrs_alignment_ms
-                )
-            else:
-                acquisition_qc["automatic_compensation_rejected_reason"] = (
-                    "qrs_detection_not_stable_after_compensation"
-                )
-                acquisition_qc["post_compensation_qrs_p95_shift_ms"] = (
-                    qrs_alignment_ms
-                )
-        elif approved_delays and pacing_result.get("spike_times"):
-            acquisition_qc["automatic_compensation_rejected_reason"] = (
-                "pacing_spikes_present"
-            )
-        pacing_failures = detect_pacing_failures(
-            spike_times=[int(s) for s in pacing_result["spike_times"]],
-            qrs_times=[int(r) for r in r_locs],
-            fs=fs_run,
-        )
-        pacing_spike_beat_ids = []
-        pacing_spike_offsets_samples = []
-        if pacing_result["spike_times"]:
-            for beat_id, r in enumerate(r_locs):
-                spike_lo = int(r - 0.08 * fs_run)
-                spike_hi = int(r + 0.02 * fs_run)
-                nearby_spikes = [
-                    int(s)
-                    for s in pacing_result["spike_times"]
-                    if spike_lo <= int(s) <= spike_hi
-                ]
-                if nearby_spikes:
-                    nearest_spike = min(nearby_spikes, key=lambda s: abs(int(s) - int(r)))
-                    pacing_spike_beat_ids.append(int(beat_id))
-                    pacing_spike_offsets_samples.append(int(nearest_spike) - int(r))
-        pacing_evidence_quality = assess_pacing_evidence_quality(
-            pacing_result=pacing_result,
-            spike_times=pacing_result["spike_times"],
-            qrs_count=len(r_locs),
-            pacing_spike_beat_ids=pacing_spike_beat_ids,
-            spike_offsets_samples=pacing_spike_offsets_samples,
-            pacing_failures=pacing_failures,
-            fs=fs_run,
-        )
-        pacing_capture_confirmed = _pacing_capture_alignment_confirmed(
-            pacing_result,
-            pacing_spike_offsets_samples,
-            fs_run,
-            pacing_evidence_quality,
-        )
-        paced_beat_ids = (
-            list(pacing_spike_beat_ids)
-            if pacing_capture_confirmed or not bool(pacing_result.get("paced", False))
-            else []
-        )
-        beat_groups = (
-            cluster_beats(ecg_measure, r_locs, fs_run, paced_beat_ids=paced_beat_ids,
-                          **({"preserve_outliers": True} if self.refinement.grouping_outliers else {}))
-            if self.compute_grouping
-            else {1: list(range(len(r_locs)))}
-        )
-        dominant_group_id, measurement_beat_ids = _select_measurement_group(beat_groups, paced_beat_ids)
-        measurement_group_paced = bool(
-            pacing_result.get("paced", False)
-            and _selected_group_paced_majority(measurement_beat_ids, paced_beat_ids)
-        )
-        confirmed_pacing_context = bool(measurement_group_paced or pacing_capture_confirmed)
-        paced_fraction = _paced_beat_fraction(paced_beat_ids, len(r_locs))
-        localized_pacing_segmentation = bool(
-            pacing_capture_confirmed
-            and (
-                measurement_group_paced
-                or paced_fraction <= 0.50
-            )
-        )
-        segmentation_paced_beat_ids = (
-            list(paced_beat_ids)
-            if localized_pacing_segmentation
-            else []
-        )
-        paced_qrs_floor_beat_ids = (
-            list(segmentation_paced_beat_ids)
-            if localized_pacing_segmentation and pacing_capture_confirmed
-            else []
-        )
-        beats = build_beat_annotations(r_locs, fs_run, beat_groups, paced_beat_ids=paced_beat_ids)
-        _representative, representative_meta = build_representative_beats_with_meta(
-            ecg_measure,
-            r_locs,
-            beat_groups,
-            fs_run,
-            paced_beat_ids=paced_beat_ids,
-            **representative_options,
-        )
-        beat_features = delineate_beats(
-            ecg_measure, fs_run, r_locs,
-            beat_groups=beat_groups,
-            rep_beats=_representative,
-            paced_beat_ids=segmentation_paced_beat_ids,
-            paced_qrs_floor_beat_ids=paced_qrs_floor_beat_ids,
-            pacing_spike_times=pacing_result["spike_times"],
-            quality=quality,
-            qrs_low_slope_guard=qrs_result.fallback_used,
-            rep_left_ms=rep_left_ms,
-            **refinement_kwargs,
-        )
-        if self.enable_hybrid_r_localization:
-            apply_hybrid_r_localization(
-                beat_features,
-                localization_ecg=ecg_detect,
-                r_locs=r_locs,
-                fs=fs_run,
-            )
-        if self.enable_hybrid_wave_localization:
-            apply_hybrid_wave_localization(
-                beat_features,
-                localization_ecg=ecg_measure,
-                r_locs=r_locs,
-                fs=fs_run,
-            )
-        if self.enable_hybrid_st_measurement:
-            apply_hybrid_st_measurement(
-                beat_features,
-                measurement_ecg=ecg_measure,
-                r_locs=r_locs,
-                fs=fs_run,
-                quality=quality,
-            )
-        initial_measurement_group_id = dominant_group_id
-        initial_measurement_beat_ids = list(measurement_beat_ids)
-        (
-            dominant_group_id,
-            measurement_beat_ids,
-            measurement_reselect_reason,
-        ) = _refine_measurement_group_after_delineation(
-            beat_groups,
-            paced_beat_ids,
-            dominant_group_id,
-            measurement_beat_ids,
-            beat_features,
-            representative_meta,
-        )
-        measurement_group_paced = bool(
-            pacing_result.get("paced", False)
-            and _selected_group_paced_majority(measurement_beat_ids, paced_beat_ids)
-        )
-        confirmed_pacing_context = bool(measurement_group_paced or pacing_capture_confirmed)
-        qrs_tail_settling_rescue: Dict[str, Any] = {
-            "applied": False,
-            "reason": "confirmed_pacing_context"
-            if confirmed_pacing_context
-            else "not_evaluated",
-        }
-        if not confirmed_pacing_context:
-            beat_features, qrs_tail_settling_rescue = (
-                apply_systematic_qrs_tail_settling_rescue(
-                    beat_features,
-                    ecg=ecg_measure,
-                    fs=fs_run,
-                    quality=quality,
-                    r_locs=r_locs,
-                    selected_beat_ids=measurement_beat_ids,
-                )
-            )
-            if qrs_tail_settling_rescue.get("applied"):
-                if self.enable_hybrid_r_localization:
-                    apply_hybrid_r_localization(
-                        beat_features,
-                        localization_ecg=ecg_detect,
-                        r_locs=r_locs,
-                        fs=fs_run,
-                    )
-                if self.enable_hybrid_wave_localization:
-                    apply_hybrid_wave_localization(
-                        beat_features,
-                        localization_ecg=ecg_measure,
-                        r_locs=r_locs,
-                        fs=fs_run,
-                    )
-                if self.enable_hybrid_st_measurement:
-                    apply_hybrid_st_measurement(
-                        beat_features,
-                        measurement_ecg=ecg_measure,
-                        r_locs=r_locs,
-                        fs=fs_run,
-                        quality=quality,
-                    )
-        # Refine T only after the QRS terminal-tail decision.  T onset is a
-        # guard for that rescue, so changing it earlier creates a circular
-        # dependency and can suppress a valid late QRS offset.
-        t_fusion_audit: List[Dict[str, Any]] = []
-        if self.enable_t_wave_refinement:
-            refine_t_wave_boundaries(
-                beat_features,
-                measurement_ecg=ecg_measure,
-                r_locs=r_locs,
-                fs=fs_run,
-                quality=quality,
-                **({"fusion_audit": t_fusion_audit} if (self.refinement.t_correlated_fusion
-                    or self.refinement.t_boundary_projection or self.refinement.t_sequence_selection
-                    or self.refinement.t_projection_offset_only or self.refinement.t_sequence_offset_only) else {}),
-                **refinement_kwargs,
-            )
-            if self.enable_hybrid_st_measurement:
-                apply_hybrid_st_measurement(
-                    beat_features,
-                    measurement_ecg=ecg_measure,
-                    r_locs=r_locs,
-                    fs=fs_run,
-                    quality=quality,
-                )
-        p_config_kwargs = dict(model_arbitration=self.refinement.p_model_arbitration,
-                               multiple_candidates=self.refinement.p_multiple_candidates)
-        if available_leads is not None:
-            p_config_kwargs.update(minimum_informative_leads=min(2, len(available_leads)),
-                                   minimum_independent_groups=1)
-        p_wave_assessments = build_p_wave_assessments(
-            ecg_measure,
-            fs_run,
-            r_locs,
-            beat_features,
-            quality,
-            beat_groups=beat_groups,
-            acquisition_qc=acquisition_qc,
-            **({"config": PWaveConfig(**p_config_kwargs)}
-               if available_leads is not None or self.refinement.p_model_arbitration or self.refinement.p_multiple_candidates else {}),
-        )
-        atrial_events = extract_atrial_events(beat_features, quality, r_locs, fs_run, ecg=ecg_measure)
-        atrial_validation_audit: Dict[str, Any] = {}
-        if self.refinement.atrial_event_validation:
-            from ._engine.atrial.validation import validate_atrial_events
-            atrial_events = validate_atrial_events(atrial_events, ecg_measure, fs_run, beat_features,
-                                                  quality, audit=atrial_validation_audit)
-        atrial_residual = build_qrst_subtracted_residual(
-            ecg_measure,
-            fs_run,
-            r_locs,
-            beat_features,
-            quality,
-        )
-        rr_ms = [
-            float(r_locs[idx + 1] - r_locs[idx]) * 1000.0 / float(fs_run)
-            for idx in range(max(0, len(r_locs) - 1))
-        ]
-        organized_p_ratio = compute_organized_p_ratio(atrial_events, len(r_locs))
-        pr_dispersion_ms = compute_pr_dispersion_ms(atrial_events)
-        af_afl_summary = _classify_af_afl(
-            rr_ms, atrial_residual, organized_p_ratio, pr_dispersion_ms
-        )
-        # Snapshot the boundary-quality verdict before the rhythm verdict is
-        # stamped onto it.  `finalize_p_wave_states` is destructive: on an AF or
-        # flutter call it forces `accepted=False` on every beat with no pristine
-        # copy retained, so it cannot be re-run to a correct answer later (a
-        # second call finds `accepted` already False and lands every beat in
-        # OVERLAP_UNCERTAIN).  The flutter verdict read here can still be
-        # retracted further down (`flutter_suppressed_by`), and that retraction
-        # has to be able to give these beats their P waves back -- hence the
-        # snapshot.  See the restore below.
-        pristine_p_wave_states = [
-            (
-                assessment.accepted,
-                list(assessment.reject_reasons),
-                assessment.p_state,
-            )
-            for assessment in p_wave_assessments
-        ]
-        finalize_p_wave_states(p_wave_assessments, af_afl_summary)
-        p_corrections = []
-        if self.refinement.p_boundary_correction:
-            p_corrections = correct_p_boundaries(beat_features, p_wave_assessments, ecg_measure, fs_run)
-            if p_corrections:
-                if self.enable_hybrid_st_measurement:
-                    # Hybrid ST uses the accepted P offset to choose its PR
-                    # baseline. Correcting P invalidates that measurement.
-                    apply_hybrid_st_measurement(
-                        beat_features, measurement_ecg=ecg_measure,
-                        r_locs=r_locs, fs=fs_run, quality=quality,
-                    )
-                # Rebuild dependent atrial evidence once, then reapply the
-                # rhythm gate to the pristine boundary verdict (not a verdict
-                # already destructively finalized by the previous rhythm).
-                atrial_events = extract_atrial_events(beat_features, quality, r_locs, fs_run, ecg=ecg_measure)
-                if self.refinement.atrial_event_validation:
-                    atrial_events = validate_atrial_events(atrial_events, ecg_measure, fs_run, beat_features,
-                                                          quality, audit=atrial_validation_audit)
-                organized_p_ratio = compute_organized_p_ratio(atrial_events, len(r_locs))
-                pr_dispersion_ms = compute_pr_dispersion_ms(atrial_events)
-                af_afl_summary = _classify_af_afl(rr_ms, atrial_residual, organized_p_ratio, pr_dispersion_ms)
-                for assessment, (accepted, reasons, state) in zip(p_wave_assessments, pristine_p_wave_states):
-                    assessment.accepted, assessment.reject_reasons, assessment.p_state = accepted, list(reasons), state
-                finalize_p_wave_states(p_wave_assessments, af_afl_summary)
-        # Ordering note: the backfill must stay downstream of a finalize, not be
-        # deferred to the restore below.  Its AF-safety rests entirely on the
-        # `assessment.accepted` gate, which only excludes AF_LIKE /
-        # ORGANIZED_ATRIAL_ACTIVITY beats once a finalize has stamped them; run
-        # against the raw boundary verdict it would backfill P waves onto
-        # fibrillating beats.  It also writes `feature.p`, which feeds
-        # `_physiologic_pr_core_from_beats` and therefore the retraction decision
-        # itself, so moving it would make that decision circular.
-        backfill_missing_p_from_robust_engine(
-            beat_features, p_wave_assessments, ecg_measure, fs_run
-        )
+        qrs_result = context.ventricular.qrs_result
+        pacing_qrs_rescue = context.ventricular.pacing_qrs_rescue
+        representative_meta = context.beats.representative_meta
+        initial_measurement_group_id = context.beats.initial_measurement_group_id
+        initial_measurement_beat_ids = context.beats.initial_measurement_beat_ids
+        pacing_failures = context.ventricular.pacing_failures
+        p_corrections = context.atrial.p_corrections
+        atrial_validation_audit = context.atrial.atrial_validation_audit
+        t_fusion_audit = context.delineation.t_fusion_audit
         paced_beat_id_set = {int(beat_id) for beat_id in paced_beat_ids}
         measurement_beat_features = (
             [
