@@ -10,11 +10,27 @@ import re
 from typing import Any, Mapping
 
 from ..errors import RecordValidationError, AddressNotFoundError, AddressSyntaxError
+from .registry import check_ceiling
 
 
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise RecordValidationError(message, code="invalid_record_contract")
+
+
+def _check_fiducial_order(fiducials: Mapping[str, Any]) -> None:
+    """Published landmarks of one wave must be ordered: onset <= peak <= offset."""
+
+    for chain in (("p_onset", "p_offset"), ("qrs_onset", "r_peak", "qrs_offset")):
+        present = [fiducials[name]["values"] for name in chain
+                   if name in fiducials and fiducials[name]["axes"] == ["beat", "lead"]]
+        if len(present) != len(chain):
+            continue
+        for i, row in enumerate(present[0]):
+            for j in range(len(row)):
+                values = [matrix[i][j] for matrix in present]
+                ordered = [value for value in values if value is not None]
+                _require(ordered == sorted(ordered), f"{'/'.join(chain)}: fiducial order violated at beat {i}, lead {j}")
 
 
 def validate_document(record: Any, *, strict: bool = True) -> None:
@@ -79,6 +95,9 @@ def validate_document(record: Any, *, strict: bool = True) -> None:
             _require(isinstance(evidence, list), f"{name}: evidence must be an array")
             if validation["status"] != "unvalidated":
                 _require(bool(evidence), f"{name}: validation claim requires evidence")
+            if strict:
+                root = "/delineation/fiducials" if group == "fiducials" else f"/measurements/{group}"
+                check_ceiling(f"{root}/{name}", validation["status"], record.schema_version)
             ref = field["provenance_ref"]
             _require(isinstance(ref, str) and ref.startswith("/provenance/"), f"{name}: invalid provenance pointer")
             if strict:
@@ -124,6 +143,8 @@ def validate_document(record: Any, *, strict: bool = True) -> None:
                     _require(0 <= value < acq["sample_count"], f"{name}: sample outside acquisition")
                 if strict and group == "intervals":
                     _require(value >= 0, f"{name}: negative interval")
+    if strict:
+        _check_fiducial_order(doc["delineation"].get("fiducials", {}))
     for artifact in doc["artifacts"].values():
         if artifact is None:
             continue

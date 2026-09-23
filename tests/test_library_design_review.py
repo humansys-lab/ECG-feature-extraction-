@@ -284,8 +284,30 @@ def test_internal_coordinates_are_mapped_to_original_signal_and_unknown_leads():
 
 def test_zero_r_sample_is_not_replaced_by_detection_fiducial():
     measurements = measured_fixture()
-    measurements.legacy_features.beat_features[0].r_peak_index = 0
+    cell = measurements.legacy_features.beat_features[0]
+    cell.r_peak_index = 0
+    cell.qrs.onset = 0  # keep the published onset <= R <= offset invariant
     assert query_measurement(ecg_emit(measurements), "r_peak", lead="sensor", beat=0).value == 0
+
+
+def test_r_peak_outside_its_qrs_window_is_withheld_not_published():
+    measurements = measured_fixture()
+    measurements.legacy_features.beat_features[0].r_peak_index = 0  # before QRS onset 380
+    record = ecg_emit(measurements)
+    for name in ("r_peak", "qrs_onset", "qrs_offset", "qrs_duration_ms"):
+        result = query_measurement(record, name, lead="sensor", beat=0)
+        assert result.value is None and result.absence.reason == "fiducial_order_violation", name
+
+
+def test_inverted_qrs_and_negative_interval_become_unmeasurable():
+    measurements = measured_fixture()
+    cell = measurements.legacy_features.beat_features[0]
+    cell.qrs.onset, cell.qrs.offset, cell.qrs_ms = 432, 428, -8.0
+    cell.pr_ms = -4.0
+    record = ecg_emit(measurements)
+    assert query_measurement(record, "qrs_duration_ms", lead="sensor", beat=0).absence.reason == "fiducial_order_violation"
+    assert query_measurement(record, "r_peak", lead="sensor", beat=0).value is not None
+    assert query_measurement(record, "pr_interval_ms", lead="sensor", beat=0).absence.reason == "negative_interval"
 
 
 def test_missing_true_r_peak_is_not_replaced_by_detection_fiducial():

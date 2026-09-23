@@ -1,0 +1,468 @@
+{
+  "registry_version": 1,
+  "schema_family": "1.0",
+  "status_vocabulary": {
+    "wire": [
+      "benchmark_validated",
+      "indirectly_validated",
+      "unvalidated",
+      "known_problem"
+    ],
+    "order": [
+      "known_problem",
+      "unvalidated",
+      "indirectly_validated",
+      "benchmark_validated"
+    ],
+    "document_06_aliases": {
+      "validated": "benchmark_validated",
+      "partially_validated": "indirectly_validated"
+    }
+  },
+  "promotion_rule": "A field may carry benchmark_validated or indirectly_validated only if its ceiling allows it, it cites at least one evidence manifest under benchmarks/evidence/, every cited manifest names a tool, a pinned dataset version/hash, a baseline, a metric, an acceptance threshold and a passing result, its validated_for scope covers the field, and it was produced by the current schema major. Promotion is a Validation Owner decision; this registry is the only source of validation status (no call-site override).",
+  "fields": [
+    {
+      "pointer": "/delineation/fiducials/p_onset",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "P-wave delineation is the weakest endpoint in the repository's LUDB/QTDB benchmarks; P waves are frequently missed at short RR (<600 ms) or when the P wave overlaps the preceding T wave."
+      ],
+      "legacy_source": "/beat_features/*/p/onset"
+    },
+    {
+      "pointer": "/delineation/fiducials/p_offset",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "P-wave delineation is the weakest endpoint in the repository's LUDB/QTDB benchmarks; P waves are frequently missed at short RR (<600 ms) or when the P wave overlaps the preceding T wave."
+      ],
+      "legacy_source": "/beat_features/*/p/offset"
+    },
+    {
+      "pointer": "/delineation/fiducials/qrs_onset",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/qrs/onset"
+    },
+    {
+      "pointer": "/delineation/fiducials/r_peak",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/r_peak_index"
+    },
+    {
+      "pointer": "/delineation/fiducials/qrs_offset",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/qrs/offset"
+    },
+    {
+      "pointer": "/delineation/fiducials/j_point",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/j_index"
+    },
+    {
+      "pointer": "/delineation/fiducials/t_offset",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/t/offset"
+    },
+    {
+      "pointer": "/measurements/intervals/p_duration_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "P-wave delineation is the weakest endpoint in the repository's LUDB/QTDB benchmarks; P waves are frequently missed at short RR (<600 ms) or when the P wave overlaps the preceding T wave."
+      ],
+      "legacy_source": "/beat_features/*/p_dur_ms"
+    },
+    {
+      "pointer": "/measurements/intervals/pr_interval_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "P-wave delineation is the weakest endpoint in the repository's LUDB/QTDB benchmarks; P waves are frequently missed at short RR (<600 ms) or when the P wave overlaps the preceding T wave."
+      ],
+      "legacy_source": "/beat_features/*/pr_ms"
+    },
+    {
+      "pointer": "/measurements/intervals/qrs_duration_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "Per-beat per-lead QRS width; the record-level consensus QRS can differ from per-lead widths near 100-120 ms."
+      ],
+      "legacy_source": "/beat_features/*/qrs_ms"
+    },
+    {
+      "pointer": "/measurements/intervals/qt_interval_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "Raw measured interval; it is not formal QT reporting and is not rate corrected."
+      ],
+      "legacy_source": "/beat_features/*/qt_ms"
+    },
+    {
+      "pointer": "/measurements/intervals/tpeak_tend_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/tpe_ms"
+    },
+    {
+      "pointer": "/measurements/intervals/jt_interval_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/beat_features/*/jt_ms"
+    },
+    {
+      "pointer": "/measurements/amplitudes/p_amplitude_uv",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "LUDB distributes amplitude-normalised signals, so LUDB results cannot validate amplitudes.",
+        "P-wave delineation is the weakest endpoint in the repository's LUDB/QTDB benchmarks; P waves are frequently missed at short RR (<600 ms) or when the P wave overlaps the preceding T wave."
+      ],
+      "legacy_source": "/beat_features/*/p_amp_mv"
+    },
+    {
+      "pointer": "/measurements/amplitudes/r_amplitude_uv",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "LUDB distributes amplitude-normalised signals, so LUDB results cannot validate amplitudes."
+      ],
+      "legacy_source": "/beat_features/*/r_amp_mv"
+    },
+    {
+      "pointer": "/measurements/amplitudes/s_amplitude_uv",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "LUDB distributes amplitude-normalised signals, so LUDB results cannot validate amplitudes."
+      ],
+      "legacy_source": "/beat_features/*/s_amp_mv"
+    },
+    {
+      "pointer": "/measurements/amplitudes/st_80ms_uv",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "LUDB distributes amplitude-normalised signals, so LUDB results cannot validate amplitudes.",
+        "Legacy native ST level at J+80 ms on the analysis signal; the opt-in hybrid ST sources do not replace this published value."
+      ],
+      "legacy_source": "/beat_features/*/st_80ms_mv"
+    },
+    {
+      "pointer": "/measurements/amplitudes/t_amplitude_uv",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "LUDB distributes amplitude-normalised signals, so LUDB results cannot validate amplitudes."
+      ],
+      "legacy_source": "/beat_features/*/t_amp_mv"
+    },
+    {
+      "pointer": "/measurements/amplitudes/u_amplitude_uv",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "LUDB distributes amplitude-normalised signals, so LUDB results cannot validate amplitudes."
+      ],
+      "legacy_source": "/beat_features/*/u_amp_signed_mv"
+    },
+    {
+      "pointer": "/measurements/areas/qrs_signed_area_uv_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "Trapezoid integral of the baseline-subtracted analysis signal over [QRS onset, QRS offset] inclusive; legacy unit mV x internal sample converted by 1e6 / internal_fs."
+      ],
+      "legacy_source": "/beat_features/*/qrs_signed_area"
+    },
+    {
+      "pointer": "/measurements/global/heart_rate_bpm",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/global_features/heart_rate_bpm"
+    },
+    {
+      "pointer": "/measurements/global/frontal_qrs_axis_deg",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "summary",
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "not_applicable(input_mode_limited) for limited input."
+      ],
+      "legacy_source": "/global_features/qrs_axis_deg"
+    },
+    {
+      "pointer": "/measurements/global/qtc_bazett_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "Formal QTc; not_applicable(input_mode_limited) for limited input."
+      ],
+      "legacy_source": "/global_features/qtc_bazett_ms"
+    },
+    {
+      "pointer": "/measurements/global/qrs_wide_ms",
+      "publication_tier": "published_measurement",
+      "profiles": [
+        "all",
+        "debug"
+      ],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "benchmark_validated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [],
+      "legacy_source": "/global_features/qrs_wide_ms"
+    }
+  ],
+  "debug_caps": [
+    {
+      "pointer": "/debug/st_morphology",
+      "publication_tier": "internal_debug",
+      "profiles": [],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "known_problem",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "The four-class ST morphology was never validated and is anti-correlated with ischemia; it must not be used as ischemia evidence."
+      ],
+      "legacy_source": "/beat_features/*/st_morphology"
+    },
+    {
+      "pointer": "/debug/st_pattern_class",
+      "publication_tier": "internal_debug",
+      "profiles": [],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "unvalidated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "No stable definition or validation."
+      ],
+      "legacy_source": "/beat_features/*/st_pattern_class"
+    },
+    {
+      "pointer": "/debug/st_t_confusion",
+      "publication_tier": "internal_debug",
+      "profiles": [],
+      "validation_tier": "unvalidated",
+      "validation_ceiling": "unvalidated",
+      "evidence_ids": [],
+      "validated_for": null,
+      "known_limitations": [
+        "No stable definition or validation."
+      ],
+      "legacy_source": "/beat_features/*/st_t_confusion"
+    }
+  ],
+  "debug_patterns": [
+    {
+      "pattern": "st_hybrid_*",
+      "publication_tier": "internal_debug",
+      "validation_ceiling": "unvalidated",
+      "reason": "Experimental opt-in ST bypass (22 legacy keys); may appear only in debug output."
+    },
+    {
+      "pattern": "twelve_sl_*",
+      "publication_tier": "internal_debug",
+      "validation_ceiling": "unvalidated",
+      "reason": "Vendor-style compatibility block (16 legacy keys); not part of the core schema."
+    }
+  ]
+}
