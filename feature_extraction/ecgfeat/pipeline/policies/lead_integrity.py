@@ -1,11 +1,38 @@
-"""Lead-integrity policy that records evidence without relabelling leads."""
+"""Lead-integrity policy that records evidence without relabelling leads.
+
+Moved verbatim from ``ecgfeat/api.py`` in Phase 3 of the library migration
+(docs/library_design/01_architecture.md, "Destination of all 49 private
+``api.py`` helpers").
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Dict
 
 from ..context import PipelineContext, PolicyDecision, PolicyEvent
+
+
+def _clear_precordial_reversal_flags(representative_leads: Dict[str, object]) -> None:
+    for lead in [f"V{i}" for i in range(1, 7)]:
+        rep = representative_leads.get(lead)
+        if rep is None:
+            continue
+        rep.params.pop("precordial_reversal_detail", None)
+        rep.params.pop("probable_precordial_reversal", None)
+
+
+
+def _probable_limb_lead_reversal(lead_reversal: Dict[str, Any]) -> bool:
+    if not isinstance(lead_reversal, dict):
+        return False
+    return bool(
+        lead_reversal.get("probable_extremity_reversal")
+        or lead_reversal.get("probable_ra_la")
+        or lead_reversal.get("probable_ra_ll")
+        or lead_reversal.get("probable_la_ll")
+    )
+
 
 
 @dataclass(frozen=True, slots=True)
