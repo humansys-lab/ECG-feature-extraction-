@@ -71,6 +71,7 @@ def _coordinates(document: Mapping[str, Any]) -> tuple[list[str], list[str]]:
 def _states(field: Mapping[str, Any], beats: list[str], leads: list[str], values: list[list[Any]]) -> list[list[int]]:
     absence = field.get("absence") or {}
     whole = absence.get("kind") if "kind" in absence else None
+    default = (absence.get("default") or {}).get("kind")
     states = []
     for i, beat in enumerate(beats):
         row = []
@@ -84,6 +85,8 @@ def _states(field: Mapping[str, Any], beats: list[str], leads: list[str], values
                 row.append(STATE_CODES["unmeasurable"])
             elif coordinate in (absence.get("not_applicable") or {}):
                 row.append(STATE_CODES["not_applicable"])
+            elif default:
+                row.append(STATE_CODES[default])
             else:
                 row.append(STATE_CODES["null"])
         states.append(row)

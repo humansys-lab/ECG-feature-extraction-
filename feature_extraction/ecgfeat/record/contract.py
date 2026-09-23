@@ -132,13 +132,26 @@ def validate_document(record: Any, *, strict: bool = True) -> None:
                 _require(all(value is None for value in cells.values()), f"{name}: absence contradicts measured values")
                 reasons.update(cells)
             else:
-                _require(set(absence) <= {"unmeasurable", "not_applicable"}, f"{name}: unknown absence kind")
-                for mapping in absence.values():
+                _require(set(absence) <= {"unmeasurable", "not_applicable", "default"}, f"{name}: unknown absence kind")
+                default = absence.get("default")
+                if default is not None:
+                    _require(isinstance(default, dict) and set(default) == {"kind", "reason"}
+                             and default["kind"] in ("unmeasurable", "not_applicable")
+                             and isinstance(default["reason"], str) and bool(default["reason"]),
+                             f"{name}: invalid default absence")
+                    _require(field_axes != [], f"{name}: default absence needs axes")
+                    reasons.update(coordinate for coordinate, value in cells.items() if value is None)
+                for state_kind, mapping in absence.items():
+                    if state_kind == "default":
+                        continue
                     _require(isinstance(mapping, dict), f"{name}: absence map must be an object")
                     for coordinate, reason in mapping.items():
                         # Sidecar cells are checked against the state mask when the sidecar is read.
                         _require(coordinate in cells and cells[coordinate] is None, f"{name}: absence coordinate has no null cell")
-                        _require(coordinate not in reasons and isinstance(reason, str) and bool(reason), f"{name}: duplicate absence or invalid reason")
+                        _require((default is not None or coordinate not in reasons) and isinstance(reason, str) and bool(reason),
+                                 f"{name}: duplicate absence or invalid reason")
+                        _require(not (state_kind == "unmeasurable" and coordinate in (absence.get("not_applicable") or {})),
+                                 f"{name}: cell has two absence states")
                         reasons.add(coordinate)
             for coordinate, value in cells.items():
                 if value is None:

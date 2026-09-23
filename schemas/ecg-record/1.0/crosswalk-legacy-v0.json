@@ -55,7 +55,7 @@
         "reason": "negative_interval"
       }
     ],
-    "encoding": "a field whose every cell is absent with one reason uses {kind, reason}; otherwise a sparse {unmeasurable: {<beat_id>|<lead>: reason}} map"
+    "encoding": "a field whose every cell is absent with one reason uses {kind, reason}; otherwise the most frequent reason (ties by name) is the field default {default: {kind, reason}} and only the remaining cells are listed in a sparse {unmeasurable: {<beat_id>|<lead>: reason}} map"
   },
   "dense_fields": [
     {

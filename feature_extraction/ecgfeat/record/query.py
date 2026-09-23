@@ -239,6 +239,10 @@ def _sparse_absence(field: Mapping[str, Any], coordinate: str) -> UnmeasurableAb
         states = absence.get(kind)
         if isinstance(states, Mapping) and coordinate in states:
             return cls(str(states[coordinate]))
+    default = absence.get("default")
+    if isinstance(default, Mapping) and default.get("kind") in {"unmeasurable", "not_applicable"}:
+        cls = UnmeasurableAbsence if default["kind"] == "unmeasurable" else NotApplicableAbsence
+        return cls(str(default.get("reason", "unspecified")))
     return None
 
 
@@ -272,7 +276,9 @@ def query_measurement(record: ECGRecord, name: str, *, lead: str | None = None, 
             absence = _sparse_absence(field, coordinate)
     else:
         absence = _sparse_absence(field, "")
-    if value is None and absence is None:
+    if value is not None:
+        absence = None  # a field default applies to null cells only
+    elif absence is None:
         absence = NullAbsence()
     provenance = record.as_dict().get("provenance", {})
     config = provenance.get("config", {}) if isinstance(provenance, Mapping) else {}

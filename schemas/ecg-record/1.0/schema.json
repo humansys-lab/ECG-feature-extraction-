@@ -832,6 +832,27 @@
                 "type": "string",
                 "minLength": 1
               }
+            },
+            "default": {
+              "type": "object",
+              "required": [
+                "kind",
+                "reason"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "unmeasurable",
+                    "not_applicable"
+                  ]
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "description": "State of every null cell that has no explicit entry in the sparse maps; explicit entries override it."
             }
           },
           "additionalProperties": false

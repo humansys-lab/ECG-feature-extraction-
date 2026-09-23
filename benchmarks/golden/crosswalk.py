@@ -124,7 +124,8 @@ def _record_cells(field: dict[str, Any], beat_ids: list[str], leads: list[str]) 
     absence = field.get("absence") or {}
     whole = absence.get("reason") if "kind" in absence else None
     sparse = absence.get("unmeasurable", {})
-    return [[(value, None if value is not None else (whole or sparse.get(f"{beat_ids[i]}|{leads[j]}")))
+    default = (absence.get("default") or {}).get("reason")
+    return [[(value, None if value is not None else (whole or sparse.get(f"{beat_ids[i]}|{leads[j]}") or default))
              for j, value in enumerate(row)] for i, row in enumerate(field["values"])]
 
 

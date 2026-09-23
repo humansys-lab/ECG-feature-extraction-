@@ -165,6 +165,26 @@ def _enforce_published_invariants(fiducials: dict[str, dict[str, Any]], interval
                     withhold(intervals, name, i, j, REASON_NEGATIVE)
 
 
+def _encode_absence(missing: dict[str, str], cell_count: int) -> dict[str, Any]:
+    """Compact, lossless absence encoding for a dense field.
+
+    Every missing cell here is unmeasurable.  One reason shared by all cells
+    uses the whole-field form; otherwise the most frequent reason (ties broken
+    by name) becomes the field ``default`` and only the other cells are listed.
+    """
+    counts: dict[str, int] = {}
+    for reason in missing.values():
+        counts[reason] = counts.get(reason, 0) + 1
+    default = min(counts, key=lambda reason: (-counts[reason], reason))
+    if len(missing) == cell_count and len(counts) == 1:
+        return {"kind": "unmeasurable", "reason": default}
+    encoded: dict[str, Any] = {"default": {"kind": "unmeasurable", "reason": default}}
+    exceptions = {coordinate: reason for coordinate, reason in missing.items() if reason != default}
+    if exceptions:
+        encoded["unmeasurable"] = exceptions
+    return encoded
+
+
 def build_record_document(measurements: Any, profile: str) -> dict[str, Any]:
     """Build the wire document for ``profile`` from an ``ECGMeasurements`` state."""
 
@@ -320,12 +340,7 @@ def build_record_document(measurements: Any, profile: str) -> dict[str, Any]:
                 missing = {f"{beat_axis[i]['id']}|{leads[j]}": reasons.get(name, (i, j))
                            for i, row in enumerate(field["values"]) for j, value in enumerate(row) if value is None}
                 if missing:
-                    distinct = set(missing.values())
-                    # A field-wide state avoids repeating identical reasons.
-                    if len(missing) == len(beats) * len(leads) and len(distinct) == 1:
-                        field["absence"] = {"kind": "unmeasurable", "reason": distinct.pop()}
-                    else:
-                        field["absence"] = {"unmeasurable": missing}
+                    field["absence"] = _encode_absence(missing, len(beats) * len(leads))
             elif field["values"] is None:
                 field["absence"] = {"kind": "unmeasurable", "reason": REASON_UNAVAILABLE}
     document: dict[str, Any] = {
