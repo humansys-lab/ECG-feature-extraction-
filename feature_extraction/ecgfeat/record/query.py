@@ -247,6 +247,13 @@ def query_measurement(record: ECGRecord, name: str, *, lead: str | None = None, 
     axes = tuple(str(axis) for axis in field.get("axes", []))
     lead_index, beat_index = _axis_index(record, lead, beat, axes)
     values = field.get("values")
+    if "sidecar" in field:
+        from .sidecar import SidecarError
+
+        if record.sidecar_source is None:
+            raise SidecarError(f"{pointer} is stored in the NPZ sidecar; load the record from its file or pass sidecar=",
+                               code="sidecar_missing")
+        values = record.sidecar_source.values(record.as_dict())[pointer]
     value: Any = values
     if axes:
         if not isinstance(values, list):

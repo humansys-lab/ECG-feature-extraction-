@@ -57,11 +57,13 @@ from .serialize import (
     from_json_obj,
     load_record,
     loads_record,
+    materialize_record,
     record_to_dict,
     serialize_record,
     to_json_obj,
     validate_record,
 )
+from .sidecar import SidecarError
 from .validation import (
     EvidenceReference,
     FieldValidation,
@@ -81,6 +83,6 @@ __all__ = [
     "parse_record_address", "make_record_address", "resolve_pointer", "resolve_address",
     "query_measurement", "query_many", "select_measurements", "iter_leads", "iter_beats",
     "RecordProfile", "SerializedRecord", "to_json_obj", "from_json_obj", "dumps_record",
-    "loads_record", "load_record", "validate_record", "record_to_dict", "serialize_record", "encode_npz_sidecar", "dump_measurements", "EvidenceReference",
+    "loads_record", "load_record", "validate_record", "record_to_dict", "serialize_record", "materialize_record", "SidecarError", "encode_npz_sidecar", "dump_measurements", "EvidenceReference",
     "FieldValidation", "ValidationTier", "validation_for", "validate_publishable_field",
 ]

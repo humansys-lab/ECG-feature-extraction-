@@ -129,20 +129,76 @@ def validate_record(record: ECGRecord | Mapping[str, Any], *, level: Literal["st
     return value
 
 
-def load_record(source: str | Any | Mapping[str, Any], *, validate: Literal["strict", "schema", "none"] = "strict") -> ECGRecord:
+def load_record(
+    source: str | Any | Mapping[str, Any],
+    *,
+    validate: Literal["strict", "schema", "none"] = "strict",
+    sidecar: str | Any | bytes | None = None,
+) -> ECGRecord:
+    """Load a record; a dense NPZ sidecar is resolved next to a record file.
+
+    ``sidecar`` may be a path or the sidecar bytes.  Strict loading verifies a
+    sidecar-backed record's NPZ immediately (digest, identity, shape, dtype and
+    state mask); ``schema`` and ``none`` verify lazily on first access.
+    """
+    from pathlib import Path
+
     if validate not in {"strict", "schema", "none"}:
         raise ValueError("validation level must be strict, schema, or none")
+    record_path = None
     if isinstance(source, Mapping):
         value = record_from_document(source)
     elif hasattr(source, "read"):
         raw = source.read()
         value = loads_record(raw, validate="none")
     else:
-        from pathlib import Path
-        value = loads_record(Path(source).read_bytes(), validate="none")
+        record_path = Path(source)
+        value = loads_record(record_path.read_bytes(), validate="none")
+    value = _attach_sidecar(value, record_path, sidecar)
     if validate == "none":
         return value
-    return validate_record(value, level=validate)
+    value = validate_record(value, level=validate)
+    if validate == "strict" and value.sidecar_source is not None:
+        value.sidecar_source.values(value.as_dict())
+    elif validate == "strict" and (value.artifacts.get("dense_measurements") is not None):
+        from .sidecar import SidecarError
+
+        raise SidecarError("strict loading of a sidecar-backed record requires its sidecar file or bytes",
+                           code="sidecar_missing")
+    return value
+
+
+def _attach_sidecar(record: ECGRecord, record_path: Any, sidecar: Any) -> ECGRecord:
+    from dataclasses import replace
+    from pathlib import Path
+
+    from .sidecar import SidecarSource, resolve_uri
+
+    descriptor = record.artifacts.get("dense_measurements")
+    if descriptor is None:
+        return record
+    if isinstance(sidecar, (bytes, bytearray)):
+        source = SidecarSource(data=bytes(sidecar))
+    elif sidecar is not None:
+        source = SidecarSource(path=Path(sidecar))
+    elif record_path is not None:
+        source = SidecarSource(path=resolve_uri(record_path, str(descriptor.get("uri", ""))))
+    else:
+        return record
+    return replace(record, sidecar_source=source)
+
+
+def materialize_record(record: ECGRecord) -> ECGRecord:
+    """Return an inline record with every sidecar-backed matrix restored."""
+    from .sidecar import SidecarError, materialize
+
+    if record.artifacts.get("dense_measurements") is None:
+        return record
+    if record.sidecar_source is None:
+        raise SidecarError("record has a sidecar but no sidecar source was attached", code="sidecar_missing")
+    document = record.as_dict()
+    record.sidecar_source.values(document)
+    return validate_record(record_from_document(materialize(document, record.sidecar_source._data)))
 
 
 def dumps_record(record: ECGRecord, *, profile: RecordProfile | None = None, indent: int | None = None) -> bytes:
@@ -193,29 +249,26 @@ def serialize_record(
     record: ECGRecord,
     *,
     profile: RecordProfile | None = None,
-    dense_arrays: Mapping[str, np.ndarray] | None = None,
+    sidecar_uri: str | None = None,
 ) -> SerializedRecord:
-    sidecars: dict[str, bytes] = {}
-    if dense_arrays:
-        sidecar = encode_npz_sidecar(dense_arrays)
-        sidecars["dense_measurements.npz"] = sidecar
-        obj = to_json_obj(record, profile=profile)
-        artifacts = obj.setdefault("artifacts", {})
-        artifacts["dense_measurements"] = {
-            "uri": "dense_measurements.npz",
-            "media_type": "application/x-npz",
-            "sha256": "sha256:" + sha256(sidecar).hexdigest(),
-            "schema_version": record.schema_version,
-            "arrays": sorted(str(key) for key in dense_arrays),
-        }
-        json_bytes = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
-    else:
-        json_bytes = dumps_record(record, profile=profile)
-    return SerializedRecord(json_bytes=json_bytes, sidecars=sidecars)
+    """Canonical JSON, optionally moving dense beat/lead matrices to an NPZ sidecar.
+
+    ``sidecar_uri`` is a plain file name; the sidecar must be stored in the
+    same directory as the JSON document.  Sidecar bytes are deterministic.
+    """
+    if sidecar_uri is None:
+        return SerializedRecord(json_bytes=dumps_record(record, profile=profile), sidecars={})
+    from .sidecar import split_dense
+
+    document, data = split_dense(to_json_obj(record, profile=profile), sidecar_uri)
+    validate_record(record_from_document(document))
+    json_bytes = json.dumps(document, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+                            allow_nan=False).encode("utf-8")
+    return SerializedRecord(json_bytes=json_bytes, sidecars={sidecar_uri: data})
 
 
 __all__ = [
     "RecordProfile", "SerializedRecord", "to_json_obj", "from_json_obj", "record_to_dict",
     "validate_record", "load_record", "dumps_record", "loads_record", "serialize_record",
-    "encode_npz_sidecar",
+    "encode_npz_sidecar", "materialize_record",
 ]

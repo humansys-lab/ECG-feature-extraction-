@@ -92,6 +92,8 @@ _EXPORTS = {
     "resolve_pointer": (".record", "resolve_pointer"),
     "select_measurements": (".record", "select_measurements"),
     "serialize_record": (".record", "serialize_record"),
+    "materialize_record": (".record", "materialize_record"),
+    "SidecarError": (".record", "SidecarError"),
     "to_json_obj": (".record", "to_json_obj"),
     "unavailable": (".record", "unavailable"),
     "validate_record": (".record", "validate_record"),

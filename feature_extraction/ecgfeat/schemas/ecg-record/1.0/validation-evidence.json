@@ -415,7 +415,7 @@
       "pointer": "/debug/st_morphology",
       "publication_tier": "internal_debug",
       "profiles": [],
-      "validation_tier": "unvalidated",
+      "validation_tier": "known_problem",
       "validation_ceiling": "known_problem",
       "evidence_ids": [],
       "validated_for": null,

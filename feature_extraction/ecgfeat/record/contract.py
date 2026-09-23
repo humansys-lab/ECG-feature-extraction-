@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from ..errors import RecordValidationError, AddressNotFoundError, AddressSyntaxError
 from .registry import check_ceiling
+from .sidecar import validate_descriptor
 
 
 def _require(condition: bool, message: str) -> None:
@@ -23,7 +24,8 @@ def _check_fiducial_order(fiducials: Mapping[str, Any]) -> None:
 
     for chain in (("p_onset", "p_offset"), ("qrs_onset", "r_peak", "qrs_offset")):
         present = [fiducials[name]["values"] for name in chain
-                   if name in fiducials and fiducials[name]["axes"] == ["beat", "lead"]]
+                   if name in fiducials and fiducials[name]["axes"] == ["beat", "lead"]
+                   and fiducials[name]["values"] is not None]
         if len(present) != len(chain):
             continue
         for i, row in enumerate(present[0]):
@@ -106,6 +108,10 @@ def validate_document(record: Any, *, strict: bool = True) -> None:
                 except (AddressNotFoundError, AddressSyntaxError) as exc:
                     raise RecordValidationError(f"{name}: unresolved provenance pointer") from exc
             values = field["values"]
+            sidecar_backed = "sidecar" in field
+            if sidecar_backed:
+                _require(field_axes == ["beat", "lead"] and values is None, f"{name}: only null dense values may be sidecar-backed")
+                values = [[None] * len(leads) for _ in beats]
             if field_axes == ["beat", "lead"]:
                 _require(isinstance(values, list) and len(values) == len(beats), f"{name}: beat dimension mismatch")
                 _require(all(isinstance(row, list) and len(row) == len(leads) for row in values), f"{name}: lead dimension mismatch")
@@ -130,12 +136,13 @@ def validate_document(record: Any, *, strict: bool = True) -> None:
                 for mapping in absence.values():
                     _require(isinstance(mapping, dict), f"{name}: absence map must be an object")
                     for coordinate, reason in mapping.items():
+                        # Sidecar cells are checked against the state mask when the sidecar is read.
                         _require(coordinate in cells and cells[coordinate] is None, f"{name}: absence coordinate has no null cell")
                         _require(coordinate not in reasons and isinstance(reason, str) and bool(reason), f"{name}: duplicate absence or invalid reason")
                         reasons.add(coordinate)
             for coordinate, value in cells.items():
                 if value is None:
-                    _require(field["nullable"] or coordinate in reasons, f"{name}: plain null forbidden")
+                    _require(sidecar_backed or field["nullable"] or coordinate in reasons, f"{name}: plain null forbidden")
                     continue
                 types = {"integer": (int,), "number": (int, float), "boolean": (bool,), "string": (str,)}
                 _require(type(value) in types[kind], f"{name}: cell type mismatch")
@@ -143,6 +150,7 @@ def validate_document(record: Any, *, strict: bool = True) -> None:
                     _require(0 <= value < acq["sample_count"], f"{name}: sample outside acquisition")
                 if strict and group == "intervals":
                     _require(value >= 0, f"{name}: negative interval")
+    validate_descriptor(doc)
     if strict:
         _check_fiducial_order(doc["delineation"].get("fiducials", {}))
     for artifact in doc["artifacts"].values():

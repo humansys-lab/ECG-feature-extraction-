@@ -84,6 +84,8 @@ class ECGRecord:
     debug: Mapping[str, Any] = field(default_factory=dict)
     extra_members: Mapping[str, Any] = field(default_factory=dict, repr=False)
     present_optional: tuple[str, ...] = field(default=(), repr=False)
+    # Verified-on-access NPZ sidecar bytes for sidecar-backed fields.
+    sidecar_source: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if not isinstance(self.record_id, str) or not self.record_id.strip() or any(c in self.record_id for c in "@#\n\r"):

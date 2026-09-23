@@ -32,6 +32,16 @@ def _load_signal(path: str | Path) -> Any:
         return source["signal"]
 
 
+def _write_bytes(value: bytes, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="wb", dir=destination.parent, prefix=".ecg-record-", delete=False) as stream:
+        temporary = Path(stream.name)
+        stream.write(value)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, destination)
+
+
 def _write_text(value: str, destination: str | Path) -> None:
     if str(destination) == "-":
         sys.stdout.write(value)
@@ -69,11 +79,17 @@ def _config_from_file(path: str | Path | None) -> ECGConfig | None:
 
 def cli_measure(signal: str | Path, *, sampling_rate: float, lead_names: Sequence[str], amplitude_unit: str = "mV", input_mode: str = "standard_12", method: str = "default", profile: str = "summary", config: str | Path | None = None, sidecar: str | Path | None = None, output: str | Path = "-") -> int:
     from .pipeline import ecg_record
+    sidecar_path = None
     if sidecar is not None:
-        raise ConfigurationError("sidecar-backed extraction is not implemented; omit --sidecar for inline JSON")
+        sidecar_path = Path(sidecar)
+        if str(output) != "-" and sidecar_path.resolve().parent != Path(output).resolve().parent:
+            raise ConfigurationError("--sidecar must be written next to the output record (same directory)")
     record = ecg_record(_load_signal(signal), sampling_rate=sampling_rate, lead_names=lead_names, amplitude_unit=amplitude_unit, input_mode=input_mode, method=method, profile=profile, config=_config_from_file(config))
     from .record.serialize import serialize_record
-    encoded = serialize_record(record, profile=profile)
+    encoded = serialize_record(record, profile=profile, sidecar_uri=None if sidecar_path is None else sidecar_path.name)
+    if sidecar_path is not None:
+        # Sidecar first: a record file never points at a sidecar that is absent.
+        _write_bytes(encoded.sidecars[sidecar_path.name], sidecar_path)
     _write_text(encoded.json_bytes.decode("utf-8") + "\n", output)
     return 0
 

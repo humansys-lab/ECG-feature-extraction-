@@ -236,6 +236,18 @@
             }
           }
         ]
+      },
+      "properties": {
+        "dense_measurements": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/denseSidecar"
+            }
+          ]
+        }
       }
     },
     "metadata": {
@@ -330,16 +342,48 @@
         },
         "absence": {
           "$ref": "#/$defs/absence"
+        },
+        "sidecar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "array_key",
+            "state_key",
+            "dtype"
+          ],
+          "properties": {
+            "array_key": {
+              "type": "string"
+            },
+            "state_key": {
+              "type": "string"
+            },
+            "dtype": {
+              "const": "int32"
+            }
+          },
+          "description": "Dense values stored in the NPZ sidecar named by /artifacts/dense_measurements; values must then be null."
         }
       },
       "allOf": [
         {
           "if": {
-            "properties": {
-              "type": {
-                "const": "integer"
+            "allOf": [
+              {
+                "properties": {
+                  "type": {
+                    "const": "integer"
+                  }
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "sidecar"
+                  ]
+                }
               }
-            }
+            ]
           },
           "then": {
             "allOf": [
@@ -424,11 +468,22 @@
         },
         {
           "if": {
-            "properties": {
-              "type": {
-                "const": "number"
+            "allOf": [
+              {
+                "properties": {
+                  "type": {
+                    "const": "number"
+                  }
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "sidecar"
+                  ]
+                }
               }
-            }
+            ]
           },
           "then": {
             "allOf": [
@@ -513,11 +568,22 @@
         },
         {
           "if": {
-            "properties": {
-              "type": {
-                "const": "boolean"
+            "allOf": [
+              {
+                "properties": {
+                  "type": {
+                    "const": "boolean"
+                  }
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "sidecar"
+                  ]
+                }
               }
-            }
+            ]
           },
           "then": {
             "allOf": [
@@ -602,11 +668,22 @@
         },
         {
           "if": {
-            "properties": {
-              "type": {
-                "const": "string"
+            "allOf": [
+              {
+                "properties": {
+                  "type": {
+                    "const": "string"
+                  }
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "sidecar"
+                  ]
+                }
               }
-            }
+            ]
           },
           "then": {
             "allOf": [
@@ -688,6 +765,26 @@
               }
             ]
           }
+        },
+        {
+          "if": {
+            "required": [
+              "sidecar"
+            ]
+          },
+          "then": {
+            "properties": {
+              "values": {
+                "type": "null"
+              },
+              "axes": {
+                "const": [
+                  "beat",
+                  "lead"
+                ]
+              }
+            }
+          }
         }
       ]
     },
@@ -740,6 +837,69 @@
           "additionalProperties": false
         }
       ]
+    },
+    "denseSidecar": {
+      "type": "object",
+      "required": [
+        "uri",
+        "media_type",
+        "sha256",
+        "record_id",
+        "schema_version",
+        "axes",
+        "shape",
+        "state_codes",
+        "fields"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*\\.npz$"
+        },
+        "media_type": {
+          "const": "application/x-npz"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "record_id": {
+          "type": "string"
+        },
+        "schema_version": {
+          "type": "string"
+        },
+        "axes": {
+          "const": [
+            "beat",
+            "lead"
+          ]
+        },
+        "shape": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "state_codes": {
+          "const": {
+            "measured": 0,
+            "null": 1,
+            "unmeasurable": 2,
+            "not_applicable": 3
+          }
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^/"
+          }
+        }
+      }
     }
   }
 }
