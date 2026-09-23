@@ -26,7 +26,7 @@ try:
 except ImportError:
     _HAS_MPL = False
 
-from .models import ECGFeatures, LeadBeatFeatures, STANDARD_12_LEADS
+from ecgfeat.compat.models_v0 import ECGFeatures, LeadBeatFeatures, STANDARD_12_LEADS
 
 
 # ── colour palette ────────────────────────────────────────────────────────────
