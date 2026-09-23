@@ -107,7 +107,7 @@ def expected_dense(crosswalk: dict[str, Any], ctx: _Context, profile: str) -> di
             if onset is not None and offset is not None and onset > offset:
                 for name in ("qrs_onset", "qrs_offset", "qrs_duration_ms"):
                     withhold(name, i, j, ORDER)
-            elif None not in (onset, peak, offset) and not onset <= peak <= offset:
+            elif peak is not None and ((onset is not None and peak < onset) or (offset is not None and peak > offset)):
                 for name in ("qrs_onset", "r_peak", "qrs_offset", "qrs_duration_ms"):
                     withhold(name, i, j, ORDER)
     for rule in crosswalk["dense_fields"]:

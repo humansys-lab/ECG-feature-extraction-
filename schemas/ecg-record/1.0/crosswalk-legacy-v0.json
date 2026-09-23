@@ -38,7 +38,7 @@
         "reason": "fiducial_order_violation"
       },
       {
-        "when": "qrs_onset <= qrs_offset and r_peak outside [qrs_onset, qrs_offset]",
+        "when": "qrs_onset <= qrs_offset (or either missing) and r_peak precedes a present qrs_onset or follows a present qrs_offset",
         "withhold": [
           "qrs_onset",
           "r_peak",

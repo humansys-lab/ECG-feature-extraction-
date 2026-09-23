@@ -151,7 +151,9 @@ def _enforce_published_invariants(fiducials: dict[str, dict[str, Any]], interval
                 withhold(intervals, "p_duration_ms", i, j, REASON_ORDER)
             onset, peak, offset = q_on[i][j], r_pk[i][j], q_off[i][j]
             inverted = onset is not None and offset is not None and onset > offset
-            peak_outside = (not inverted and None not in (onset, peak, offset) and not onset <= peak <= offset)
+            # Any present pair of the chain must be ordered, not only a complete triple.
+            peak_outside = not inverted and peak is not None and (
+                (onset is not None and peak < onset) or (offset is not None and peak > offset))
             if inverted or peak_outside:
                 for name in ("qrs_onset", "qrs_offset") + (("r_peak",) if peak_outside else ()):
                     withhold(fiducials, name, i, j, REASON_ORDER)
