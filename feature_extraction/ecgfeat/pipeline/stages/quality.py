@@ -22,7 +22,6 @@ from ...models import STANDARD_12_LEADS
 from ..context import PipelineContext, StageResult, require
 
 
-
 @dataclass(frozen=True, slots=True)
 class QualityBundle:
     """Engine state produced by the quality stage (legacy variable names).

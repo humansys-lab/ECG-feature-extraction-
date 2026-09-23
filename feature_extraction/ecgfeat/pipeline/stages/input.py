@@ -28,6 +28,7 @@ from ..context import (
     require,
 )
 
+
 MIN_SAMPLING_RATE_HZ = 100.0
 
 MIN_RECORD_DURATION_SECONDS = 1.0

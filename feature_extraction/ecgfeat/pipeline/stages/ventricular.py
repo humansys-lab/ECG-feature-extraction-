@@ -41,7 +41,6 @@ from ..policies.pacing import (
 )
 
 
-
 @dataclass(frozen=True, slots=True)
 class VentricularBundle:
     """Engine state produced by the ventricular stage (legacy variable names).

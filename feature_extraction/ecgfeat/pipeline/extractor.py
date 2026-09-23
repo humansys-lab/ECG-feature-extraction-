@@ -289,14 +289,30 @@ def ecg_measure(prepared: ECGInput, *, method: str = "default", config: ECGConfi
     if resolved.input_mode != prepared.input_mode:
         raise ConfigurationError("config input_mode does not match prepared input", code="input_mode_mismatch")
     extractor = _legacy_extractor(resolved)
-    legacy = extractor.extract(
-        prepared.signal,
-        prepared.sampling_rate,
+    legacy = _staged_legacy_features(extractor, prepared)
+    return ECGMeasurements(prepared, legacy, resolved, config_provenance(resolved, method=method))
+
+
+def _staged_legacy_features(extractor: Any, prepared: ECGInput) -> Any:
+    """Completed legacy ``ECGFeatures`` for the record path, via the staged pipeline.
+
+    The legacy interpretation hooks are injected because the pre-decomposition record
+    path ran them, and record parity is exact.  ``ECGFEAT_LEGACY_ORCHESTRATION=1``
+    routes through ``ECGFeatureExtractor.extract`` and so to the preserved rollback
+    orchestration.
+    """
+    kwargs = dict(
         meta=deepcopy(prepared.patient),
         lead_names=list(prepared.lead_names),
         amplitude_unit=prepared.amplitude_unit,
     )
-    return ECGMeasurements(prepared, legacy, resolved, config_provenance(resolved, method=method))
+    if legacy_orchestration_requested():
+        return extractor.extract(prepared.signal, prepared.sampling_rate, **kwargs)
+    from ..compat.interpretation_hooks import LEGACY_INTERPRETATION_HOOKS
+
+    return run_legacy_pipeline(
+        extractor, prepared.signal, prepared.sampling_rate, hooks=LEGACY_INTERPRETATION_HOOKS, **kwargs,
+    ).features
 
 
 def _field_entry(

@@ -73,6 +73,31 @@ class StageIssue:
     field_paths: tuple[str, ...] = ()
 
 
+class FrozenDetails(dict):
+    """Read-only JSON-like mapping for policy-event details.
+
+    A ``dict`` subclass (not ``MappingProxyType``) so events stay picklable, deep-copyable
+    and ``dataclasses.asdict``-able for the later record-provenance change.
+    """
+
+    __slots__ = ()
+
+    def _read_only(self, *args: Any, **kwargs: Any) -> Any:
+        raise TypeError("policy event details are read-only")
+
+    __setitem__ = __delitem__ = __ior__ = _read_only
+    clear = pop = popitem = setdefault = update = _read_only
+
+    def __reduce__(self) -> Any:
+        return (type(self), (dict(self),))
+
+    def __copy__(self) -> "FrozenDetails":
+        return self
+
+    def __deepcopy__(self, memo: Any) -> "FrozenDetails":
+        return self
+
+
 @dataclass(frozen=True, slots=True)
 class PolicyEvent:
     """Descriptive record of one policy decision (policy, kind, stable reason code)."""
@@ -81,7 +106,7 @@ class PolicyEvent:
     decision: str
     reason_code: str
     source_ids: tuple[str, ...] = ()
-    details: Mapping[str, JsonValue] = field(default_factory=dict)
+    details: Mapping[str, JsonValue] = field(default_factory=FrozenDetails)
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,7 +266,7 @@ def require(context: Any, stage: str, *names: str) -> PipelineContext:
 
 __all__ = [
     "SignalDomain", "StageName", "IssueSeverity", "DecisionKind", "STAGE_ORDER", "StageUnavailableError",
-    "StageIssue", "StageResult", "PolicyEvent", "PolicyDecision", "SignalView", "ExtractionRequest",
+    "StageIssue", "StageResult", "FrozenDetails", "PolicyEvent", "PolicyDecision", "SignalView", "ExtractionRequest",
     "ExtractorSettings", "InterpretationHooks", "PipelineContext", "with_policy_event",
     "with_policy_events", "with_issue", "record_decision", "require",
 ]

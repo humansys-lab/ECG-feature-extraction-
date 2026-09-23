@@ -22,7 +22,6 @@ from ..._engine.measurement.st_localization import apply_hybrid_st_measurement
 from ..context import PipelineContext, StageResult, require
 
 
-
 @dataclass(frozen=True, slots=True)
 class DelineationBundle:
     """Engine state produced by the delineation stage (legacy variable names).

@@ -137,12 +137,12 @@ class QualityContractTests(unittest.TestCase):
              patch_calls("feature_extraction.ecgfeat.pipeline.stages.ventricular.detect_qrs_multilead_with_meta", "feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta") as mock_qrs, \
              patch("feature_extraction.ecgfeat.pipeline.stages.beats.cluster_beats", return_value={1: [0, 1]}), \
              patch("feature_extraction.ecgfeat.pipeline.stages.beats.build_beat_annotations", return_value=[]), \
-             patch_calls("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", "feature_extraction.ecgfeat.pipeline.stages.beats.build_representative_beats_with_meta", return_value=({}, {})), \
-             patch_calls("feature_extraction.ecgfeat.api.delineate_beats", "feature_extraction.ecgfeat.pipeline.stages.delineation.delineate_beats", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
-             patch_calls("feature_extraction.ecgfeat.api.compute_global_features", "feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features") as mock_global, \
-             patch_calls("feature_extraction.ecgfeat.api.interpret", "feature_extraction.ecgfeat.compat.interpretation_hooks.interpret", return_value=None):
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.beats.build_representative_beats_with_meta", "feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_beats_with_meta", return_value=({}, {})), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.delineation.delineate_beats", "feature_extraction.ecgfeat.pipeline.stages.measurement.delineate_beats", return_value=[]), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_lead_features", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_group_features", return_value={}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_global_features", "feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.compat.interpretation_hooks.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [100, 300]
             mock_global.return_value.pacing_spikes = None
             mock_global.return_value.paced_rhythm = False
