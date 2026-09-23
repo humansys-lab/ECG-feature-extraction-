@@ -6,10 +6,8 @@ from unittest.mock import patch
 
 import numpy as np
 
-from feature_extraction.ecgfeat.api import (
-    ECGFeatureExtractor,
-    _pacing_qrs_rescue_evidence,
-)
+from feature_extraction.ecgfeat.api import ECGFeatureExtractor
+from feature_extraction.ecgfeat.pipeline.policies.pacing import _pacing_qrs_rescue_evidence
 from feature_extraction.ecgfeat.quality import validate_pacing_spikes_against_qrs
 from feature_extraction.ecgfeat.grouping import cluster_beats
 from feature_extraction.ecgfeat.quality import (
@@ -323,13 +321,15 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertTrue(any(set(members) == {1, 3} for members in groups.values()))
 
     def test_extract_wires_pacing_state_and_spike_beat_ids(self) -> None:
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": [100], "paced": False, "state": "unknown", "lead_vote_count": 4}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": [100], "paced": False, "state": "unknown", "lead_vote_count": 4}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}) as mock_pacing_failures, \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[{"beat_id": 1, "type": "escape_candidate"}]) as mock_post_pause, \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}) as mock_cluster, \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
@@ -337,6 +337,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 320]
             mock_global.return_value.pacing_spikes = None
@@ -384,13 +385,15 @@ class PacingGroupingTests(unittest.TestCase):
             SimpleNamespace(beat_id=1, paced=False, group_id=2),
         ]
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": [100, 300, 500], "paced": True, "state": "on", "lead_vote_count": 4}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": [100, 300, 500], "paced": True, "state": "on", "lead_vote_count": 4}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0], 2: [1]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=beat_rows), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({1: np.zeros((12, 300), dtype=float)}, {})), \
@@ -398,6 +401,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 700]
             mock_qrs.return_value.fallback_used = False
@@ -449,14 +453,17 @@ class PacingGroupingTests(unittest.TestCase):
             for beat_id in range(5)
         ]
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": [100, 300], "paced": True, "state": "on", "lead_vote_count": 8}), \
-             patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", side_effect=lambda ecg, fs, spike_times, r_locs, pacing_result: pacing_result), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": [100, 300], "paced": True, "state": "on", "lead_vote_count": 8}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
+             patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", side_effect=lambda ecg, fs, spike_times, r_locs, pacing_result: pacing_result) as _api_patch_validate_pacing_spikes_against_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.validate_pacing_spikes_against_qrs", new=_api_patch_validate_pacing_spikes_against_qrs), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1], 2: [2, 3, 4]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=beat_rows), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({2: np.zeros((12, 300), dtype=float)}, {})), \
@@ -464,6 +471,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}) as mock_rep_leads, \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 320, 520, 720, 920]
             mock_qrs.return_value.fallback_used = False
@@ -515,14 +523,17 @@ class PacingGroupingTests(unittest.TestCase):
             for beat_id in range(4)
         ]
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": [100, 300, 500, 700], "paced": True, "state": "on", "lead_vote_count": 8}), \
-             patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", side_effect=lambda ecg, fs, spike_times, r_locs, pacing_result: pacing_result), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": [100, 300, 500, 700], "paced": True, "state": "on", "lead_vote_count": 8}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
+             patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", side_effect=lambda ecg, fs, spike_times, r_locs, pacing_result: pacing_result) as _api_patch_validate_pacing_spikes_against_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.validate_pacing_spikes_against_qrs", new=_api_patch_validate_pacing_spikes_against_qrs), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1, 2, 3]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({1: np.zeros((12, 300), dtype=float)}, {})), \
@@ -530,6 +541,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 320, 520, 720]
             mock_qrs.return_value.fallback_used = False
@@ -582,14 +594,17 @@ class PacingGroupingTests(unittest.TestCase):
                     )
                 )
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": [110, 310, 510, 710, 910, 1110, 1310], "paced": True, "state": "on", "lead_vote_count": 8}), \
-             patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", side_effect=lambda ecg, fs, spike_times, r_locs, pacing_result: pacing_result), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": [110, 310, 510, 710, 910, 1110, 1310], "paced": True, "state": "on", "lead_vote_count": 8}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
+             patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", side_effect=lambda ecg, fs, spike_times, r_locs, pacing_result: pacing_result) as _api_patch_validate_pacing_spikes_against_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.validate_pacing_spikes_against_qrs", new=_api_patch_validate_pacing_spikes_against_qrs), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: list(range(7)), 2: [7, 8, 9]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=beat_rows), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({1: np.zeros((12, 300), dtype=float), 2: np.zeros((12, 300), dtype=float)}, {})), \
@@ -597,6 +612,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}) as mock_rep_leads, \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 320, 520, 720, 920, 1120, 1320, 1520, 1720, 1920]
             mock_qrs.return_value.fallback_used = False
@@ -630,13 +646,15 @@ class PacingGroupingTests(unittest.TestCase):
             SimpleNamespace(beat_id=2, paced=False, group_id=1),
         ]
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": [95, 595, 1095], "paced": True, "state": "on", "lead_vote_count": 8}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": [95, 595, 1095], "paced": True, "state": "on", "lead_vote_count": 8}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1, 2]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=beat_rows), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({1: np.zeros((12, 300), dtype=float)}, {})), \
@@ -644,6 +662,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [125, 625, 1125]
             mock_qrs.return_value.fallback_used = False
@@ -672,10 +691,11 @@ class PacingGroupingTests(unittest.TestCase):
         )
         spike_times = [220, 620, 1020]
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={"spike_times": spike_times, "paced": True, "state": "on", "lead_vote_count": 5}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={"spike_times": spike_times, "paced": True, "state": "on", "lead_vote_count": 5}) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
              patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", return_value={
                  "spike_times": spike_times,
                  "paced": False,
@@ -683,10 +703,12 @@ class PacingGroupingTests(unittest.TestCase):
                  "lead_vote_count": 5,
                  "rejection_reason": "atrial_or_nonventricular_pacing",
                  "pacing_event_class": "atrial_or_nonventricular",
-             }), \
+             }) as _api_patch_validate_pacing_spikes_against_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.validate_pacing_spikes_against_qrs", new=_api_patch_validate_pacing_spikes_against_qrs), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1, 2]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({1: np.zeros((12, 300), dtype=float)}, {})), \
@@ -694,6 +716,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [300, 700, 1100]
             mock_qrs.return_value.fallback_used = False
@@ -724,24 +747,27 @@ class PacingGroupingTests(unittest.TestCase):
             paced_rhythm=False,
         )
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_pacing_spikes", return_value={
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_pacing_spikes", return_value={
                  "spike_times": [120],
                  "paced": True,
                  "state": "on",
                  "lead_vote_count": 6,
-             }), \
+             }) as _api_patch_detect_pacing_spikes, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_pacing_spikes", new=_api_patch_detect_pacing_spikes), \
              patch("feature_extraction.ecgfeat.api.validate_pacing_spikes_against_qrs", return_value={
                  "spike_times": [120],
                  "paced": True,
                  "state": "on",
                  "lead_vote_count": 6,
-             }), \
+             }) as _api_patch_validate_pacing_spikes_against_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.validate_pacing_spikes_against_qrs", new=_api_patch_validate_pacing_spikes_against_qrs), \
              patch("feature_extraction.ecgfeat.api.detect_pacing_failures", return_value={"artifact_confidence": 1.0, "capture_failure_suspected": False, "sensing_failure_suspected": False}), \
              patch("feature_extraction.ecgfeat.api.classify_post_pause_or_interpolated_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({1: np.zeros((12, 300), dtype=float)}, {})), \
@@ -749,6 +775,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [300, 700]
             mock_qrs.return_value.fallback_used = False
@@ -768,10 +795,11 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertFalse(mock_global.call_args.kwargs["paced"])
 
     def test_extract_disabled_pacing_keeps_off_state(self) -> None:
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}) as mock_cluster, \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
@@ -779,6 +807,7 @@ class PacingGroupingTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 320]
             mock_global.return_value.pacing_spikes = None
@@ -813,17 +842,19 @@ class PacingGroupingTests(unittest.TestCase):
                 "II": {"qt_ms": 430.0, "qt_consensus_ms": None},
             },
         )
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
              patch("feature_extraction.ecgfeat.api.delineate_beats", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features), \
+             patch("feature_extraction.ecgfeat.api.compute_global_features", return_value=global_features) as _api_patch_compute_global_features, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=_api_patch_compute_global_features), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [120, 320]
 

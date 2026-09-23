@@ -130,9 +130,10 @@ class QualityContractTests(unittest.TestCase):
         }
         qualities["V5"] = _make_quality("V5", flags=["baseline_wander"])
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value=qualities), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={}), \
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value=qualities), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={}), \
              patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta", new=mock_qrs), \
              patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}), \
              patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
              patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
@@ -140,6 +141,7 @@ class QualityContractTests(unittest.TestCase):
              patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
              patch("feature_extraction.ecgfeat.api.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features", new=mock_global), \
              patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [100, 300]
             mock_global.return_value.pacing_spikes = None

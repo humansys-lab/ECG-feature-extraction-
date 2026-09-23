@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
 from dataclasses import asdict
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 
@@ -12,26 +12,45 @@ from ._engine.atrial.core import (
     compute_pr_dispersion_ms,
     extract_atrial_events,
 )
-from ._engine.quality.acquisition import (
-    apply_channel_delay_compensation,
-    assess_acquisition_chain,
+from ._engine.atrial.p_wave import (
+    PWaveConfig,
+    backfill_missing_p_from_robust_engine,
+    build_p_wave_assessments,
+    finalize_p_wave_states,
+    summarize_p_wave_assessments,
 )
-from ._engine.delineation.core import (
-    apply_systematic_qrs_tail_settling_rescue,
-    delineate_beats,
-)
+from ._engine.beats.grouping import build_beat_annotations, cluster_beats
+from ._engine.beats.representative import build_representative_beats_with_meta
+from ._engine.delineation.core import apply_systematic_qrs_tail_settling_rescue, delineate_beats
+from ._engine.delineation.r_localization import apply_hybrid_r_localization
+from ._engine.delineation.refinement import correct_p_boundaries
+from ._engine.delineation.t_refinement import refine_t_wave_boundaries
+from ._engine.delineation.wave_localization import apply_hybrid_wave_localization
+from ._engine.detection.qrs import detect_qrs_multilead_with_meta
+from ._engine.foundation.numeric import _finite_float
 from ._engine.measurement.features import (
+    _axis_delta_deg,
+    _physiologic_pr_core_from_beats,
+    _select_reliable_qt_leads,
+    _stable_limb_signed_t_axis_deg,
     build_representative_lead_features,
     compute_global_features,
     compute_group_features,
     estimate_initial_qrs_axis_deg,
     estimate_pr_segment_ms,
-    _axis_delta_deg,
-    _physiologic_pr_core_from_beats,
-    _select_reliable_qt_leads,
-    _stable_limb_signed_t_axis_deg,
 )
-from ._engine.beats.grouping import build_beat_annotations, cluster_beats
+from ._engine.measurement.profiles.twelve_sl import apply_twelve_sl_measurement_profile
+from ._engine.measurement.st_baseline import adaptive_st_signal, calibrated_st_signal
+from ._engine.measurement.st_localization import apply_hybrid_st_measurement
+from ._engine.preprocess import lowpass_filter
+from ._engine.quality.acquisition import apply_channel_delay_compensation, assess_acquisition_chain
+from ._engine.quality.signal import (
+    build_diagnostic_gate,
+    compute_adjacent_precordial_correlations,
+    compute_qrs_detector_agreement,
+    remove_pacing_spikes,
+    validate_pacing_spikes_against_qrs,
+)
 from .clinical_rules.engine import analyze_clinical
 from .interpret import interpret
 from .models import (
@@ -40,49 +59,14 @@ from .models import (
     STANDARD_12_LEADS,
     resolve_patient_age,
 )
-from ._engine.preprocess import analysis_signal, lowpass_filter, resample_ecg
-from ._engine.atrial.p_wave import (
-    PWaveConfig,
-    backfill_missing_p_from_robust_engine,
-    build_p_wave_assessments,
-    finalize_p_wave_states,
-    summarize_p_wave_assessments,
+from .pipeline.policies.applicability import (
+    _apply_measurement_availability_to_representatives,
+    _atrial_measurements_invalid_for_availability,
 )
-from ._engine.detection.qrs import detect_qrs_multilead_with_meta
-from ._engine.quality.signal import (
-    build_diagnostic_gate,
-    compute_adjacent_precordial_correlations,
-    compute_qrs_detector_agreement,
-    compute_quality,
-    detect_limb_lead_reversal,
-    detect_pacing_spikes,
-    prepare_pacing_detection_cache,
-    remove_pacing_spikes,
-    summarize_record_quality,
-    validate_pacing_spikes_against_qrs,
+from .pipeline.policies.lead_integrity import (
+    _clear_precordial_reversal_flags,
+    _probable_limb_lead_reversal,
 )
-from ._engine.delineation.r_localization import apply_hybrid_r_localization
-from ._engine.delineation.wave_localization import apply_hybrid_wave_localization
-from ._engine.measurement.st_localization import apply_hybrid_st_measurement
-from ._engine.measurement.st_baseline import calibrated_st_signal, adaptive_st_signal
-from .refinement import RefinementConfig
-from ._engine.delineation.refinement import correct_p_boundaries
-from ._engine.delineation.t_refinement import refine_t_wave_boundaries
-from ._engine.beats.representative import build_representative_beats_with_meta
-from .rhythm_rules import (
-    assess_pacing_evidence_quality,
-    build_measurement_availability,
-    classify_pacing_context,
-    classify_post_pause_or_interpolated_beats,
-    detect_av_block_availability_flags,
-    detect_pacing_failures,
-    detect_pauses_and_av_block,
-    detect_preexcitation,
-    select_measurement_beat_ids,
-)
-from .rhythm_statements import build_rhythm_statement_candidates
-from ._engine.measurement.profiles.twelve_sl import apply_twelve_sl_measurement_profile
-from .validation import validate_ecg_input
 from .pipeline.policies.pacing import (
     _PACING_QRS_RESCUE_MIN_CAPTURE_BEATS,
     _borderline_paced_qrs_wide_offset_override_ms,
@@ -113,17 +97,6 @@ from .pipeline.policies.qt import (
     _rescue_intermittent_paced_qt_from_native,
     _rescue_qt_after_qrs_tail_settling,
 )
-from .pipeline.policies.lead_integrity import (
-    _clear_precordial_reversal_flags,
-    _probable_limb_lead_reversal,
-)
-from .pipeline.policies.applicability import (
-    _apply_measurement_availability_to_representatives,
-    _atrial_measurements_invalid_for_availability,
-)
-from .pipeline.stages.input import (
-    _resolve_mains_frequency,
-)
 from .pipeline.stages.beats import (
     _refine_measurement_group_after_delineation,
     _select_measurement_group,
@@ -139,9 +112,19 @@ from .pipeline.stages.measurement import (
     _delta_evidence,
     _pr_series_ms,
 )
-from ._engine.foundation.numeric import (
-    _finite_float,
+from .refinement import RefinementConfig
+from .rhythm_rules import (
+    assess_pacing_evidence_quality,
+    build_measurement_availability,
+    classify_pacing_context,
+    classify_post_pause_or_interpolated_beats,
+    detect_av_block_availability_flags,
+    detect_pacing_failures,
+    detect_pauses_and_av_block,
+    detect_preexcitation,
+    select_measurement_beat_ids,
 )
+from .rhythm_statements import build_rhythm_statement_candidates
 
 
 class ECGFeatureExtractor:
@@ -203,83 +186,36 @@ class ECGFeatureExtractor:
         gain_uv_per_lsb: Optional[float] = None,
         prior_features: Optional[ECGFeatures] = None,
     ) -> ECGFeatures:
-        input_unit = (
-            amplitude_unit
-            or (getattr(meta, "amplitude_unit", None) if meta is not None else None)
-            or "mV"
-        )
-        input_gain = (
-            gain_uv_per_lsb
-            if gain_uv_per_lsb is not None
-            else (getattr(meta, "gain_uv_per_lsb", None) if meta is not None else None)
-        )
-        ecg, fs_run, input_contract = validate_ecg_input(
+        from .pipeline.extractor import run_legacy_pipeline
+
+        context = run_legacy_pipeline(
+            self,
             ecg_12lead,
             fs,
-            self.fs_internal,
+            meta,
             lead_names=lead_names,
-            amplitude_unit=input_unit,
-            gain_uv_per_lsb=input_gain,
-            **({"allow_limited_leads": True} if self.input_mode == "limited" else {}),
-        )
-        available_leads = input_contract.get("available_leads")
-        quality_options = {"available_leads": available_leads} if available_leads is not None else {}
-
-        ecg_rs = resample_ecg(ecg, fs, fs_run)
-        mains_freq_run = _resolve_mains_frequency(ecg_rs, fs_run, self.mains_freq)
-        # Measurement signal: baseline removal + mains notch (no LP).
-        # Used for all amplitude/boundary measurements to preserve peak heights.
-        ecg_an = analysis_signal(ecg_rs, fs_run, mains_hz=mains_freq_run)
-        # Detection signal: ecg_an + low-pass filter.
-        # Used only for QRS R-peak detection to suppress muscle noise.
-        ecg_det = lowpass_filter(ecg_an, fs_run, cutoff_hz=self.lp_hz, order=4)
-
-        adc_full_scale_mv = (
-            getattr(meta, "adc_full_scale_mv", None)
-            if meta is not None
-            else None
-        )
-        raw_quality = compute_quality(
-            ecg_rs,
-            fs_run,
-            mains_hz=mains_freq_run,
-            adc_full_scale_mv=adc_full_scale_mv,
-        )
-        raw_record_quality = summarize_record_quality(raw_quality, **quality_options)
-        quality = compute_quality(
-            ecg_an,
-            fs_run,
-            mains_hz=mains_freq_run,
-            adc_full_scale_mv=adc_full_scale_mv,
-        )
-        record_quality = summarize_record_quality(quality, **quality_options)
-        refinement_kwargs = {"refinement": self.refinement} if self.refinement.enabled else {}
-        qrs_options = ({"quality": quality, "quality_reference": True}
-                       if self.refinement.qrs_quality_reference else {})
-        if available_leads is not None:
-            qrs_options["leads"] = tuple(STANDARD_12_LEADS.index(name) for name in available_leads)
-        if self.refinement.qrs_adaptive_consensus:
-            qrs_options["adaptive_consensus"] = True
-            qrs_options["quality"] = quality
-        rep_left_ms = 450 if self.refinement.representative_robust else 300
-        representative_options = ({"left_ms": rep_left_ms, "robust_alignment": True}
-                                  if self.refinement.representative_robust else {})
-        lead_reversal = detect_limb_lead_reversal(ecg_an) if self.enable_lead_reversal and available_leads is None else {}
-        pacing_detection_cache = (
-            prepare_pacing_detection_cache(ecg_rs, fs_run)
-            if self.enable_pacing
-            else None
-        )
-        pacing_result = detect_pacing_spikes(
-            ecg_rs,
-            fs_run,
-            detection_cache=pacing_detection_cache,
-        ) if self.enable_pacing else {
-            "spike_times": [],
-            "paced": False,
-            "state": "off",
-            "lead_vote_count": 0,
-        }
+            amplitude_unit=amplitude_unit,
+            gain_uv_per_lsb=gain_uv_per_lsb,
+            prior_features=prior_features,
+            stop_after='quality',
+        ).context
+        ecg_an = context.input.ecg_an
+        ecg_det = context.input.ecg_det
+        pacing_result = context.quality.pacing_result
+        fs_run = context.input.fs_run
+        qrs_options = context.quality.qrs_options
+        quality = context.quality.quality
+        ecg_rs = context.input.ecg_rs
+        pacing_detection_cache = context.quality.pacing_detection_cache
+        input_contract = context.input.input_contract
+        representative_options = context.quality.representative_options
+        rep_left_ms = context.quality.rep_left_ms
+        refinement_kwargs = context.quality.refinement_kwargs
+        available_leads = context.input.available_leads
+        mains_freq_run = context.input.mains_freq_run
+        lead_reversal = context.quality.lead_reversal
+        record_quality = context.quality.record_quality
+        raw_record_quality = context.quality.raw_record_quality
         ecg_measure = ecg_an
         ecg_detect = ecg_det
         pre_despike_qrs_result = None

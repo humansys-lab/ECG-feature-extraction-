@@ -14,8 +14,8 @@ import numpy as np
 
 from ..._engine.foundation.numeric import _finite_float
 from ..._engine.measurement.features import compute_global_features
-from ...record.availability import Measured, NotApplicable, Unavailable
 from ..context import PipelineContext, PolicyDecision, PolicyEvent
+from ._events import event
 
 _PACING_INTERMITTENT_QT_NATIVE_RESCUE_MAX_PACED_FRACTION = 0.80
 _PACING_INTERMITTENT_QT_NATIVE_RESCUE_MIN_DELTA_MS = 40.0
@@ -215,7 +215,124 @@ class QTPolicy:
     version: str = "1"
 
     def decide(self, evidence: QTEvidence, *, context: PipelineContext) -> PolicyDecision:
-        raise NotImplementedError("The qt policy is still embedded in the legacy engine; independent decisions require the migration equivalence gate")
+        raise NotImplementedError(
+            "a target-architecture QT selection from abstract QTEvidence is not implemented; "
+            "the legacy-parity decisions are QTTailSettlingRescuePolicy, IntermittentPacedQTRescuePolicy "
+            "and QTRejectGatePolicy"
+        )
 
 
-__all__ = ["QTEvidence", "QTDecision", "QTPolicy"]
+# --------------------------------------------------------------------------- #
+# Decision-cluster policy objects.
+#
+# The three QT helpers write their decision into ``GlobalFeatures`` in place.
+# During Phase 3 ``decide`` executes the verbatim helper, so the application to
+# the engine object owned by the calling stage (see the ownership-transfer rule
+# in ``pipeline.context``) happens exactly as before; the returned value is the
+# helper's own return value and the event reports the observed effect.
+# --------------------------------------------------------------------------- #
+
+_POLICY = "qt"
+_QT_FIELDS = ("global_features.qt_ms", "global_features.qtc_bazett_ms", "global_features.qtc_fridericia_ms")
+
+
+@dataclass(frozen=True, slots=True)
+class QTTailSettlingRescuePolicy:
+    """Report multilead QT consensus after a systematic QRS terminal-tail rescue."""
+
+    name: str = f"{_POLICY}.qrs_tail_settling_rescue"
+
+    def decide(
+        self,
+        *,
+        global_features: Any,
+        representative_leads: Dict[str, Any],
+        r_locs: np.ndarray,
+        fs: int,
+        qrs_tail_settling_rescue: Dict[str, Any],
+    ) -> PolicyDecision:
+        source = _rescue_qt_after_qrs_tail_settling(
+            global_features=global_features,
+            representative_leads=representative_leads,
+            r_locs=r_locs,
+            fs=fs,
+            qrs_tail_settling_rescue=qrs_tail_settling_rescue,
+        )
+        if source is None:
+            outcome = event(self.name, "no_change", "tail_settling_qt_rescue_not_applicable", _QT_FIELDS)
+        else:
+            outcome = event(
+                self.name, "rescue", source, _QT_FIELDS
+                + tuple(f"lead:{lead}" for lead in getattr(global_features, "qt_used_leads", []) or []),
+                qt_ms=_finite_float(getattr(global_features, "qt_ms", None)),
+            )
+        return PolicyDecision(source, outcome)
+
+
+@dataclass(frozen=True, slots=True)
+class IntermittentPacedQTRescuePolicy:
+    """Replace an irregular paced-route QT with the native-beat QT when it is longer."""
+
+    name: str = f"{_POLICY}.intermittent_paced_native_rescue"
+
+    def decide(
+        self,
+        global_features: Any,
+        representative_leads: Dict[str, Any],
+        measurement_beat_features: List[Any],
+        r_locs: np.ndarray,
+        fs: int,
+        paced_fraction: float,
+    ) -> PolicyDecision:
+        replaced_qt = _finite_float(getattr(global_features, "qt_ms", None))
+        replaced_source = getattr(global_features, "qt_source", None)
+        source = _rescue_intermittent_paced_qt_from_native(
+            global_features,
+            representative_leads,
+            measurement_beat_features,
+            r_locs,
+            fs,
+            paced_fraction,
+        )
+        if source is None:
+            outcome = event(self.name, "no_change", "native_qt_rescue_not_applicable", _QT_FIELDS,
+                            paced_fraction=paced_fraction)
+        else:
+            outcome = event(
+                self.name, "rescue", "paced_native_qt_rescue", _QT_FIELDS,
+                replaced_qt_ms=replaced_qt, replaced_source=replaced_source,
+                qt_ms=_finite_float(getattr(global_features, "qt_ms", None)), qt_source=source,
+                paced_fraction=paced_fraction,
+            )
+        return PolicyDecision(source, outcome)
+
+
+@dataclass(frozen=True, slots=True)
+class QTRejectGatePolicy:
+    """Withdraw QT/QTc when weak QT reliability meets a poor record grade."""
+
+    name: str = f"{_POLICY}.reject_gate"
+
+    def decide(self, global_features: Any, record_grade: Optional[str]) -> PolicyDecision:
+        was_rejected = bool(getattr(global_features, "qt_rejected", False))
+        reliability = getattr(global_features, "qt_reliability", "unavailable")
+        result = _apply_qt_reject_gate(global_features, record_grade)
+        if bool(getattr(global_features, "qt_rejected", False)) and not was_rejected:
+            outcome = event(self.name, "reject", "weak_qt_reliability_with_poor_record_grade", _QT_FIELDS,
+                            qt_reliability=reliability, record_grade=record_grade)
+        else:
+            outcome = event(self.name, "no_change", "qt_reject_gate_not_triggered", _QT_FIELDS,
+                            qt_reliability=reliability, record_grade=record_grade)
+        return PolicyDecision(result, outcome)
+
+
+QT_TAIL_SETTLING_RESCUE = QTTailSettlingRescuePolicy()
+INTERMITTENT_PACED_QT_RESCUE = IntermittentPacedQTRescuePolicy()
+QT_REJECT_GATE = QTRejectGatePolicy()
+
+
+__all__ = [
+    "QTEvidence", "QTDecision", "QTPolicy",
+    "QTTailSettlingRescuePolicy", "IntermittentPacedQTRescuePolicy", "QTRejectGatePolicy",
+    "QT_TAIL_SETTLING_RESCUE", "INTERMITTENT_PACED_QT_RESCUE", "QT_REJECT_GATE",
+]

@@ -174,6 +174,105 @@ def _legacy_extractor(config: ECGConfig) -> Any:
     )
 
 
+# --------------------------------------------------------------------------- #
+# Staged legacy-parity pipeline (library migration Phase 3).
+#
+# The pre-decomposition ``ECGFeatureExtractor.extract`` body runs as the fixed
+# stage sequence below; each entry is (label, stage module, stage function).
+# The beats stage refines its measurement group after primary delineation, and
+# delineation settles the QRS tail and refines T after that refinement, exactly
+# where the legacy body did.  Stage modules are imported lazily so that
+# record-only users of ``ecgfeat.pipeline`` do not load the numerical engine.
+# --------------------------------------------------------------------------- #
+
+LEGACY_ORCHESTRATION_ENV = "ECGFEAT_LEGACY_ORCHESTRATION"
+
+LEGACY_STAGE_SEQUENCE: tuple[tuple[str, str, str], ...] = (
+    ("input", "input", "run"),
+    ("quality", "quality", "run"),
+    ("ventricular", "ventricular", "run"),
+    ("beats", "beats", "run"),
+    ("delineation", "delineation", "run"),
+    ("beats.refine_measurement_group", "beats", "refine_measurement_group"),
+    ("delineation.settle_qrs_tail_and_refine_t", "delineation", "settle_qrs_tail_and_refine_t"),
+    ("atrial", "atrial", "run"),
+    ("measurement", "measurement", "run"),
+    ("finalize", "finalize", "run"),
+)
+
+
+def legacy_orchestration_requested() -> bool:
+    """True when ``ECGFEAT_LEGACY_ORCHESTRATION`` routes extraction to the rollback path.
+
+    The rollback path is the preserved pre-decomposition orchestration in
+    ``ecgfeat.compat._api_v0_legacy_orchestration`` (migration plan, Phase 3 / F).
+    """
+    import os
+
+    return os.environ.get(LEGACY_ORCHESTRATION_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyPipelineRun:
+    """Final pipeline context of one staged legacy-parity extraction."""
+
+    context: Any
+
+    @property
+    def features(self) -> Any:
+        return self.context.legacy_features
+
+    @property
+    def policy_events(self) -> tuple[Any, ...]:
+        return self.context.policy_events
+
+
+def run_legacy_pipeline(
+    extractor: Any,
+    ecg_12lead: Any,
+    fs: Any,
+    meta: Any = None,
+    *,
+    lead_names: Any = None,
+    amplitude_unit: Any = None,
+    gain_uv_per_lsb: Any = None,
+    prior_features: Any = None,
+    hooks: Any = None,
+    stop_after: str | None = None,
+) -> LegacyPipelineRun:
+    """Run the staged pipeline that reproduces ``ECGFeatureExtractor.extract``.
+
+    ``extractor`` supplies the resolved legacy configuration (any object with the
+    ``ECGFeatureExtractor`` attributes).  ``hooks`` are the interpretation hooks the
+    legacy entry point injects (``ecgfeat.compat.interpretation_hooks``); without
+    them no interpretation output is produced.  ``stop_after`` names a stage label
+    after which to stop (diagnosis and ablation only).
+    """
+    from dataclasses import replace
+    from importlib import import_module
+
+    from .context import ExtractionRequest, ExtractorSettings, PipelineContext
+
+    labels = [label for label, _module, _function in LEGACY_STAGE_SEQUENCE]
+    if stop_after is not None and stop_after not in labels:
+        raise ValueError(f"unknown stage label {stop_after!r}; expected one of {labels}")
+    context = PipelineContext(
+        config=ExtractorSettings.from_extractor(extractor),
+        patient=meta,
+        request=ExtractionRequest(ecg_12lead, fs, meta, lead_names, amplitude_unit, gain_uv_per_lsb, prior_features),
+        hooks=hooks,
+    )
+    for label, module, function in LEGACY_STAGE_SEQUENCE:
+        stage = getattr(import_module(f".stages.{module}", __package__), function)
+        result = stage(context)
+        context = result.context
+        if result.issues:
+            context = replace(context, issues=context.issues + tuple(result.issues))
+        if label == stop_after:
+            break
+    return LegacyPipelineRun(context)
+
+
 def ecg_measure(prepared: ECGInput, *, method: str = "default", config: ECGConfig | None = None) -> ECGMeasurements:
     if not isinstance(prepared, ECGInput):
         raise ConfigurationError("prepared must be an ECGInput from ecg_prepare")

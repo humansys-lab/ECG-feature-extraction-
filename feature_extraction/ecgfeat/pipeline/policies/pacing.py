@@ -31,6 +31,7 @@ from ..._engine.quality.signal import (
 from ...models import STANDARD_12_LEADS
 from ..context import PipelineContext, PolicyDecision, PolicyEvent
 from ..stages.atrial import _av_block_evidence
+from ._events import event
 
 _PACING_LIKE_NEAR_WIDE_QRS_MS = 115.0
 _PACING_LIKE_ATRIAL_EVENTS_PER_RR_MIN = 3.0
@@ -1132,7 +1133,417 @@ class PacingPolicy:
     version: str = "1"
 
     def decide(self, evidence: PacingEvidence, *, context: PipelineContext) -> PolicyDecision:
-        raise NotImplementedError("The pacing policy is still embedded in the legacy engine; independent decisions require the migration equivalence gate")
+        raise NotImplementedError(
+            "a target-architecture pacing decision from abstract PacingEvidence is not implemented; "
+            "the legacy-parity decisions are the decision-cluster policies in this module"
+        )
 
 
-__all__ = ["PacingEvidence", "PacingDecision", "PacingPolicy"]
+# --------------------------------------------------------------------------- #
+# Decision-cluster policy objects.
+#
+# Each ``decide`` takes exactly the arguments of the legacy helper(s) it wraps,
+# returns exactly the value the legacy code computed, and describes the outcome
+# in a PolicyEvent.  Event construction only reads the evidence.  The staged
+# extractor applies the value exactly as the pre-decomposition code did.
+# --------------------------------------------------------------------------- #
+
+_POLICY = "pacing"
+
+
+def _qrs_source_ids(*names: str) -> tuple[str, ...]:
+    return tuple(f"qrs_detector:{name}" for name in names)
+
+
+@dataclass(frozen=True, slots=True)
+class PacingQRSRescueEvidencePolicy:
+    """Does de-spiking look like it removed genuine, regularly captured QRS beats?"""
+
+    name: str = f"{_POLICY}.qrs_rescue_evidence"
+
+    def decide(
+        self,
+        *,
+        pacing_result: Dict[str, Any],
+        pre_despike_qrs_result: Any,
+        despiked_qrs_result: Any,
+        fs: int,
+    ) -> PolicyDecision:
+        evidence = _pacing_qrs_rescue_evidence(
+            pacing_result=pacing_result,
+            pre_despike_qrs_result=pre_despike_qrs_result,
+            despiked_qrs_result=despiked_qrs_result,
+            fs=fs,
+        )
+        supported = bool(evidence.get("applied"))
+        return PolicyDecision(evidence, event(
+            self.name,
+            "accept" if supported else "no_change",
+            str(evidence.get("reason")) if supported else "rescue_evidence_insufficient",
+            _qrs_source_ids("pre_despike", "despiked"),
+            pre_despike_n_beats=evidence.get("pre_despike_n_beats"),
+            despiked_n_beats=evidence.get("despiked_n_beats"),
+            capture_beats=evidence.get("capture_beats"),
+        ))
+
+
+@dataclass(frozen=True, slots=True)
+class CleanedSingleLeadQRSRescuePolicy:
+    """Recover missed paced beats from one reliable de-spiked lead, if one confirms them."""
+
+    name: str = f"{_POLICY}.cleaned_single_lead_qrs_rescue"
+
+    def decide(
+        self,
+        *,
+        ecg_detect: np.ndarray,
+        fs: int,
+        quality: Dict[str, Any],
+        pacing_result: Dict[str, Any],
+        pre_despike_qrs_result: Any,
+    ) -> PolicyDecision:
+        candidate, detail = _pacing_qrs_cleaned_single_lead_rescue(
+            ecg_detect=ecg_detect,
+            fs=fs,
+            quality=quality,
+            pacing_result=pacing_result,
+            pre_despike_qrs_result=pre_despike_qrs_result,
+        )
+        if candidate is None:
+            outcome = event(self.name, "reject", "no_regular_cleaned_single_lead_confirmation",
+                            _qrs_source_ids("pre_despike", "despiked"))
+        else:
+            outcome = event(
+                self.name, "rescue", "paced_cleaned_single_lead_qrs_rescue",
+                _qrs_source_ids("despiked") + (f"lead:{detail.get('rescue_lead')}",),
+                n_beats=detail.get("cleaned_single_lead_n_beats"),
+                match_fraction=detail.get("cleaned_single_lead_match_fraction"),
+            )
+        return PolicyDecision((candidate, detail), outcome)
+
+
+@dataclass(frozen=True, slots=True)
+class AttenuatedPacingRescuePolicy:
+    """Accept attenuated pacer spikes only when QRS-validated capture is present."""
+
+    name: str = f"{_POLICY}.attenuated_spike_rescue"
+
+    def decide(
+        self,
+        *,
+        ecg_rs: np.ndarray,
+        ecg_an: np.ndarray,
+        fs_run: int,
+        lp_hz: float,
+        current_pacing_result: Dict[str, Any],
+        current_ecg_measure: np.ndarray,
+        current_ecg_detect: np.ndarray,
+        current_qrs_result: Any,
+        current_r_locs: np.ndarray,
+        pacing_detection_cache: Optional[Dict[str, Any]] = None,
+    ) -> PolicyDecision:
+        result = _try_attenuated_pacing_rescue(
+            ecg_rs=ecg_rs,
+            ecg_an=ecg_an,
+            fs_run=fs_run,
+            lp_hz=lp_hz,
+            current_pacing_result=current_pacing_result,
+            current_ecg_measure=current_ecg_measure,
+            current_ecg_detect=current_ecg_detect,
+            current_qrs_result=current_qrs_result,
+            current_r_locs=current_r_locs,
+            pacing_detection_cache=pacing_detection_cache,
+        )
+        pacing_result = result[0]
+        if pacing_result is current_pacing_result:
+            outcome = event(self.name, "no_change", "attenuated_rescue_not_applied", ("pacing_detection",))
+        else:
+            outcome = event(
+                self.name, "rescue", str(pacing_result.get("rescue_reason")),
+                ("pacing_detection", "qrs_detector:attenuated_spike_cleaned"),
+                prominence_uv=pacing_result.get("rescue_prominence_uv"),
+                capture_fraction=pacing_result.get("rescue_capture_fraction"),
+            )
+        return PolicyDecision(result, outcome)
+
+
+@dataclass(frozen=True, slots=True)
+class PacingCaptureAlignmentPolicy:
+    """Is ventricular capture by the detected spikes confirmed?"""
+
+    name: str = f"{_POLICY}.capture_alignment"
+
+    def decide(
+        self,
+        pacing_result: Dict[str, Any],
+        spike_offsets_samples: List[int],
+        fs: int,
+        evidence_quality: Optional[Dict[str, Any]] = None,
+    ) -> PolicyDecision:
+        confirmed = _pacing_capture_alignment_confirmed(
+            pacing_result,
+            spike_offsets_samples,
+            fs,
+            evidence_quality,
+        )
+        if confirmed:
+            outcome = event(self.name, "accept", "ventricular_capture_alignment_confirmed",
+                            ("pacing_detection",), n_aligned_spikes=len(spike_offsets_samples))
+        elif bool(pacing_result.get("paced", False)):
+            outcome = event(self.name, "reject", "capture_alignment_not_confirmed",
+                            ("pacing_detection",), n_aligned_spikes=len(spike_offsets_samples))
+        else:
+            outcome = event(self.name, "no_change", "pacing_not_detected", ("pacing_detection",))
+        return PolicyDecision(confirmed, outcome)
+
+
+@dataclass(frozen=True, slots=True)
+class PacedMeasurementGroupPolicy:
+    """Is the selected measurement group made mostly of paced beats?"""
+
+    name: str = f"{_POLICY}.paced_measurement_group"
+
+    def decide(
+        self,
+        measurement_beat_ids: List[int],
+        paced_beat_ids: List[int],
+    ) -> PolicyDecision:
+        paced_majority = _selected_group_paced_majority(measurement_beat_ids, paced_beat_ids)
+        return PolicyDecision(paced_majority, event(
+            self.name,
+            "accept" if paced_majority else "no_change",
+            "selected_group_paced_majority" if paced_majority else "selected_group_not_paced_majority",
+            tuple(f"beat:{int(beat_id)}" for beat_id in measurement_beat_ids),
+        ))
+
+
+@dataclass(frozen=True, slots=True)
+class IntermittentPacingWideContextPolicy:
+    """Route intermittent pacing with a wide QRS offset consensus to paced measurement."""
+
+    name: str = f"{_POLICY}.intermittent_wide_measurement_context"
+
+    def decide(self, representative_leads: Dict[str, Any]) -> PolicyDecision:
+        wide = _intermittent_pacing_wide_measurement_context(representative_leads)
+        return PolicyDecision(wide, event(
+            self.name,
+            "accept" if wide else "no_change",
+            "intermittent_pacing_wide_qrs_consensus" if wide else "no_intermittent_wide_qrs_consensus",
+            ("representative_leads",),
+        ))
+
+
+@dataclass(frozen=True, slots=True)
+class PacingLikeContextPolicy:
+    """Wide or over-wide QRS with AV-relation evidence that behaves like pacing."""
+
+    name: str = f"{_POLICY}.pacing_like_context"
+
+    def decide(
+        self,
+        qrs_duration_ms: object,
+        groups: Dict[int, Any],
+        rule_summary: Dict[str, Any],
+    ) -> PolicyDecision:
+        wide = _wide_qrs_pacing_like_context(qrs_duration_ms, rule_summary)
+        context = wide or _overwide_qrs_pacing_like_context(qrs_duration_ms, groups, rule_summary)
+        if wide:
+            reason = "wide_qrs_pacing_like_context"
+        elif context:
+            reason = "overwide_qrs_pacing_like_context"
+        else:
+            reason = "no_pacing_like_context"
+        return PolicyDecision(context, event(
+            self.name, "accept" if context else "no_change", reason,
+            ("global_features.qrs_ms",), qrs_ms=_finite_float(qrs_duration_ms),
+        ))
+
+
+@dataclass(frozen=True, slots=True)
+class PacingLikeQRSOverridePolicy:
+    """QRS-duration override in a pacing-like context (first matching rule wins)."""
+
+    name: str = f"{_POLICY}.pacing_like_qrs_override"
+
+    def decide(
+        self,
+        qrs_duration_ms: object,
+        representative_leads: Dict[str, Any],
+        groups: Dict[int, Any],
+        rule_summary: Dict[str, Any],
+    ) -> PolicyDecision:
+        rule = "raw_pacing_qrs_underestimate"
+        override = _raw_pacing_qrs_underestimate_override_ms(
+            qrs_duration_ms,
+            representative_leads,
+            rule_summary,
+        )
+        if override is None:
+            rule = "near_wide_pacing_group"
+            override = _near_wide_pacing_qrs_override_ms(
+                qrs_duration_ms,
+                groups,
+                rule_summary,
+            )
+        if override is None:
+            rule = "overwide_pacing_raw_consensus"
+            override = _overwide_pacing_qrs_override_ms(
+                qrs_duration_ms,
+                representative_leads,
+                groups,
+                rule_summary,
+            )
+        return PolicyDecision(override, _override_event(self.name, rule, qrs_duration_ms, override))
+
+
+@dataclass(frozen=True, slots=True)
+class PacedQRSOverridePolicy:
+    """QRS-duration override on the paced measurement route (first matching rule wins)."""
+
+    name: str = f"{_POLICY}.paced_qrs_override"
+
+    def decide(
+        self,
+        qrs_duration_ms: object,
+        representative_leads: Dict[str, Any],
+        groups: Dict[int, Any],
+    ) -> PolicyDecision:
+        rules = (
+            ("overwide_paced_raw_consensus", _overwide_paced_qrs_raw_consensus_override_ms,
+             (qrs_duration_ms, representative_leads, groups)),
+            ("dominant_paced_wide_group", _dominant_paced_wide_qrs_override_ms,
+             (qrs_duration_ms, groups)),
+            ("near_wide_paced_qrs_offset", _near_wide_paced_qrs_offset_override_ms,
+             (qrs_duration_ms, representative_leads, groups)),
+            ("intermittent_paced_wide_qrs", _intermittent_paced_wide_qrs_override_ms,
+             (qrs_duration_ms, representative_leads, groups)),
+            ("borderline_paced_qrs_wide_offset", _borderline_paced_qrs_wide_offset_override_ms,
+             (qrs_duration_ms, representative_leads)),
+            ("secondary_paced_wide_group", _secondary_paced_wide_group_qrs_override_ms,
+             (qrs_duration_ms, representative_leads, groups)),
+        )
+        override: Optional[float] = None
+        rule = rules[-1][0]
+        for rule, helper, arguments in rules:
+            override = helper(*arguments)
+            if override is not None:
+                break
+        return PolicyDecision(override, _override_event(self.name, rule, qrs_duration_ms, override))
+
+
+def _override_event(policy: str, rule: str, measured: object, override: Optional[float]) -> PolicyEvent:
+    if override is None:
+        return event(policy, "no_change", "no_override_rule_matched", ("global_features.qrs_ms",),
+                     measured_ms=_finite_float(measured))
+    return event(policy, "override", rule, ("global_features.qrs_ms",),
+                 measured_ms=_finite_float(measured), override_ms=_finite_float(override))
+
+
+@dataclass(frozen=True, slots=True)
+class PacingMeasurementEffectPolicy:
+    """How pacing affected the global measurement route."""
+
+    name: str = f"{_POLICY}.measurement_effect"
+
+    def decide(
+        self,
+        *,
+        pacing_enabled: bool,
+        pacing_result: Dict[str, Any],
+        measurement_group_paced: bool,
+        global_measurement_paced: bool,
+        pacing_capture_confirmed: bool,
+        paced_qrs_floor_beat_ids: List[int],
+    ) -> PolicyDecision:
+        effect = _pacing_measurement_effect(
+            pacing_enabled=pacing_enabled,
+            pacing_result=pacing_result,
+            measurement_group_paced=measurement_group_paced,
+            global_measurement_paced=global_measurement_paced,
+            pacing_capture_confirmed=pacing_capture_confirmed,
+            paced_qrs_floor_beat_ids=paced_qrs_floor_beat_ids,
+        )
+        return PolicyDecision(effect, _effect_event(self.name, effect))
+
+
+@dataclass(frozen=True, slots=True)
+class PacingSegmentationEffectPolicy:
+    """How pacing affected beat segmentation."""
+
+    name: str = f"{_POLICY}.segmentation_effect"
+
+    def decide(
+        self,
+        *,
+        pacing_enabled: bool,
+        pacing_result: Dict[str, Any],
+        measurement_group_paced: bool,
+        segmentation_paced_beat_ids: List[int],
+        paced_qrs_floor_beat_ids: List[int],
+    ) -> PolicyDecision:
+        effect = _pacing_segmentation_effect(
+            pacing_enabled=pacing_enabled,
+            pacing_result=pacing_result,
+            measurement_group_paced=measurement_group_paced,
+            segmentation_paced_beat_ids=segmentation_paced_beat_ids,
+            paced_qrs_floor_beat_ids=paced_qrs_floor_beat_ids,
+        )
+        return PolicyDecision(effect, _effect_event(self.name, effect))
+
+
+@dataclass(frozen=True, slots=True)
+class MeasurementPacingStatePolicy:
+    """The pacing state reported for measurement (off / unknown / on)."""
+
+    name: str = f"{_POLICY}.measurement_state"
+
+    def decide(
+        self,
+        *,
+        pacing_enabled: bool,
+        detection_state: object,
+        confirmed_pacing_context: bool,
+        pacing_measurement_effect: str,
+    ) -> PolicyDecision:
+        state = _measurement_pacing_state(
+            pacing_enabled=pacing_enabled,
+            detection_state=detection_state,
+            confirmed_pacing_context=confirmed_pacing_context,
+            pacing_measurement_effect=pacing_measurement_effect,
+        )
+        return PolicyDecision(state, event(
+            self.name, "accept", f"measurement_pacing_state_{state}", ("pacing_detection",),
+            detection_state=str(detection_state or "off"),
+        ))
+
+
+def _effect_event(policy: str, effect: str) -> PolicyEvent:
+    inert = effect in {"disabled", "none", "metadata_only"}
+    return event(policy, "no_change" if inert else "accept", effect, ("pacing_detection",))
+
+
+PACING_QRS_RESCUE_EVIDENCE = PacingQRSRescueEvidencePolicy()
+CLEANED_SINGLE_LEAD_QRS_RESCUE = CleanedSingleLeadQRSRescuePolicy()
+ATTENUATED_PACING_RESCUE = AttenuatedPacingRescuePolicy()
+PACING_CAPTURE_ALIGNMENT = PacingCaptureAlignmentPolicy()
+PACED_MEASUREMENT_GROUP = PacedMeasurementGroupPolicy()
+INTERMITTENT_PACING_WIDE_CONTEXT = IntermittentPacingWideContextPolicy()
+PACING_LIKE_CONTEXT = PacingLikeContextPolicy()
+PACING_LIKE_QRS_OVERRIDE = PacingLikeQRSOverridePolicy()
+PACED_QRS_OVERRIDE = PacedQRSOverridePolicy()
+PACING_MEASUREMENT_EFFECT = PacingMeasurementEffectPolicy()
+PACING_SEGMENTATION_EFFECT = PacingSegmentationEffectPolicy()
+MEASUREMENT_PACING_STATE = MeasurementPacingStatePolicy()
+
+
+__all__ = [
+    "PacingEvidence", "PacingDecision", "PacingPolicy",
+    "PacingQRSRescueEvidencePolicy", "CleanedSingleLeadQRSRescuePolicy", "AttenuatedPacingRescuePolicy",
+    "PacingCaptureAlignmentPolicy", "PacedMeasurementGroupPolicy", "IntermittentPacingWideContextPolicy",
+    "PacingLikeContextPolicy", "PacingLikeQRSOverridePolicy", "PacedQRSOverridePolicy",
+    "PacingMeasurementEffectPolicy", "PacingSegmentationEffectPolicy", "MeasurementPacingStatePolicy",
+    "PACING_QRS_RESCUE_EVIDENCE", "CLEANED_SINGLE_LEAD_QRS_RESCUE", "ATTENUATED_PACING_RESCUE",
+    "PACING_CAPTURE_ALIGNMENT", "PACED_MEASUREMENT_GROUP", "INTERMITTENT_PACING_WIDE_CONTEXT",
+    "PACING_LIKE_CONTEXT", "PACING_LIKE_QRS_OVERRIDE", "PACED_QRS_OVERRIDE",
+    "PACING_MEASUREMENT_EFFECT", "PACING_SEGMENTATION_EFFECT", "MEASUREMENT_PACING_STATE",
+]
