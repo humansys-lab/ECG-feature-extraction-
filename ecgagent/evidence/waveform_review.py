@@ -214,8 +214,7 @@ def build_waveform_review(
 
     # Filtering is only a local morphology aid; R/S and ST use raw samples.
     try:
-        from ecgfeat.atrial_validation import p_waveform_evidence
-        from ecgfeat.preprocess import lowpass_filter
+        from .signal_helpers import lowpass_filter, p_waveform_evidence
     except ImportError:
         return unavailable_waveform_review("measurement_helper_unavailable")
     filtered = {lead: lowpass_filter(signal, original_fs, 15.)
