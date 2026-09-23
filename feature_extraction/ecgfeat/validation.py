@@ -14,20 +14,7 @@ STANDARD_12_LEADS = (
 INDEPENDENT_8_LEADS = ("I", "II", "V1", "V2", "V3", "V4", "V5", "V6")
 
 
-class ECGInputError(ValueError):
-    """A machine-readable input-contract violation."""
-
-    def __init__(self, code: str, message: str, **details: Any) -> None:
-        super().__init__(message)
-        self.code = str(code)
-        self.details = dict(details)
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "code": self.code,
-            "message": str(self),
-            "details": dict(self.details),
-        }
+from .errors import ECGInputError
 
 
 def _finite_sampling_rate(value: object, *, field: str) -> float:
@@ -67,6 +54,7 @@ def validate_ecg_input(
     amplitude_unit: str = "mV",
     gain_uv_per_lsb: Optional[float] = None,
     minimum_duration_seconds: float = MIN_RECORD_DURATION_SECONDS,
+    allow_limited_leads: bool = False,
 ) -> Tuple[np.ndarray, int, Dict[str, Any]]:
     """Validate, reorder and normalize a conventional 12-lead ECG.
 
@@ -113,6 +101,10 @@ def validate_ecg_input(
         if lead_names is not None
         else None
     )
+    if allow_limited_leads and (not normalized_lead_names or not 1 <= len(normalized_lead_names) <= 8
+                                or any(not name for name in normalized_lead_names)):
+        raise ECGInputError("limited_lead_names_required", "limited input requires 1-8 explicit channel names")
+    lead_slot_map = None
     expected_count = len(normalized_lead_names) if normalized_lead_names else 12
     transposed = False
     if ecg.shape[0] != expected_count:
@@ -139,7 +131,20 @@ def validate_ecg_input(
             for index, name in enumerate(normalized_lead_names)
         }
         supplied = set(lead_map)
-        if set(STANDARD_12_LEADS).issubset(supplied):
+        if allow_limited_leads:
+            # Slots are computational coordinates only. Unknown channels do
+            # not acquire anatomical meaning and no limb leads are derived.
+            preferred = ["II", "V2", "V5", "I", "V1", "V3", "V4", "V6", "III", "aVR", "aVL", "aVF"]
+            used = supplied & set(STANDARD_12_LEADS)
+            free = iter(name for name in preferred if name not in used)
+            lead_slot_map = {name: name if name in STANDARD_12_LEADS else next(free)
+                             for name in normalized_lead_names}
+            output = np.zeros((12, ecg.shape[1]), dtype=float)
+            for name, slot in lead_slot_map.items():
+                output[STANDARD_12_LEADS.index(slot)] = lead_map[name]
+            ecg = output
+            lead_mode = "limited_explicit"
+        elif set(STANDARD_12_LEADS).issubset(supplied):
             ecg = np.stack([lead_map[name] for name in STANDARD_12_LEADS])
             lead_mode = "complete_12_reordered"
         elif set(INDEPENDENT_8_LEADS).issubset(supplied):
@@ -235,7 +240,7 @@ def validate_ecg_input(
         )
     ecg = np.asarray(ecg * unit_scale, dtype=float)
     amplitude_calibration = _assess_amplitude_calibration(ecg)
-    if lead_mode != "independent_8_with_derived_limb_leads":
+    if lead_mode not in {"independent_8_with_derived_limb_leads", "limited_explicit"}:
         lead_i, lead_ii, lead_iii, avr, avl, avf = ecg[:6]
         reference = max(
             float(np.sqrt(np.mean(lead_i**2) + np.mean(lead_ii**2))),
@@ -259,7 +264,7 @@ def validate_ecg_input(
             "consistent": bool(normalized_error <= 0.35),
             "severely_inconsistent": bool(normalized_error > 1.0),
         }
-    else:
+    elif lead_mode == "independent_8_with_derived_limb_leads":
         limb_consistency = {
             "einthoven_rms_mv": 0.0,
             "goldberger_rms_mv": 0.0,
@@ -299,6 +304,10 @@ def validate_ecg_input(
         "limb_lead_consistency": limb_consistency,
         "amplitude_calibration": amplitude_calibration,
     }
+    if allow_limited_leads:
+        contract.update(lead_slot_map=lead_slot_map, available_leads=list(lead_slot_map.values()),
+                        anatomical_names_known=all(name in STANDARD_12_LEADS for name in normalized_lead_names),
+                        unavailable_leads=[name for name in STANDARD_12_LEADS if name not in lead_slot_map.values()])
     return ecg, internal_fs, contract
 
 

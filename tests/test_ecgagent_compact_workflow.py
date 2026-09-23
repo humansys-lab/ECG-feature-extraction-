@@ -220,9 +220,13 @@ def test_compact_rule_candidate_is_added_only_after_blind_plan():
         "get_atrial_event_table",
     ]
     assert [step["id"] for step in candidate["diagnostic_pathway"]["steps"]] == [
+        "atrial_wave_identity",
         "pr_criterion",
         "one_to_one_av",
     ]
+    identity = candidate["diagnostic_pathway"]["steps"][0]
+    assert identity["owner"] == "model"
+    assert identity["gate"] == "required"
     assert agent._compact_prefetch_arguments(
         "get_interval_waveform_context", merged
     )["interval"] == "pr"
@@ -621,7 +625,7 @@ def test_candidate_only_delta_detector_cannot_refute_ivcd():
     assert len(result[1]) == 2
 
 
-def test_rate_and_sinus_mechanism_nodes_are_program_owned():
+def test_sinus_numeric_nodes_are_program_owned_and_p_morphology_requires_interpretation():
     payload = _payload()
     payload["global_features"]["heart_rate_bpm"] = 52.0
     agent = ECGDiagnosticAgent(
@@ -653,11 +657,18 @@ def test_rate_and_sinus_mechanism_nodes_are_program_owned():
     )[0]["diagnostic_pathway"]
     assert [step["id"] for step in path["steps"]] == [
         "rate_threshold",
+        "sinus_p_morphology",
         "sinus_mechanism_support",
         "sinus_p_support",
         "sinus_candidate_stream_reconciled",
     ]
-    assert all(step["owner"] == "program" for step in path["steps"])
+    assert {step["id"]: step["owner"] for step in path["steps"]} == {
+        "rate_threshold": "program",
+        "sinus_p_morphology": "model",
+        "sinus_mechanism_support": "program",
+        "sinus_p_support": "program",
+        "sinus_candidate_stream_reconciled": "program",
+    }
 
 
 def test_sinus_mechanism_uses_direct_rates_and_p_axis_not_candidate_event_counts():
@@ -768,7 +779,7 @@ def test_preexcitation_components_require_short_pr_and_multilead_delta():
     )[0]["diagnostic_pathway"]
     assert {
         step["id"]: step["gate"] for step in path["steps"]
-    }["pr_component"] == "supporting"
+    }["pr_component"] == "required"
 
 
 def test_wide_complex_tachycardia_is_dropped_when_record_max_rate_is_not_tachycardic():
@@ -880,7 +891,7 @@ def test_tool_ceiling_covers_the_widest_observed_pathway_demand():
     assert ceiling >= widest_pathway_signatures + required_interval_views
 
 
-def test_v38_pathways_mark_program_nodes_and_add_qtc_definition_gate():
+def test_qtc_threshold_is_program_owned_but_applicability_requires_interpretation():
     agent = ECGDiagnosticAgent(
         store=EvidenceStore.from_dict(_payload(), record_id="V38-OWNERS"),
         backend=_empty_backend(),
@@ -898,11 +909,18 @@ def test_v38_pathways_mark_program_nodes_and_add_qtc_definition_gate():
     )[0]["diagnostic_pathway"]
 
     assert [step["id"] for step in path["steps"]] == [
+        "qt_reference_applicability",
         "interval_reportable",
         "qt_threshold",
         "component_endpoint_support",
     ]
-    assert {step["owner"] for step in path["steps"]} == {"program"}
+    assert {step["id"]: step["owner"] for step in path["steps"]} == {
+        "qt_reference_applicability": "model",
+        "interval_reportable": "program",
+        "qt_threshold": "program",
+        "component_endpoint_support": "program",
+    }
+    assert path["steps"][0]["unknown_blocks_confirmation"] is True
     assert "Omit every `owner=program`" in compact_diagnostic_prompts.SYSTEM_PROMPT
 
 
@@ -986,9 +1004,10 @@ def test_low_voltage_uses_program_calculated_peak_to_peak_amplitude():
     pointer_tools = {}
     for lead in ("I", "II", "III", "aVR", "aVL", "aVF"):
         payload["representative_leads"][lead] = {
-            "params": {"r_amp_mv": 0.18, "s_amp_mv": -0.16, "q_amp_mv": 0.0}
+            "params": {"r_amp_mv": 0.18, "s_amp_mv": -0.16, "q_amp_mv": 0.0,
+                       "reliable_for_qrs": True}
         }
-        for field in ("r_amp_mv", "s_amp_mv", "q_amp_mv"):
+        for field in ("r_amp_mv", "s_amp_mv", "q_amp_mv", "reliable_for_qrs"):
             pointer_tools[
                 f"/representative_leads/{lead}/params/{field}"
             ] = {"get_lead_table"}
@@ -1061,7 +1080,7 @@ def test_pacing_capture_and_failure_have_opposite_program_logic():
     assert failure is not None and failure[0] == "fail"
 
 
-def test_all_program_qt_path_can_confirm_with_empty_model_step_array():
+def test_qt_measurements_do_not_confirm_without_model_applicability():
     payload = _payload()
     payload["global_features"].update(
         {
@@ -1115,13 +1134,17 @@ def test_all_program_qt_path_can_confirm_with_empty_model_step_array():
         }
     )
 
-    assert [row["code"] for row in verdict["diagnoses"]] == [
-        "markedly_prolonged_qt"
-    ]
+    assert verdict["diagnoses"] == []
     assert "/global_features/qtc_fridericia_ms" in agent.registry.whitelist
     assert agent.registry.model_visible_whitelist == frozenset()
     steps = agent._compact_decision_audit["decisions"][0]["pathway_steps"]
-    assert all(row["resolution_owner"] == "deterministic_measurement_gate" for row in steps)
+    by_id = {row["id"]: row for row in steps}
+    assert by_id["qt_reference_applicability"]["effective_status"] == "unknown"
+    assert by_id["qt_reference_applicability"]["unknown_blocks_confirmation"] is True
+    for step_id in ("interval_reportable", "qt_threshold", "component_endpoint_support"):
+        assert by_id[step_id]["resolution_owner"] == "deterministic_measurement_gate"
+        assert by_id[step_id]["effective_status"] == "pass"
+    assert agent._compact_decision_audit["decisions"][0]["final_placement"] == "unresolved"
 
 
 def test_legacy_program_gate_authorizes_hidden_rate_input():
@@ -1250,7 +1273,7 @@ def test_unmeasurable_voltage_precondition_stays_unknown_and_does_not_reject():
     assert result is not None and result[0] == "unknown"
 
 
-def test_invalidator_gate_rejects_while_unknown_invalidator_does_not_stall():
+def test_voltage_applicability_gates_block_confirmation_without_excluding_disease():
     from ecgagent.agent.diagnostic_pathways import PATHWAY_GATES, build_diagnostic_pathway
 
     assert "invalidator" in PATHWAY_GATES
@@ -1258,6 +1281,10 @@ def test_invalidator_gate_rejects_while_unknown_invalidator_does_not_stall():
     gates = {step["id"]: step["gate"] for step in steps}
     assert gates["voltage_criteria_qrs_valid"] == "invalidator"
     assert gates["voltage_criteria_pacing_valid"] == "invalidator"
+    for step in steps:
+        if step["id"] in {"voltage_criteria_qrs_valid", "voltage_criteria_pacing_valid"}:
+            assert step["unknown_blocks_confirmation"] is True
+            assert step["failure_means_not_applicable"] is True
     # The voltage criterion itself stays `required`: an invalidator may only
     # veto, never substitute for the positive criterion.
     assert gates["cross_lead_voltage_criterion"] == "required"
@@ -1273,9 +1300,13 @@ def test_unknown_pathway_gate_is_rejected_at_construction():
 
 
 def _lvh_verdict(mean_qrs_ms: float, record_id: str):
-    """Adjudicate an LVH candidate whose voltage criterion the model passes."""
+    """Adjudicate LVH with positive measured voltage and explicit quality."""
 
     payload = _lvh_payload(mean_qrs_ms=mean_qrs_ms)
+    payload.setdefault("metadata", {}).setdefault("patient_meta", {})["sex"] = "male"
+    # The field catalog is inferred from the first representative lead.
+    # Include S there so the actual voltage view succeeds before adjudication.
+    payload["representative_leads"]["I"]["params"]["s_amp_mv"] = -0.10
     payload["representative_leads"]["aVL"] = {
         "lead": "aVL",
         "params": {"r_amp_mv": 1.60, "s_amp_mv": -0.10, "reliable_for_qrs": True},
@@ -1311,10 +1342,10 @@ def _lvh_verdict(mean_qrs_ms: float, record_id: str):
         ("get_pacing_profile", {"include_beats": False}),
         (
             "get_lead_table",
-            {"fields": ["r_amp_mv", "s_amp_mv"], "leads": ["aVL", "V2", "V3", "V4"]},
+            {"fields": ["r_amp_mv", "s_amp_mv", "reliable_for_qrs"], "leads": ["aVL", "V2", "V3", "V4"]},
         ),
     ):
-        agent.registry.call(tool, arguments)
+        assert agent.registry.call(tool, arguments).ok
     verdict = agent._expand_compact_verdict(
         {
             "overall_status": "confirmed_diagnosis",
@@ -1334,21 +1365,29 @@ def _lvh_verdict(mean_qrs_ms: float, record_id: str):
             "human_review_reasons": [],
         }
     )
-    placement = agent._compact_decision_audit["decisions"][0]["final_placement"]
-    return verdict, placement
+    decision = agent._compact_decision_audit["decisions"][0]
+    return verdict, decision
 
 
-def test_wide_qrs_invalidator_rejects_an_otherwise_passing_voltage_criterion():
-    verdict, placement = _lvh_verdict(146.0, "LVH-REJECT")
+def test_wide_qrs_makes_voltage_criterion_inapplicable_without_rejecting_lvh():
+    verdict, decision = _lvh_verdict(146.0, "LVH-NOT-APPLICABLE")
 
-    assert placement == "rejected"
+    assert decision["final_placement"] == "unresolved"
+    assert decision["criterion_not_applicable"] is True
+    steps = {step["id"]: step for step in decision["pathway_steps"]}
+    assert steps["voltage_criteria_qrs_valid"]["effective_status"] == "fail"
+    assert steps["cross_lead_voltage_criterion"]["effective_status"] == "pass"
     assert [row["code"] for row in verdict["diagnoses"]] == []
 
 
 def test_narrow_qrs_leaves_the_voltage_criterion_free_to_confirm():
-    _, placement = _lvh_verdict(84.0, "LVH-KEEP")
+    _, decision = _lvh_verdict(84.0, "LVH-KEEP")
 
-    assert placement != "rejected"
+    assert decision["final_placement"] != "rejected"
+    assert decision["criterion_not_applicable"] is False
+    steps = {step["id"]: step for step in decision["pathway_steps"]}
+    assert steps["voltage_criteria_qrs_valid"]["effective_status"] == "pass"
+    assert steps["cross_lead_voltage_criterion"]["effective_status"] == "pass"
 
 
 def test_shadow_mode_returns_the_nodes_to_the_model_and_still_records_the_program_answer(
@@ -1377,7 +1416,12 @@ def test_shadow_mode_returns_the_nodes_to_the_model_and_still_records_the_progra
     enforced = build_diagnostic_pathway_owners("prolonged_qt")
 
     assert set(shadowed.values()) == {"model"}
-    assert set(enforced.values()) == {"program"}
+    assert enforced == {
+        "qt_reference_applicability": "model",
+        "interval_reportable": "program",
+        "qt_threshold": "program",
+        "component_endpoint_support": "program",
+    }
 
 
 def build_diagnostic_pathway_owners(code: str) -> dict[str, str]:
@@ -1585,8 +1629,8 @@ def test_af_gate_keeps_technical_p_measurement_failure_unknown():
     assert fact.reason_code == "organized_p_absence_not_established"
 
 
-def test_open_ended_alternative_cause_node_cannot_be_a_required_gate():
-    """`required` on an unprovable negative can only ever stall a candidate."""
+def test_progression_context_cannot_erase_a_measured_progression_phenotype():
+    """Confounder interpretation supports the measured phenotype without vetoing it."""
 
     from ecgagent.agent.diagnostic_pathways import build_diagnostic_pathway
 
@@ -1595,7 +1639,9 @@ def test_open_ended_alternative_cause_node_cannot_be_a_required_gate():
             step["id"]: step["gate"]
             for step in build_diagnostic_pathway(code)["steps"]
         }
-        assert steps["alternative_qrs_cause_excluded"] == "invalidator"
+        assert steps["precordial_progression"] == "required"
+        assert steps["progression_context"] == "supporting"
+        assert "alternative_qrs_cause_excluded" not in steps
 
 
 def _pvc_morphology(groups, record_id):
@@ -1609,7 +1655,7 @@ def _pvc_morphology(groups, record_id):
     available = {
         f"/groups/{group_id}/{field}"
         for group_id in groups
-        for field in ("mean_qrs_ms", "member_count", "member_pct")
+        for field in ("mean_qrs_ms", "member_count", "member_pct", "flags/dominant_group")
     }
     return resolve_additional_deterministic_step(
         store,

@@ -1,0 +1,745 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ECG Record 1.0",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "profile",
+    "record_id",
+    "acquisition",
+    "axes",
+    "quality",
+    "provenance",
+    "delineation",
+    "measurements",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "profile": {
+      "enum": [
+        "summary",
+        "all",
+        "measurement",
+        "debug"
+      ]
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^@#\\r\\n]+$"
+    },
+    "intended_use": {
+      "type": "string"
+    },
+    "acquisition": {
+      "type": "object",
+      "required": [
+        "sample_rate_hz",
+        "sample_count",
+        "input_mode",
+        "leads",
+        "amplitude_unit"
+      ],
+      "properties": {
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "input_mode": {
+          "enum": [
+            "standard_12",
+            "limited"
+          ]
+        },
+        "leads": {
+          "$ref": "#/$defs/leads"
+        },
+        "amplitude_unit": {
+          "enum": [
+            "mV",
+            "uV"
+          ]
+        }
+      }
+    },
+    "axes": {
+      "type": "object",
+      "required": [
+        "leads",
+        "beats"
+      ],
+      "properties": {
+        "leads": {
+          "$ref": "#/$defs/leads"
+        },
+        "beats": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[^|]+$"
+              },
+              "r_sample": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "quality": {
+      "type": "object"
+    },
+    "provenance": {
+      "type": "object"
+    },
+    "delineation": {
+      "type": "object",
+      "properties": {
+        "fiducials": {
+          "type": "object",
+          "additionalProperties": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/field"
+              },
+              {
+                "properties": {
+                  "type": {
+                    "const": "integer"
+                  },
+                  "unit": {
+                    "const": "sample"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "properties": {
+        "intervals": {
+          "type": "object",
+          "additionalProperties": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/field"
+              },
+              {
+                "properties": {
+                  "type": {
+                    "const": "integer"
+                  },
+                  "unit": {
+                    "const": "ms"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "amplitudes": {
+          "type": "object",
+          "additionalProperties": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/field"
+              },
+              {
+                "properties": {
+                  "type": {
+                    "const": "integer"
+                  },
+                  "unit": {
+                    "const": "uV"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "areas": {
+          "type": "object",
+          "additionalProperties": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/field"
+              },
+              {
+                "properties": {
+                  "type": {
+                    "const": "integer"
+                  },
+                  "unit": {
+                    "const": "uV_ms"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "flags": {
+          "$ref": "#/$defs/fieldMap"
+        },
+        "global": {
+          "$ref": "#/$defs/fieldMap"
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "null"
+          },
+          {
+            "type": "object",
+            "required": [
+              "uri",
+              "media_type",
+              "sha256"
+            ],
+            "properties": {
+              "uri": {
+                "type": "string"
+              },
+              "media_type": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "debug": {
+      "type": "object"
+    },
+    "extensions": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "leads": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[^|]+$"
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": [
+        "type",
+        "unit",
+        "axes",
+        "values",
+        "nullable",
+        "validation",
+        "provenance_ref"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "integer",
+            "number",
+            "boolean",
+            "string"
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "axes": {
+          "enum": [
+            [],
+            [
+              "beat"
+            ],
+            [
+              "lead"
+            ],
+            [
+              "beat",
+              "lead"
+            ]
+          ]
+        },
+        "values": {},
+        "nullable": {
+          "type": "boolean"
+        },
+        "validation": {
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "benchmark_validated",
+                "indirectly_validated",
+                "unvalidated",
+                "validated",
+                "partially_validated"
+              ]
+            },
+            "evidence": {
+              "type": "array"
+            }
+          }
+        },
+        "provenance_ref": {
+          "type": "string",
+          "pattern": "^/provenance/"
+        },
+        "absence": {
+          "$ref": "#/$defs/absence"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "integer"
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": []
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "enum": [
+                        [
+                          "beat"
+                        ],
+                        [
+                          "lead"
+                        ]
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": [
+                        "beat",
+                        "lead"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "number"
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": []
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "enum": [
+                        [
+                          "beat"
+                        ],
+                        [
+                          "lead"
+                        ]
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": [
+                        "beat",
+                        "lead"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "boolean"
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": []
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": [
+                        "boolean",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "enum": [
+                        [
+                          "beat"
+                        ],
+                        [
+                          "lead"
+                        ]
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": [
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": [
+                        "beat",
+                        "lead"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "boolean",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "string"
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": []
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "enum": [
+                        [
+                          "beat"
+                        ],
+                        [
+                          "lead"
+                        ]
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "axes": {
+                      "const": [
+                        "beat",
+                        "lead"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "values": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "fieldMap": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "absence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "unmeasurable",
+                "not_applicable"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmeasurable": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "not_applicable": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

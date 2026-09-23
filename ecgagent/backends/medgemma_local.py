@@ -441,6 +441,19 @@ def _compact_tool_excerpt(text: str, limit: int) -> tuple[str, int]:
     if len(original) <= hard_limit:
         return original, 0
 
+    try:
+        payload = json.loads(original)
+    except (ValueError, TypeError):
+        payload = None
+    if isinstance(payload, dict) and isinstance(payload.get("evidence"), list):
+        from ..evidence.packing import pack_evidence_rows
+        rows = pack_evidence_rows([{
+            "tool": payload.get("tool", "unknown"),
+            "arguments": payload.get("arguments", {}), "result": payload,
+        }], hard_limit)
+        rendered = json.dumps(rows[0]["result"] if rows else {}, ensure_ascii=False, separators=(",", ":"))
+        return rendered, max(0, len(original) - len(rendered))
+
     lines = original.splitlines()
     data_rows = [
         index
@@ -504,6 +517,7 @@ class _PendingChat:
     done: threading.Event = field(default_factory=threading.Event)
     output: Any = None
     error: BaseException | None = None
+    deadline: float | None = None
 
 
 class _VLLMChatBatcher:
@@ -538,12 +552,15 @@ class _VLLMChatBatcher:
         )
         self._thread.start()
 
-    def submit(self, messages: list[dict[str, str]], sampling_params: Any) -> Any:
+    def submit(self, messages: list[dict[str, str]], sampling_params: Any, *, deadline: float | None = None) -> Any:
         if self._closed:
             raise RuntimeError("local MedGemma batch scheduler is closed")
-        pending = _PendingChat(messages=messages, sampling_params=sampling_params)
+        from .request_budget import remaining_seconds
+        remaining = remaining_seconds(deadline) if deadline is not None else None
+        pending = _PendingChat(messages=messages, sampling_params=sampling_params, deadline=deadline)
         self._queue.put(pending)
-        pending.done.wait()
+        if not pending.done.wait(timeout=remaining):
+            raise TimeoutError("local model queue/generation deadline exhausted")
         if pending.error is not None:
             raise pending.error
         return pending.output
@@ -570,6 +587,18 @@ class _VLLMChatBatcher:
                     break
                 batch.append(item)
             try:
+                active = []
+                for item in batch:
+                    if item.deadline is not None and time.perf_counter() >= item.deadline:
+                        item.error = TimeoutError("local model request expired in queue")
+                        item.done.set()
+                    else:
+                        active.append(item)
+                batch = active
+                if not batch:
+                    if stop_after_batch:
+                        return
+                    continue
                 with self._stats_lock:
                     self._batches += 1
                     self._requests += len(batch)
@@ -635,6 +664,7 @@ class MedGemmaLocalBackend:
     seed: int = 0
     gpu_memory_utilization: float = DEFAULT_GPU_MEMORY_UTILIZATION
     enforce_eager: bool = False
+    max_retained_evidence_chars: int = 8000
     max_batch_size: int = DEFAULT_MAX_BATCH_SIZE
     batch_wait_ms: float = DEFAULT_BATCH_WAIT_MS
     enforce_phase_coverage: bool = True
@@ -649,6 +679,7 @@ class MedGemmaLocalBackend:
     hard_phase_guards: bool = True
     capabilities: BackendCapabilities = field(
         default=BackendCapabilities(
+            request_context=True,
             native_tool_calls=False,
             structured_output_level="grammar",
             context_compaction=True,
@@ -703,6 +734,7 @@ class MedGemmaLocalBackend:
 
     def __post_init__(self) -> None:
         self.capabilities = BackendCapabilities(
+            request_context=True,
             native_tool_calls=False,
             structured_output_level=("grammar" if self.hard_phase_guards else "json"),
             context_compaction=True,
@@ -815,6 +847,7 @@ class MedGemmaLocalBackend:
             gpu_memory_utilization=self.gpu_memory_utilization,
             enforce_eager=self.enforce_eager,
             max_batch_size=self.max_batch_size,
+            max_retained_evidence_chars=self.max_retained_evidence_chars,
             batch_wait_ms=self.batch_wait_ms,
             enforce_phase_coverage=self.enforce_phase_coverage,
             supports_orchestrated_prefetch=self.supports_orchestrated_prefetch,
@@ -937,7 +970,8 @@ class MedGemmaLocalBackend:
         for source in rows:
             row = dict(source)
             result, _ = _compact_tool_excerpt(
-                str(row.get("result") or ""),
+                (json.dumps(row["result"], ensure_ascii=False, separators=(",", ":"))
+                 if isinstance(row.get("result"), dict) else str(row.get("result") or "")),
                 per_result_chars,
             )
             row["result"] = result
@@ -1074,7 +1108,12 @@ class MedGemmaLocalBackend:
         max_tokens: int | None = None,
         response_schema: dict[str, Any] | None = None,
         require_tool_call: bool = False,
+        phase: str | None = None,
+        deadline: float | None = None,
     ) -> LLMResponse:
+        from .request_budget import remaining_seconds
+        if deadline is not None:
+            remaining_seconds(deadline)
         tool_schema: dict[str, Any] | None = None
         system_sections = [system]
         if tools:
@@ -1135,7 +1174,7 @@ class MedGemmaLocalBackend:
         )
         try:
             if self.scheduler is not None:
-                request_output = self.scheduler.submit(chat, sampling_params)
+                request_output = self.scheduler.submit(chat, sampling_params, **({"deadline": deadline} if deadline is not None else {}))
             else:
                 outputs = self.llm.chat(
                     chat,
@@ -1145,6 +1184,10 @@ class MedGemmaLocalBackend:
                 if not outputs:
                     raise RuntimeError("local MedGemma returned no completion")
                 request_output = outputs[0]
+            if deadline is not None:
+                remaining_seconds(deadline)
+        except TimeoutError:
+            raise
         except Exception as exc:
             detail = str(exc)
             lowered = detail.lower()
@@ -1450,27 +1493,16 @@ class MedGemmaLocalBackend:
                 int(row.get("sequence") or 0),
             ),
         )
-        rendered: list[dict[str, Any]] = []
-        used = 0
+        from ..evidence.packing import pack_evidence_rows
+        normalized = []
         for row in rows:
-            public = {
-                "tool": row["tool"],
-                "arguments": row["arguments"],
-                "result": row["result"],
-            }
-            size = len(
-                json.dumps(
-                    public,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    default=str,
-                )
-            )
-            if rendered and used + size > MAX_INFLIGHT_TOOL_EVIDENCE_CHARS:
-                continue
-            rendered.append(public)
-            used += size
-        return rendered
+            result = row["result"]
+            try:
+                result = json.loads(result) if isinstance(result, str) else result
+            except (ValueError, TypeError):
+                pass
+            normalized.append({**row, "result": result})
+        return pack_evidence_rows(normalized, self.max_retained_evidence_chars)
 
     def compact_phase_context(
         self,
@@ -1718,12 +1750,10 @@ class MedGemmaLocalBackend:
                     separators=(",", ":"),
                 )
                 self._retained_sequence += 1
-                result = str(row.get("result") or "")
+                result = (json.dumps(row["result"], ensure_ascii=False, separators=(",", ":"))
+                 if isinstance(row.get("result"), dict) else str(row.get("result") or ""))
                 if len(result) > MAX_RETAINED_TOOL_RESULT_CHARS:
-                    result = (
-                        result[:MAX_RETAINED_TOOL_RESULT_CHARS]
-                        + "\n[retained excerpt truncated; re-query for full detail]"
-                    )
+                    result, _ = _compact_tool_excerpt(result, MAX_RETAINED_TOOL_RESULT_CHARS)
                 self._retained_tool_evidence[key] = {
                     "tool": tool,
                     "arguments": arguments,

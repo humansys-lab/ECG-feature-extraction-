@@ -281,6 +281,7 @@ def test_diagnostic_agent_rebinds_a_caller_registry_to_the_safe_view():
     full = EvidenceStore.from_dict(_modality_payload(), record_id="SAFE")
     caller_registry = build_default_registry(full, budget=None)
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=full,
         backend=ScriptedBackend(script=[]),
         registry=caller_registry,

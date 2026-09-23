@@ -899,6 +899,7 @@ def test_deepseek_disables_thinking_for_compact_plan_only():
     backend.complete(
         system="S",
         messages=[{"role": "user", "content": "COMPACT PLAN — route evidence"}],
+        phase="plan",
         tools=[],
         max_tokens=1200,
         response_schema=prompts.OUTPUT_SCHEMA,

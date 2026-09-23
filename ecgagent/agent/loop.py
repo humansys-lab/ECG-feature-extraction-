@@ -107,6 +107,9 @@ class PhaseSpec:
     program_only_prefetch_tool_calls: tuple[
         tuple[str, tuple[tuple[str, Any], ...]], ...
     ] = ()
+    model_evidence_requirements: tuple[
+        tuple[str, str, tuple[tuple[str, Any], ...]], ...
+    ] = ()
 
 
 # Sized against a real record: 8 matched rules and 36 abstentions on the
@@ -266,6 +269,7 @@ class PhaseRecord:
     phase_guard_passed: bool | None = None
     phase_guard_problems: list[str] = field(default_factory=list)
     phase_sanitizations: list[str] = field(default_factory=list)
+    response_history: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -285,6 +289,7 @@ class PhaseRecord:
             "phase_guard_problems": list(self.phase_guard_problems),
             "phase_sanitizations": list(self.phase_sanitizations),
             "text": self.text,
+            "response_history": self.response_history,
         }
 
 
@@ -485,6 +490,7 @@ class ECGAgent:
     )
     _run_started: float = field(default=0.0, repr=False)
     _model_turns: int = field(default=0, repr=False)
+    _model_request_metrics: list[dict[str, Any]] = field(default_factory=list, repr=False)
     _prompt_tokens: int = field(default=0, repr=False)
     _completion_tokens: int = field(default=0, repr=False)
     _total_tokens: int = field(default=0, repr=False)
@@ -539,6 +545,7 @@ class ECGAgent:
         return {
             "elapsed_seconds": round(elapsed, 3),
             "model_turns": self._model_turns,
+            "model_requests": list(self._model_request_metrics),
             "prompt_tokens": self._prompt_tokens,
             "completion_tokens": self._completion_tokens,
             "total_tokens": self._total_tokens,
@@ -603,13 +610,36 @@ class ECGAgent:
 
     def _complete_turn(self, **kwargs: Any) -> LLMResponse:
         self._check_runtime_budget()
+        phase = kwargs.pop("phase", None)
+        if self._backend_capabilities.request_context:
+            kwargs["phase"] = phase
+            kwargs["deadline"] = self._run_started + self.max_wall_seconds if self._run_started else None
+        started = time.perf_counter()
         self._emit(
             "[model] starting turn "
             f"{self._model_turns + 1}/{self.max_model_turns}; "
             f"elapsed={self._runtime_snapshot()['elapsed_seconds']:.1f}s"
         )
-        response = self.backend.complete(**kwargs)
+        try:
+            response = self.backend.complete(**kwargs)
+        except Exception as exc:
+            self._model_request_metrics.append({
+                "phase": phase, "elapsed_seconds": round(time.perf_counter() - started, 6),
+                "prompt_tokens": None, "completion_tokens": None,
+                "stop_reason": "error", "error_type": type(exc).__name__,
+            })
+            raise
+        usage = response.usage if isinstance(response.usage, Mapping) else {}
+        self._model_request_metrics.append({
+            "phase": phase,
+            "elapsed_seconds": round(time.perf_counter() - started, 6),
+            "prompt_tokens": usage.get("prompt_tokens"),
+            "completion_tokens": usage.get("completion_tokens"),
+            "stop_reason": response.stop_reason,
+        })
         self._record_model_response(response)
+        if self._run_started and time.perf_counter() - self._run_started >= self.max_wall_seconds:
+            raise TimeoutError("agent wall-clock deadline exceeded during model request")
         return response
 
     def _backend_usage_snapshot(self) -> dict[str, int]:
@@ -686,6 +716,7 @@ class ECGAgent:
     def run(self) -> AgentResult:
         self._run_started = time.perf_counter()
         self._model_turns = 0
+        self._model_request_metrics.clear()
         self._prompt_tokens = 0
         self._completion_tokens = 0
         self._total_tokens = 0
@@ -1420,7 +1451,16 @@ class ECGAgent:
                     f"{hidden} omitted before model context"
                 )
 
+    def _record_evidence_coverage(
+        self, spec: PhaseSpec, required: Mapping[str, tuple[str, ...]],
+    ) -> None:
+        """Profile hook after actual model-visible authorization."""
+
     # -- phases -------------------------------------------------------------
+    def _program_phase_response(self, spec: PhaseSpec) -> str | None:
+        """Return a terminal program response only when no model task remains."""
+        return None
+
     def _run_phase(
         self,
         spec: PhaseSpec,
@@ -1476,6 +1516,7 @@ class ECGAgent:
         )
         if can_prefetch:
             prefetched: list[ToolOutcome] = []
+            required_evidence: dict[str, tuple[str, ...]] = {}
             successful_prefetches = 0
             program_only_signatures = {
                 self.registry.call_signature(name, dict(argument_items))
@@ -1486,11 +1527,13 @@ class ECGAgent:
                 start=1,
             ):
                 arguments = dict(argument_items)
+                self._check_runtime_budget()
                 result = self.registry.call(name, arguments)
                 successful_prefetches += int(result.ok)
                 program_only = self.registry.call_signature(
                     name, arguments
                 ) in program_only_signatures
+                self.registry.calls[-1].program_only = program_only
                 model_view = (
                     None
                     if program_only
@@ -1498,8 +1541,15 @@ class ECGAgent:
                         result,
                         tool=name,
                         arguments=arguments,
+                        required_by=tuple(
+                            node for node, tool, args in spec.model_evidence_requirements
+                            if self.registry.call_signature(tool, dict(args))
+                            == self.registry.call_signature(name, arguments)
+                        ),
                     )
                 )
+                if model_view is not None:
+                    required_evidence.update(model_view.required_evidence)
                 if not program_only:
                     prefetched.append(
                         ToolOutcome(
@@ -1589,6 +1639,7 @@ class ECGAgent:
                 authorization_messages,
                 source=f"{spec.key}:prefetch",
             )
+            self._record_evidence_coverage(spec, required_evidence)
             coverage_gap = self._phase_completion_feedback(spec, calls_at_start)
             # The packet used known, program-owned arguments. A legitimate
             # unavailable result is itself a Survey limitation; asking the
@@ -1641,6 +1692,13 @@ class ECGAgent:
             max_tools_per_turn=max_tools_per_turn,
             phase_state_retries=(self.phase_state_retries if hard_guards else 0),
         )
+        program_text = self._program_phase_response(spec)
+        if program_text is not None:
+            record.text = program_text
+            record.stop_reason = "program_completed"
+            record.phase_guard_passed = True
+            turn_limit = 0
+            self._emit(f"[{spec.key}] program-only work complete; no model request needed")
         for _turn in range(turn_limit):
             response_schema = (
                 spec.response_schema
@@ -1656,6 +1714,7 @@ class ECGAgent:
             )
             require_tool_call = bool(coverage_before_turn and phase_tools)
             response = self._complete_turn(
+                phase=spec.key,
                 system=self.prompt_module.SYSTEM_PROMPT,
                 messages=messages,
                 tools=phase_tools,
@@ -1665,6 +1724,11 @@ class ECGAgent:
             )
             record.turns += 1
             record.stop_reason = response.stop_reason
+            record.response_history.append({
+                "turn": record.turns, "text": response.text,
+                "stop_reason": response.stop_reason,
+                "refusal": response.refusal if response.refused else None,
+            })
 
             if response.refused:
                 record.text = response.refusal or "refused"
@@ -1732,6 +1796,7 @@ class ECGAgent:
                 )
                 if guard_problems is not None:
                     if guard_problems:
+                        record.response_history[-1]["guard_problems"] = list(guard_problems)
                         record.phase_guard_attempts += 1
                         record.phase_guard_problems = list(guard_problems)
                         if (
@@ -1762,6 +1827,7 @@ class ECGAgent:
                                 + "\n- ".join(guard_problems[:8])
                             )
                             messages.append(self.backend.user_turn(feedback))
+                            record.response_history[-1]["repair_feedback"] = feedback
                             self._emit(
                                 f"[{spec.key}] hard state repair "
                                 f"{record.phase_guard_attempts}/{self.phase_state_retries}"
@@ -1884,9 +1950,10 @@ class ECGAgent:
                     )
                 )
         else:
-            record.text = (response.text if response else "") or ""
-            record.stop_reason = "turn_limit"
-            if hard_guards and spec.response_schema is not None and not spec.structured:
+            if program_text is None:
+                record.text = (response.text if response else "") or ""
+                record.stop_reason = "turn_limit"
+            if program_text is None and hard_guards and spec.response_schema is not None and not spec.structured:
                 record.phase_guard_passed = False
                 if not record.phase_guard_problems:
                     record.phase_guard_problems = [

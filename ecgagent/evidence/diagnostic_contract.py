@@ -7,13 +7,15 @@ default: they must be classified here and advance the contract version.
 from __future__ import annotations
 
 import copy
+import math
+import re
 from dataclasses import dataclass
 from typing import Any, Mapping
 
 from ..age import canonicalize_patient_age
 
 
-DIAGNOSTIC_EVIDENCE_CONTRACT_VERSION = "ecgagent.diagnosis-evidence.v4"
+DIAGNOSTIC_EVIDENCE_CONTRACT_VERSION = "ecgagent.diagnosis-evidence.v5"
 
 # A morphology map exposes every field as a separate evidence atom.  That is
 # ideal for exact lookup, but a six-lead conduction pathway used to spend 66
@@ -49,6 +51,7 @@ ALLOWED_TOP_LEVEL = frozenset(
         "morphology_inputs",
         "quality",
         "metadata",
+        "waveform_review",
     }
 )
 
@@ -239,6 +242,136 @@ def _scrub(
     return copy.deepcopy(node)
 
 
+# This boundary is deliberately field- AND value-allowlisted. In particular,
+# free-form source/method/reason/support text is not waveform evidence, even
+# when an upstream producer puts it in an otherwise approved review artifact.
+WAVEFORM_REVIEW_STATUSES = frozenset({"unavailable", "observations_available", "conflict"})
+WAVEFORM_REVIEW_REASONS = frozenset({
+    "original_waveform_missing", "artifact_missing_or_invalid",
+    "sampling_rate_missing_or_invalid", "raw_shape_invalid", "review_limit_reached",
+    "lead_mapping_missing_or_invalid", "amplitude_units_missing_or_invalid",
+    "timebase_conflict", "record_duration_conflict", "input_contract_invalid",
+    "measurement_helper_unavailable", "exported_candidates_missing",
+    "candidate_timing_missing_or_invalid", "event_timebase_conflict",
+    "lead_quality_missing_or_invalid", "qrs_overlap", "t_overlap",
+    "local_p_morphology_not_supported", "ventricular_timing_missing",
+    "qrs_timing_missing_or_invalid", "quiet_qrs_baseline_missing",
+    "exported_signed_amplitudes_missing", "signed_rs_conflict",
+    "qs_positive_r_conflict", "local_window_incomplete",
+    "candidate_boundaries_missing_or_invalid", "st_anchor_timing_invalid",
+    "st_window_overlaps_t_or_record_edge", "bracketing_pr_anchors_missing",
+    "pr_anchor_gap_too_large", "exported_st_amplitude_missing",
+    "st_amplitude_disagreement", "st_local_noise_excessive",
+})
+WAVEFORM_REVIEW_NUMBER_FIELDS = frozenset({
+    "event_index", "feature_index", "beat_id", "raw_sample", "time_ms",
+    "raw_prominence_mv", "local_snr", "half_height_width_ms", "raw_max_mv",
+    "raw_min_mv", "baseline_mv", "raw_qrs_onset_sample", "raw_qrs_offset_sample",
+    "amplitude_tolerance_mv", "exported_r_mv", "exported_s_mv", "anchor_count",
+    "raw_st_80ms_mv", "baseline_uncertainty_mv", "left_anchor_sample",
+    "right_anchor_sample", "exported_st_80ms_mv", "difference_mv", "raw_j_sample",
+})
+
+
+def _waveform_review_document(value: Any, dropped: list[str]) -> dict[str, Any]:
+    from .waveform_review import (
+        MAX_OBSERVATIONS, SCHEMA_VERSION, STANDARD_LEADS, unavailable_waveform_review,
+    )
+
+    if value is None:
+        return unavailable_waveform_review()
+    if not isinstance(value, Mapping) or value.get("schema_version") != SCHEMA_VERSION:
+        dropped.append("/waveform_review")
+        return unavailable_waveform_review("artifact_missing_or_invalid")
+
+    def finite(number: Any) -> bool:
+        return isinstance(number, (int, float)) and not isinstance(number, bool) and math.isfinite(number)
+
+    def clean(source: Any, path: str, validators: dict) -> dict:
+        result = {}
+        if not isinstance(source, Mapping):
+            dropped.append(path)
+            return result
+        for key, item in source.items():
+            validator = validators.get(key)
+            if validator is None or not validator(item):
+                dropped.append(f"{path}/{key}")
+                continue
+            result[key] = copy.deepcopy(item)
+        return result
+
+    def reasons(items: Any) -> bool:
+        return isinstance(items, list) and len(items) <= 40 and all(isinstance(i, str) and i in WAVEFORM_REVIEW_REASONS for i in items)
+
+    def leads(items: Any) -> bool:
+        return isinstance(items, list) and len(items) <= 12 and all(isinstance(i, str) and i in STANDARD_LEADS for i in items)
+
+    status = lambda item: isinstance(item, str) and item in WAVEFORM_REVIEW_STATUSES
+    row_rules = {key: finite for key in WAVEFORM_REVIEW_NUMBER_FIELDS}
+    row_rules.update(status=status, conflict_reasons=reasons, missing_requirements=reasons,
+                     lead=lambda item: isinstance(item, str) and item in STANDARD_LEADS,
+                     reviewed_leads=leads, supporting_leads=leads,
+                     raw_qs_candidate=lambda item: type(item) is bool)
+    row_rules["baseline_method"] = lambda item: item in ("quiet_pr_anchor", "quiet_pre_qrs")
+    row_rules["st_anchor_source"] = lambda item: item in ("exported_qrs_offset", "exported_remeasured_j")
+    provenance_rules = {
+        "source": lambda item: item == "original_calibrated_ecg",
+        "bounds_source": lambda item: item == "exported_features",
+        "amplitude_unit": lambda item: item == "mV",
+        "timebase": lambda item: item == "feature_samples_to_original_samples",
+        "same_acquisition": lambda item: item is True,
+        "independent_acquisition": lambda item: item is False,
+        "clinical_validation": lambda item: item is False,
+        "experimental_candidates_enabled": lambda item: item is False,
+        "raw_sha256": lambda item: isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item) is not None,
+        "lead_names": leads,
+        **{key: finite for key in ("original_fs_hz", "feature_fs_hz", "sample_count",
+                                   "duration_ms", "sample_rounding_error_ms", "max_p_events", "max_beats_per_lead")},
+    }
+    result = unavailable_waveform_review("artifact_missing_or_invalid")
+    for key in value:
+        if key not in {"schema_version", "status", "provenance", "profiles"}:
+            dropped.append(f"/waveform_review/{key}")
+    approved_provenance = clean(value.get("provenance"), "/waveform_review/provenance", provenance_rules)
+    result["provenance"].update(approved_provenance)
+    profiles = value.get("profiles")
+    profiles = profiles if isinstance(profiles, Mapping) else {}
+    for name in profiles:
+        if name not in result["profiles"]:
+            dropped.append(f"/waveform_review/profiles/{name}")
+    for name, destination in result["profiles"].items():
+        source = profiles.get(name)
+        if not isinstance(source, Mapping):
+            continue
+        path = f"/waveform_review/profiles/{name}"
+        destination.update(clean(source, path, {
+            "status": status, "conflict_reasons": reasons, "missing_requirements": reasons,
+            "input_count": finite, "reviewed_count": finite,
+            "truncated": lambda item: type(item) is bool,
+            "observations": lambda item: isinstance(item, list) and len(item) <= MAX_OBSERVATIONS,
+        }))
+        destination["observations"] = [
+            clean(row, f"{path}/observations/{index}", row_rules)
+            for index, row in enumerate(destination["observations"])
+        ]
+    required_provenance = {
+        "source", "bounds_source", "amplitude_unit", "timebase", "same_acquisition",
+        "independent_acquisition", "clinical_validation", "experimental_candidates_enabled",
+        "raw_sha256", "original_fs_hz", "feature_fs_hz", "sample_count", "lead_names",
+    }
+    if any(profile["status"] != "unavailable" for profile in result["profiles"].values()):
+        if not required_provenance <= approved_provenance.keys():
+            dropped.append("/waveform_review/provenance")
+            return unavailable_waveform_review("artifact_missing_or_invalid")
+    # Recompute the headline from approved profile statuses, never source text.
+    statuses = [profile["status"] for profile in result["profiles"].values()]
+    result["status"] = ("conflict" if "conflict" in statuses else
+                        "observations_available" if "observations_available" in statuses else "unavailable")
+    if not status(value.get("status")):
+        dropped.append("/waveform_review/status")
+    return result
+
+
 def build_diagnostic_document(
     source: Mapping[str, Any],
 ) -> tuple[dict[str, Any], ContractAudit]:
@@ -249,13 +382,17 @@ def build_diagnostic_document(
     unknown = source_keys - ALLOWED_TOP_LEVEL - _FORBIDDEN_KEYS
     document: dict[str, Any] = {}
     dropped_sensitive: list[str] = [f"/{key}" for key in known_blocked]
-    for key in sorted(ALLOWED_TOP_LEVEL - {"metadata", "rhythm_inputs", "morphology_inputs"}):
+    for key in sorted(ALLOWED_TOP_LEVEL - {"metadata", "rhythm_inputs", "morphology_inputs", "waveform_review"}):
         if key in source:
             document[key] = _scrub(
                 source[key],
                 path=f"/{key}",
                 dropped=dropped_sensitive,
             )
+
+    document["waveform_review"] = _waveform_review_document(
+        source.get("waveform_review"), dropped_sensitive
+    )
 
     metadata_source = source.get("metadata")
     metadata_source = metadata_source if isinstance(metadata_source, Mapping) else {}

@@ -130,8 +130,10 @@ def _detect_with_threshold(
     *,
     fallback_used: bool = False,
     fallback_reason: Optional[str] = None,
+    energy_trace: Optional[tuple[np.ndarray, np.ndarray]] = None,
+    fiducial_lead: Optional[int] = None,
 ) -> QRSDetectorResult:
-    vm, mwa = _energy_trace(ecg, fs, leads)
+    vm, mwa = energy_trace if energy_trace is not None else _energy_trace(ecg, fs, leads)
     distance = max(1, int(0.22 * fs))
     peaks, props = find_peaks(mwa, distance=distance, height=threshold)
     if len(peaks) == 0:
@@ -142,8 +144,19 @@ def _detect_with_threshold(
             fallback_reason=fallback_reason,
         )
 
-    # Local R refinement using lead II if available, otherwise vector magnitude.
-    ref = ecg[1] if ecg.shape[0] > 1 else vm
+    # Keep the established II fiducial only when II actually participates and
+    # has signal. An excluded or flat channel must not move all detected beats.
+    # The same participating-lead fallback is used for single-lead pacing rescue.
+    preferred = 1 if fiducial_lead is None else fiducial_lead
+    reference_leads = (preferred,) + tuple(i for i in leads if i != preferred)
+    ref = vm
+    for index in reference_leads:
+        if (index in leads or index == fiducial_lead) and float(np.std(ecg[index])) >= 1e-8:
+            ref = ecg[index]
+            break
+    dynamic_range = max(
+        float(np.percentile(mwa, 99) - threshold), float(np.std(mwa)), 1e-8
+    )
     peak_heights = props.get("peak_heights", np.zeros(len(peaks), dtype=float))
     candidates = []
     search = int(0.05 * fs)
@@ -154,7 +167,7 @@ def _detect_with_threshold(
         if local.size == 0:
             continue
         r = lo + _qrs_fiducial_from_local_waveform(local)
-        confidence = _detector_confidence(float(detector_height), float(threshold), mwa)
+        confidence = float(np.clip((detector_height - threshold) / dynamic_range, 0.0, 1.0))
         candidates.append(QRSCandidateWindow(
             detector_peak_index=int(p),
             search_start_index=int(lo),
@@ -234,10 +247,90 @@ def detect_qrs_multilead_with_meta(
     ecg: np.ndarray,
     fs: int,
     leads: Iterable[int] = DEFAULT_QRS_LEADS,
+    *,
+    fiducial_lead: Optional[int] = None,
+    quality: Optional[dict] = None,
+    quality_reference: bool = False,
+    adaptive_consensus: bool = False,
 ) -> QRSDetectorResult:
-    leads = tuple(int(i) for i in leads)
-    _, mwa = _energy_trace(ecg, fs, leads)
-    primary = _detect_with_threshold(ecg, fs, leads, _standard_energy_threshold(mwa))
+    """Detect with selected leads and refine on a participating signal by default.
+
+    An explicit fiducial_lead is a separate, caller-selected timing reference.
+    Pacing capture rescue uses this to compare different energy channels on a
+    common time axis; excluded channels never influence the implicit reference.
+    """
+    leads = tuple(dict.fromkeys(int(i) for i in leads))
+    if not leads or any(i < 0 or i >= ecg.shape[0] for i in leads):
+        raise ValueError("leads must contain valid participating ECG row indices")
+    if fiducial_lead is not None and (
+        not isinstance(fiducial_lead, (int, np.integer))
+        or not 0 <= fiducial_lead < ecg.shape[0]
+    ):
+        raise ValueError("fiducial_lead must be a valid ECG row index")
+    # A caller-selected fiducial is used by pacing capture comparisons, which
+    # require one fixed time reference across detectors. Keep that contract.
+    if adaptive_consensus and fiducial_lead is None:
+        from .adaptive_qrs import detect_adaptive_qrs, guard_weak_additions
+        active = tuple(i for i in leads if float(np.std(ecg[i])) > 1e-8)
+        scores = {i: float(getattr((quality or {}).get(STANDARD_12_LEADS[i]), "b_sqi", 0.) or 0.) for i in active}
+        baseline = detect_qrs_multilead_with_meta(ecg, fs, leads=leads, fiducial_lead=fiducial_lead)
+        if scores and min(scores.values()) >= .90:
+            return baseline
+        # Preserve the established detector when independent detector agreement
+        # is high. Exclude a disagreeing channel before nonlinear fusion; flat
+        # placeholders and low-quality leads must not dilute the clean lead.
+        if scores and max(scores.values()) >= .95:
+            best = max(scores.values())
+            selected = tuple(i for i in active if scores[i] >= best-.02)
+            reference = fiducial_lead if fiducial_lead is not None else max(selected, key=lambda i: (scores[i], i == 1))
+            adaptive = detect_qrs_multilead_with_meta(ecg, fs, leads=selected, fiducial_lead=reference)
+        else:
+            adaptive = detect_adaptive_qrs(ecg, fs, active, channel_quality=scores)
+        # A long analysis window can contain both artifact and clean signal.
+        # Use local detector agreement to protect clean sections; there is no
+        # assumption about rhythm regularity or the artifact's timing.
+        from .quality import _bsqi
+        chosen = []
+        for start in range(0, ecg.shape[1], max(1, round(4*fs))):
+            stop = min(ecg.shape[1], start+round(4*fs))
+            lo, hi = max(0, start-round(2*fs)), min(ecg.shape[1], stop+round(2*fs))
+            clean = bool(active) and all(_bsqi(ecg[i, lo:hi], fs) >= .90 for i in active)
+            source = baseline if clean else adaptive
+            chosen.extend(c for c in source.qrs_candidate_windows if start <= c.refined_r_index < stop)
+        chosen.sort(key=lambda c: c.refined_r_index)
+        kept = []
+        for candidate in chosen:
+            if not kept or candidate.refined_r_index-kept[-1].refined_r_index >= round(.20*fs):
+                kept.append(candidate)
+            elif candidate.confidence > kept[-1].confidence:
+                kept[-1] = candidate
+        before_guard = len(kept)
+        kept = guard_weak_additions(kept, baseline, ecg, fs, active)
+        adaptive.qrs_candidate_windows = kept
+        adaptive.r_locs = [c.refined_r_index for c in kept]
+        adaptive.qrs_detector_confidence = [c.confidence for c in kept]
+        adaptive.fallback_reason = "quality_gated_per_channel_envelopes"
+        if len(kept) != before_guard:
+            adaptive.fallback_reason += f";weak_additions_rejected={before_guard-len(kept)}"
+        return adaptive
+    if quality_reference and quality:
+        qualified = tuple(index for index in leads
+                          if getattr(quality.get(STANDARD_12_LEADS[index]), "reliable_for_qrs", False)
+                          and float(np.std(ecg[index])) > 1e-8)
+        if qualified:
+            leads = qualified
+            if fiducial_lead is None:
+                fiducial_lead = max(leads, key=lambda index: (
+                    float(getattr(quality.get(STANDARD_12_LEADS[index]), "b_sqi", 0.0) or 0.0),
+                    -float(getattr(quality.get(STANDARD_12_LEADS[index]), "muscle_noise_score", 0.0) or 0.0),
+                    index == 1,
+                ))
+    trace = _energy_trace(ecg, fs, leads)
+    _, mwa = trace
+    primary = _detect_with_threshold(
+        ecg, fs, leads, _standard_energy_threshold(mwa), energy_trace=trace,
+        fiducial_lead=fiducial_lead,
+    )
 
     robust_threshold = _robust_energy_threshold(mwa)
     if robust_threshold < primary.energy_threshold:
@@ -248,6 +341,8 @@ def detect_qrs_multilead_with_meta(
             robust_threshold,
             fallback_used=True,
             fallback_reason="robust_threshold_sparse_primary",
+            energy_trace=trace,
+            fiducial_lead=fiducial_lead,
         )
         if _should_use_robust_fallback(primary, robust, ecg.shape[-1], fs):
             return robust

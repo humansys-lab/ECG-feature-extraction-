@@ -67,7 +67,7 @@ def positive_float_env(name: str, default: float) -> float:
         value = float(raw)
     except ValueError as exc:
         raise RuntimeError(f"{name} must be a positive number") from exc
-    if value <= 0.0:
+    if not math.isfinite(value) or value <= 0.0:
         raise RuntimeError(f"{name} must be a positive number")
     return value
 

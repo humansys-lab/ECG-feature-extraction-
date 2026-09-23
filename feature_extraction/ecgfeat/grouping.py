@@ -81,6 +81,7 @@ def _morphology_cluster(
     templates: List[np.ndarray],
     max_groups: int,
     threshold: float = 0.88,
+    preserve_outliers: bool = False,
 ) -> List[BeatCluster]:
     """Online morphology clustering within one narrow/wide bin."""
     clusters: List[BeatCluster] = []
@@ -91,7 +92,11 @@ def _morphology_cluster(
             continue
         scores = [_corr(vec, c.prototype) for c in clusters]
         best_i = int(np.argmax(scores))
-        if scores[best_i] >= threshold or len(clusters) >= max_groups:
+        if preserve_outliers and len(clusters) >= max_groups and scores[best_i] < 0.65:
+            # A distinct singleton is explicit evidence, not contamination of
+            # the dominant template. max_groups remains the regular budget.
+            clusters.append(BeatCluster(members=[beat_idx], prototype=vec))
+        elif scores[best_i] >= threshold or len(clusters) >= max_groups:
             c = clusters[best_i]
             c.members.append(beat_idx)
             c.prototype = 0.8 * c.prototype + 0.2 * vec
@@ -107,6 +112,7 @@ def cluster_beats(
     max_groups: int = 5,
     wide_qrs_threshold_ms: float = 120.0,
     paced_beat_ids: List[int] | None = None,
+    preserve_outliers: bool = False,
 ) -> Dict[int, List[int]]:
     """
     Measurement-group beat grouper (T008).
@@ -149,11 +155,11 @@ def cluster_beats(
     all_clusters: List[BeatCluster] = []
 
     if narrow_idx:
-        for c in _morphology_cluster(narrow_idx, templates, n_narrow):
+        for c in _morphology_cluster(narrow_idx, templates, n_narrow, preserve_outliers=preserve_outliers):
             all_clusters.append(c)
 
     if wide_idx:
-        for c in _morphology_cluster(wide_idx, templates, n_wide):
+        for c in _morphology_cluster(wide_idx, templates, n_wide, preserve_outliers=preserve_outliers):
             c.is_wide = True
             all_clusters.append(c)
 

@@ -131,7 +131,7 @@ def match_beats(
     Returns list of (gt_beat, det_beat) pairs within MATCH_TOLERANCE_MS.
     """
     tol = int(MATCH_TOLERANCE_MS * fs / 1000)
-    gt = sorted(gt_beats, key=lambda beat: int(beat["r_sample"]))
+    gt = sorted(gt_beats, key=lambda beat: float(beat["r_sample"]))
     detected = sorted(
         (beat for beat in det_beats if beat.qrs.peak is not None),
         key=lambda beat: int(beat.qrs.peak),
@@ -146,7 +146,7 @@ def match_beats(
     scores = [[(0, 0) for _ in range(n_det + 1)] for _ in range(n_gt + 1)]
     choices = [["" for _ in range(n_det + 1)] for _ in range(n_gt + 1)]
 
-    def better(candidate: tuple[int, int], current: tuple[int, int]) -> bool:
+    def better(candidate: tuple[int, float], current: tuple[int, float]) -> bool:
         return candidate[0] > current[0] or (
             candidate[0] == current[0] and candidate[1] < current[1]
         )
@@ -163,7 +163,7 @@ def match_beats(
                 best = scores[gt_index][det_index - 1]
                 choice = "skip_det"
             distance = abs(
-                int(gt[gt_index - 1]["r_sample"])
+                float(gt[gt_index - 1]["r_sample"])
                 - int(detected[det_index - 1].qrs.peak)
             )
             if distance <= tol:
@@ -193,7 +193,7 @@ def match_beats(
 
 # ── Error computation ────────────────────────────────────────────────────────
 
-def boundary_error_ms(gt_sample: Optional[int], det_sample: Optional[int], fs: int) -> Optional[float]:
+def boundary_error_ms(gt_sample: Optional[float], det_sample: Optional[int], fs: int) -> Optional[float]:
     """Detected − GT in milliseconds (positive = detected later)."""
     if gt_sample is None or det_sample is None:
         return None
@@ -216,10 +216,10 @@ def _det_p_by_gt_p_timing(
     for gt in gt_beats:
         if gt.get("p_on") is None or gt.get("p_peak") is None or gt.get("p_off") is None:
             continue
-        gt_r = int(gt["r_sample"])
-        p_on = int(gt["p_on"])
-        p_peak = int(gt["p_peak"])
-        p_off = int(gt["p_off"])
+        gt_r = gt["r_sample"]
+        p_on = float(gt["p_on"])
+        p_peak = float(gt["p_peak"])
+        p_off = float(gt["p_off"])
 
         candidates: List[Tuple[int, object]] = []
         for det in det_with_qrs:
@@ -249,11 +249,47 @@ def _det_p_by_gt_p_timing(
 
 # ── Per-record evaluation ────────────────────────────────────────────────────
 
+BOUNDARIES = ("qrs_on", "qrs_off", "p_on", "p_off", "t_on", "t_off")
+
+
+def rescale_annotations(beats: List[Dict], fs_in: float, fs_out: float) -> List[Dict]:
+    """Express reference times in detector samples without rounding them.
+
+    Fractional reference samples preserve annotation time when evaluating a
+    different internal rate; detection samples remain integer-valued.
+    """
+    scale = float(fs_out) / float(fs_in)
+    return [
+        {key: value * scale if value is not None else None for key, value in beat.items()}
+        for beat in beats
+    ]
+
+
+def summarize_coverage(coverage_rows: List[Dict]) -> Dict:
+    totals = {
+        key: sum(int(row.get(key, 0)) for row in coverage_rows)
+        for key in ("gt_qrs", "matched_qrs", "unmatched_det_in_gt_span")
+    }
+    totals["unmatched_gt_qrs"] = totals["gt_qrs"] - totals["matched_qrs"]
+    boundaries = {}
+    for key in BOUNDARIES:
+        annotated = sum(int(row.get("gt_" + key, 0)) for row in coverage_rows)
+        scored = sum(int(row.get("scored_" + key, 0)) for row in coverage_rows)
+        boundaries[key] = {
+            "annotated": annotated,
+            "scored": scored,
+            "missing_or_unmatched": annotated - scored,
+            "coverage": scored / annotated if annotated else None,
+        }
+    return {**totals, "boundaries": boundaries,
+            "scope": "per_lead_annotation_span; boundary coverage is not wave-event sensitivity"}
+
 def evaluate_record(
     record_id: str,
     extractor: ECGFeatureExtractor,
     *,
     failure_details: List[str] | None = None,
+    coverage_rows: List[Dict] | None = None,
 ) -> List[Dict]:
     """
     Run extraction on one LUDB record and return a list of error dicts
@@ -277,12 +313,13 @@ def evaluate_record(
         print(f"  [skip] {record_id}: extractor failed — {e}")
         if failure_details is not None:
             failure_details.append(f"extractor: {type(e).__name__}: {e}")
-        return []
+        feat = None
 
     # Build per-lead dict of detected beat features
     det_by_lead: Dict[str, list] = defaultdict(list)
-    for bf in feat.beat_features:
+    for bf in feat.beat_features if feat is not None else []:
         det_by_lead[bf.lead].append(bf)
+    scoring_fs = feat.fs if feat is not None else fs
 
     rows = []
     for lead in STANDARD_12_LEADS:
@@ -296,16 +333,16 @@ def evaluate_record(
             if failure_details is not None:
                 failure_details.append(f"annotation {lead}: {exc}")
             continue
-        if not gt_beats:
-            continue
+        gt_beats = rescale_annotations(gt_beats, fs, scoring_fs)
         det_beats = det_by_lead.get(lead, [])
-        pairs = match_beats(gt_beats, det_beats, feat.fs)
+        pairs = match_beats(gt_beats, det_beats, scoring_fs)
+        lead_row_start = len(rows)
 
         # P-wave convention: LUDB annotates the P-wave of beat N AFTER beat N's
         # T-wave (i.e., it is the P-wave preceding the following QRS).  Some
         # leads omit that following QRS even when the P annotation is present,
         # so map by the GT P-to-detected-QRS timing rather than by GT beat index.
-        det_p_by_gt_r = _det_p_by_gt_p_timing(gt_beats, det_beats, feat.fs)
+        det_p_by_gt_r = _det_p_by_gt_p_timing(gt_beats, det_beats, scoring_fs)
 
         for gt, det in pairs:
             det_p = det_p_by_gt_r.get(gt["r_sample"])  # det beat whose P to compare
@@ -314,25 +351,25 @@ def evaluate_record(
                 "lead":     lead,
                 "r_sample": gt["r_sample"],
                 # QRS
-                "qrs_on_err":  boundary_error_ms(gt["qrs_on"],  det.qrs.onset,  feat.fs),
-                "qrs_off_err": boundary_error_ms(gt["qrs_off"], det.qrs.offset, feat.fs),
+                "qrs_on_err":  boundary_error_ms(gt["qrs_on"],  det.qrs.onset,  scoring_fs),
+                "qrs_off_err": boundary_error_ms(gt["qrs_off"], det.qrs.offset, scoring_fs),
                 # T wave
-                "t_on_err":    boundary_error_ms(gt["t_on"],    det.t.onset,    feat.fs),
-                "t_off_err":   boundary_error_ms(gt["t_off"],   det.t.offset,   feat.fs),
+                "t_on_err":    boundary_error_ms(gt["t_on"],    det.t.onset,    scoring_fs),
+                "t_off_err":   boundary_error_ms(gt["t_off"],   det.t.offset,   scoring_fs),
                 # P wave (corrected convention: GT P of beat i → det P of beat i+1)
                 "p_on_err":    boundary_error_ms(
                     gt["p_on"],
                     det_p.p.onset if det_p is not None else None,
-                    feat.fs,
+                    scoring_fs,
                 ),
                 "p_off_err":   boundary_error_ms(
                     gt["p_off"],
                     det_p.p.offset if det_p is not None else None,
-                    feat.fs,
+                    scoring_fs,
                 ),
                 # QT interval errors
                 "qt_gt_ms":    (
-                    (gt["t_off"] - gt["qrs_on"]) * 1000.0 / feat.fs
+                    (gt["t_off"] - gt["qrs_on"]) * 1000.0 / scoring_fs
                     if gt["t_off"] is not None and gt["qrs_on"] is not None else None
                 ),
                 "qt_det_ms":   det.qt_ms,
@@ -345,6 +382,26 @@ def evaluate_record(
                 else None
             )
             rows.append(row)
+
+        if coverage_rows is not None:
+            matched_ids = {id(det) for _, det in pairs}
+            tolerance = MATCH_TOLERANCE_MS * scoring_fs / 1000.0
+            lo = min((gt["r_sample"] for gt in gt_beats), default=0) - tolerance
+            hi = max((gt["r_sample"] for gt in gt_beats), default=0) + tolerance
+            coverage = {
+                "record": record_id, "lead": lead,
+                "gt_qrs": len(gt_beats), "matched_qrs": len(pairs),
+                "unmatched_det_in_gt_span": sum(
+                    bool(gt_beats) and id(det) not in matched_ids and det.qrs.peak is not None
+                    and lo <= det.qrs.peak <= hi for det in det_beats
+                ),
+            }
+            for key in BOUNDARIES:
+                coverage["gt_" + key] = sum(gt[key] is not None for gt in gt_beats)
+                coverage["scored_" + key] = sum(
+                    row[key + "_err"] is not None for row in rows[lead_row_start:]
+                )
+            coverage_rows.append(coverage)
 
     return rows
 
@@ -366,7 +423,7 @@ def _stats(vals: List[float]) -> Dict:
     }
 
 
-def compute_summary(rows: List[Dict]) -> Dict:
+def compute_summary(rows: List[Dict], *, coverage_rows: List[Dict] | None = None) -> Dict:
     """Aggregate errors across all records and leads."""
     fields = [
         "qrs_on_err", "qrs_off_err",
@@ -393,6 +450,8 @@ def compute_summary(rows: List[Dict]) -> Dict:
     unrel_qt = [r["qt_err"] for r in rows if r["qt_err"] is not None and not r["beat_reliable"]]
     summary["qt_err_reliable"]   = _stats(rel_qt)
     summary["qt_err_unreliable"] = _stats(unrel_qt)
+    if coverage_rows is not None:
+        summary["coverage"] = summarize_coverage(coverage_rows)
 
     return summary
 
@@ -698,6 +757,7 @@ def main() -> int:
     print()
 
     all_rows: List[Dict] = []
+    coverage_rows: List[Dict] = []
     failed_records: List[Dict[str, object]] = []
     for i, rid in enumerate(all_records, 1):
         print(f"  [{i:>3d}/{len(all_records)}]  {rid}", end="  ", flush=True)
@@ -706,6 +766,7 @@ def main() -> int:
             rid,
             extractor,
             failure_details=record_failures,
+            coverage_rows=coverage_rows,
         )
         n_pairs = len(rows)
         print(f"→ {n_pairs} beat×lead pairs matched")
@@ -725,12 +786,22 @@ def main() -> int:
             json.dumps(failed_records, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+    summary = compute_summary(all_rows, coverage_rows=coverage_rows)
+    summary["requested_records"] = len(all_records)
+    summary["failed_records"] = failed_records
+    summary["operational_coverage_complete"] = not failed_records
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "summary.json").write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     if not all_rows:
         print("No results — check that LUDB data directory is accessible.")
         return 1
 
-    summary = compute_summary(all_rows)
     print_summary(summary, len(all_records), len(all_rows))
+    print("  Annotation coverage (includes missing/unmatched boundaries):")
+    for name, counts in summary["coverage"]["boundaries"].items():
+        print(f"    {name}: {counts['scored']}/{counts['annotated']}")
 
     save_csv(all_rows, out_dir)
     print()

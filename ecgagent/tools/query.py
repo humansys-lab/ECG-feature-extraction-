@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..evidence.caveats import classify_modality
-from ..evidence.pointer import PointerError, infer_unit
+from ..evidence.pointer import PointerError, alias_table, infer_unit, resolve_alias
 from ..evidence.store import EvidenceStore
 from ._render import bullet_list, format_cell, markdown_table, truncate_lines
 from .registry import ToolResult, ToolSpec
@@ -65,9 +65,16 @@ def get_global_table(store: EvidenceStore, fields: list[str]) -> ToolResult:
     rows: list[list[str]] = []
     citations: list[str] = []
     unknown: list[str] = []
+    known_global = {pointer.rsplit("/", 1)[-1] for pointer in alias_table().values()
+                    if pointer.startswith("/global_features/")} | {"qt_reportable", "qt_reliability", "qt_rejected", "qt_reject_reason"}
     for requested in fields:
         evidence = store.try_resolve(str(requested))
         if evidence is None or not evidence.pointer.startswith("/global_features/"):
+            canonical = resolve_alias(str(requested)) or str(requested)
+            field = canonical.removeprefix("/global_features/")
+            if evidence is None and field in known_global:
+                rows.append([str(requested), "", "unavailable", infer_unit(field) or "", "unavailable", "not exported"])
+                continue
             unknown.append(str(requested))
             continue
         citations.extend((evidence.pointer, *evidence.companions))
@@ -171,7 +178,8 @@ def get_lead_table(
             "Split into focused calls."
         )
 
-    known = set(store.lead_param_fields())
+    from ..evidence.diagnostic_contract import QRS_MEASUREMENT_BUNDLE_FIELDS
+    known = set(store.lead_param_fields()) | set(QRS_MEASUREMENT_BUNDLE_FIELDS) | set(_QUALITY_FLAG_BY_MODALITY.values())
     unknown = [name for name in fields if name not in known]
     if unknown:
         suggestions: list[str] = []
@@ -187,7 +195,7 @@ def get_lead_table(
 
     target_leads = [lead for lead in (leads or store.leads) if lead in store.leads]
     if not target_leads:
-        return ToolResult.error(
+        return ToolResult.unavailable(
             f"no matching leads. Available: {', '.join(store.leads)}"
         )
 
@@ -273,7 +281,7 @@ def get_beat_table(
 
     beats = store.document.get("beats") or []
     if not beats:
-        return ToolResult.error("this record has no per-beat data")
+        return ToolResult.unavailable("this record has no per-beat data")
 
     per_lead: dict[int, tuple[int, dict[str, Any]]] = {}
     if lead is not None:
@@ -281,7 +289,7 @@ def get_beat_table(
             return ToolResult.error(f"unknown lead {lead!r}. Available: {', '.join(store.leads)}")
         per_lead = _beat_feature_index(store, lead)
         if not per_lead:
-            return ToolResult.error(f"no per-beat features stored for lead {lead}")
+            return ToolResult.unavailable(f"no per-beat features stored for lead {lead}")
 
     sample_lead_row = next(iter(per_lead.values()))[1] if per_lead else {}
     known = set(_BEAT_LEVEL_FIELDS) | set(sample_lead_row)
@@ -298,7 +306,7 @@ def get_beat_table(
         if beat_ids is None or beat.get("beat_id") in set(beat_ids)
     ]
     if not selected:
-        return ToolResult.error(f"no beats matched beat_ids={beat_ids}")
+        return ToolResult.unavailable(f"no beats matched beat_ids={beat_ids}")
 
     units = {name: infer_unit(name) for name in fields}
     headers = ["beat"] + [f"{n} ({units[n]})" if units[n] else n for n in fields]

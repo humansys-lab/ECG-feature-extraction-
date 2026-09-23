@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, is_dataclass
+from dataclasses import asdict, is_dataclass, replace
 import hashlib
 import json
 from math import isfinite, log2, sqrt
@@ -351,6 +351,10 @@ def _native_global_measurements(features: ECGFeatures) -> Dict[str, Any]:
         "qtc_bazett_ms": _finite(gf.qtc_bazett_ms),
         "qtc_fridericia_ms": _finite(gf.qtc_fridericia_ms),
         "qt_dispersion_ms": _finite(gf.qt_dispersion_ms),
+        "qt_dispersion_independent_ms": _finite(gf.qt_dispersion_independent_ms),
+        "qt_dispersion_p90_p10_ms": _finite(gf.qt_dispersion_p90_p10_ms),
+        "qt_dispersion_used_leads": list(gf.qt_dispersion_used_leads),
+        "qt_dispersion_legacy_excluded_leads": list(gf.qt_dispersion_legacy_excluded_leads),
         "p_axis_frontal_deg": _finite(gf.p_axis_deg),
         "qrs_axis_frontal_deg": _finite(gf.qrs_axis_deg),
         "t_axis_frontal_deg": _finite(gf.t_axis_deg),
@@ -358,7 +362,7 @@ def _native_global_measurements(features: ECGFeatures) -> Dict[str, Any]:
         "heart_rate_source": "native",
         "interval_source": "native",
         "qtc_source": "native",
-        "qt_dispersion_source": "native",
+        "qt_dispersion_source": gf.qt_dispersion_source or "native",
         "axis_source": "native",
     }
 
@@ -1292,6 +1296,9 @@ def _pediatric_morphology_context(
 
 def build_morphology_inputs(features: ECGFeatures) -> Dict[str, Any]:
     """Build the feature schema consumed by the morphology rule layer."""
+    if features.metadata.get("limited_lead_capabilities"):
+        return {"available": False, "reason": "limited_lead_measurement_only",
+                "channel_to_slot": to_dict(features.metadata["limited_lead_capabilities"]["channel_to_slot"])}
     by_lead = _features_by_lead(features)
     gf = features.global_features
     record_quality = features.metadata.get("record_quality", {})
@@ -2309,6 +2316,9 @@ def build_statement_engine_payload(
     rhythm_inputs: Optional[Dict[str, Any]] = None,
     morphology_inputs: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    if features.metadata.get("limited_lead_capabilities"):
+        return {"available": False, "reason": "limited_lead_measurement_only",
+                "candidates": [], "final_statements": []}
     metadata_payload = features.metadata.get("statement_engine")
     if isinstance(metadata_payload, dict):
         return to_dict(metadata_payload)
@@ -2398,14 +2408,39 @@ def _reference_metadata_payload(clinical: Any) -> Dict[str, Any]:
     }
 
 
-def to_dict(obj: Any) -> Any:
+def to_dict(obj: Any, *, profile: Optional[str] = None) -> Any:
+    """Build an export payload, optionally skipping fields discarded on disk.
+
+    With a profile, large omitted dataclasses are never recursively copied.
+    ``prepare_json_export`` still performs final rounding and JSON sanitation.
+    The no-profile API retains the full historical payload.
+    """
+    if profile is not None:
+        profile = str(profile).strip().lower()
+        if profile not in {"summary", "audit", "debug"}:
+            raise ValueError("profile must be one of: summary, audit, debug")
     if isinstance(obj, ECGFeatures):
-        payload = asdict(obj)
+        source = obj
+        if profile in {"summary", "audit"}:
+            options = {"beat_features": []}
+            if profile == "summary":
+                options.update(p_wave_assessments=[], metadata={
+                    key: value for key, value in obj.metadata.items()
+                    if key != "rhythm_analysis"
+                })
+            source = replace(obj, **options)
+        payload = asdict(source)
+        if profile in {"summary", "audit"}:
+            payload.pop("beat_features", None)
+        if profile == "summary":
+            payload.pop("p_wave_assessments", None)
         metadata = payload.get("metadata")
         if isinstance(metadata, dict):
             metadata.pop("glasgow_analysis", None)
         payload["rhythm_inputs"] = build_rhythm_inputs(obj)
         payload["morphology_inputs"] = build_morphology_inputs(obj)
+        if profile == "summary":
+            payload["morphology_inputs"].pop("native_beat_profiles", None)
         payload["statement_engine"] = build_statement_engine_payload(
             obj,
             rhythm_inputs=payload["rhythm_inputs"],

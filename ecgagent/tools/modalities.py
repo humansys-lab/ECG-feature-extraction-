@@ -62,7 +62,7 @@ def _pointer_table(
         rendered.append([label, pointer, value])
         citations.extend((evidence.pointer, *evidence.companions))
     if not rendered:
-        return ToolResult.error("the requested modality evidence is unavailable")
+        return ToolResult.unavailable("the requested modality evidence is unavailable")
     text = markdown_table(["observation", "pointer", "value"], rendered)
     if cautioned:
         text += (
@@ -356,7 +356,7 @@ def get_atrial_event_table(
         if len(selected) >= limit:
             break
     if not selected:
-        return ToolResult.error("no atrial events matched the requested filters")
+        return ToolResult.unavailable("no atrial events matched the requested filters")
 
     headers = ["event"] + [
         f"{name} ({infer_unit(name)})" if infer_unit(name) else name
@@ -452,7 +452,7 @@ def get_p_assessment_table(
         if len(selected) >= limit:
             break
     if not selected:
-        return ToolResult.error("no P-wave assessments matched the requested beat ids")
+        return ToolResult.unavailable("no P-wave assessments matched the requested beat ids")
 
     show_diagnostic_use = "accepted" in chosen and "ta_ambiguous" in chosen
     headers = ["beat"] + [
@@ -516,7 +516,7 @@ def get_morphology_groups(
     """Describe QRS morphology families and their beat-level prevalence."""
     groups = store.document.get("groups") or {}
     if not groups:
-        return ToolResult.error("no morphology groups are available")
+        return ToolResult.unavailable("no morphology groups are available")
     citations: list[str] = []
     rows: list[list[str]] = []
     headers = [
@@ -784,6 +784,8 @@ def get_qrs_measurement_bundle(
 
     available = store.raw("/measurement_bundles/qrs_by_lead", {})
     available = available if isinstance(available, dict) else {}
+    if not available:
+        return ToolResult.unavailable("no QRS measurement bundles are available")
     target_leads = [
         lead
         for lead in (leads or store.leads)
@@ -1384,7 +1386,7 @@ def get_native_beat_profile(
                 }
             )
     if not row_refs:
-        return ToolResult.error(
+        return ToolResult.unavailable(
             "native per-beat morphology is unavailable; regenerate the feature "
             "artifact with the compact native-beat profile contract or include "
             "beat_features"
@@ -1456,7 +1458,7 @@ def get_native_beat_profile(
                 citations.append(citation)
         rendered.append(cells)
     if not rendered:
-        return ToolResult.error("no native-beat rows matched the requested leads")
+        return ToolResult.unavailable("no native-beat rows matched the requested leads")
 
     prefix = (
         "WARNING: no non-paced beat was available; showing the dominant paced "

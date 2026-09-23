@@ -14,12 +14,12 @@ The language model is the diagnostic reasoner. ecgfeat is a read-only measuremen
 
 The default compact workflow is designed for local 27B-class models:
 
-1. **Plan** — the model reads one compact, diagnosis-neutral overview and proposes at most three candidates with support and falsification views.
+1. **Plan** — the model reads one compact, diagnosis-neutral overview and proposes candidates up to a record-specific ceiling of three to six with support and falsification views.
 2. **Programmatic routing** — the orchestrator adds diagnosis-specific pathway steps, merges overlapping views and prefetches bounded tool results.
-3. **Adjudicate** — deterministic nodes are computed in code; the model answers only morphology, mechanism and differential questions that require interpretation.
+3. **Adjudicate** — deterministic nodes are computed in code; the model answers morphology, mechanism and differential questions in at most four bounded batches. One update may open up to two additional candidates from newly visible reliable measurements; each must complete its own pathway.
 4. **Render and verify** — code merges both node types, determines final placement, materializes true values from citations, renders reports and performs structural, semantic, numeric and evidence validation.
 
-The older five-phase ledger workflow remains available with `--diagnostic-workflow legacy`. The CLI and batch runner default to `compact`.
+The older five-phase ledger workflow remains available with `--diagnostic-workflow legacy`. The CLI, batch runner, and Python constructor default to `compact`.
 
 ## Evidence rules
 
@@ -30,7 +30,7 @@ The older five-phase ledger workflow remains available with `--diagnostic-workfl
 - A representative beat is not automatically representative of the entire recording.
 - Missing PR does not mean absent P waves; missing QT does not mean uninformative T waves.
 - Rate and rhythm mechanism are assessed separately.
-- Positive diagnoses require definition-level evidence, independent corroboration when morphology or mechanism is involved, and active counterevidence review.
+- Positive diagnoses require definition-level evidence, explicit morphology/mechanism review and active counterevidence review. Multiple views of one extractor are not independent clinical validation.
 
 ## Diagnosis-specific pathways
 
@@ -41,11 +41,11 @@ Each active candidate receives a short pathway with explicit required, supportin
 
 Program-owned coverage includes PR and QT reportability and thresholds, P-QRS association counts, repeated nonconducted atrial events, AV sequence summaries, directly measured atrial and ventricular rates, P-wave axis, RR irregularity, QRS duration, morphology-group prevalence, premature timing, repeated wide-QRS sequences, low voltage, pacing markers/capture/sensing, right-precordial voltage relationships and precordial R/S progression.
 
-Missing fields, insufficient reliability or inadequate sample counts remain `unknown`. Candidate-event counts are never promoted into AV conduction ratios.
+Missing fields, insufficient reliability or inadequate sample counts remain `unknown`. Candidate-event counts are never promoted into AV conduction ratios. Atrial association requires unique event/beat identities and consistent event timing, confidence and standard lead provenance. Inapplicable criteria do not exclude the underlying condition. All 123 catalog codes have explicit paths; see the [v44 pathway audit](../docs/ecgagent_v44_pathway_audit.md).
 
 ## Rule-based second opinion
 
-The compact workflow uses a dual-channel candidate process. The model first proposes independent candidates from a neutral measurement overview. Only after that plan is frozen can the program add a small number of sanitized ecgfeat rule-based second-opinion candidates.
+The compact workflow uses a dual-channel candidate process. The model first proposes independent candidates from a neutral measurement overview. After preserving that blind plan, the program adds sanitized ecgfeat rule-based second-opinion candidates. A single later evidence-triggered update is audited separately.
 
 Rule status is never support or counterevidence. A rule-added candidate must complete the same independent measurement pathway and falsification process as a model candidate. Unadjudicated rule candidates are abstained or sent for human review, never confirmed automatically.
 
@@ -66,6 +66,7 @@ Rule status is never support or counterevidence. A rule-added candidate must com
 | `get_morphology_map(profile, leads?)` | Review bounded cross-lead QRS, ST or T/U morphology |
 | `get_interval_waveform_context(interval)` | Review PR or QT/QTc status together with retained component-wave information |
 | `get_pacing_profile(...)` | Review pacing markers, capture, sensing and evidence conflicts |
+| `get_waveform_review(profile="all")` | Read bounded original-waveform P/AV, signed QRS and PR-baselined ST observations, conflicts and provenance |
 | `get_native_beat_profile(profile, leads?, max_beats?)` | Review repeated native/non-paced beats for Q waves, R-wave progression or repolarization |
 | `list_findings` / `get_rule_detail` | Legacy adjudication mode only; unavailable to diagnostic phases |
 
@@ -84,7 +85,9 @@ Every successful run can produce:
 - `brief_reports/<record>_brief.md` — concise English conclusion, evidence, limitations and recommendations
 - `agent_traces/<record>_agent_trace.md` — phase output, model-visible tool context, complete raw tool audit, validation and runtime usage
 
-Reports are rendered deterministically from the structured verdict. No second model paraphrases the result.
+Reports are rendered deterministically from the structured verdict. No second model paraphrases the result. Confidence fields are qualitative evidence strength, not diagnostic probabilities; compact confirmations are capped at MEDIUM until independent calibration exists. The audit records processing dependencies and unresolved applicability.
+
+Qwen and DeepSeek share the same evidence packing policy: an 8,000-character target with a 24,000-character ceiling for required evidence. Omitted required content cannot pass a model node. Complete pathways are split across bounded batches; deferred candidates remain explicitly unassessed.
 
 ## Run one record with a local Qwen server
 
@@ -102,6 +105,10 @@ cd /workspace/ecg_gemma
   --qwen-base-url http://127.0.0.1:8000/v1 \
   --diagnostic-workflow compact
 ```
+
+To attach matching original samples, add `--waveform-record /path/to/record` (WFDB base path or `.hea`). Batch extraction attaches the artifact automatically. Without original samples or a saved artifact, raw review is explicitly unavailable. Relevant raw conflicts add a budgeted review node; availability alone cannot establish consistency. The raw review shares acquisition and exported timing with extraction and is not independent validation.
+
+For vLLM deployments using the configured thinking budget, enable the model-compatible reasoning parser (the tested Qwen3.5 checkpoint used `--reasoning-parser qwen3`).
 
 The Qwen backend uses OpenAI-compatible `tools` and `tool_calls`. In compact mode, tool views are prefetched by the orchestrator, so Qwen does not need to generate tool calls. Strict JSON-schema decoding constrains both the plan and final adjudication.
 
@@ -135,3 +142,65 @@ Identical tool-and-argument calls within a phase are deduplicated. Whole-record 
 Deterministic validation checks output structure, citation authorization, exact values and units, reliability qualification, numeric comparisons, diagnosis-code placement and selected definition-level contradictions. It never creates a diagnosis and does not read dataset labels or clinical-rule conclusions.
 
 All positive findings, downgraded findings and non-pass quality-gate results require qualified human review. ECGAgent output does not replace the original waveform, clinical history, symptoms, prior tests or a formal medical diagnosis.
+
+## Runtime and performance controls (v42)
+
+v43 additionally preserves cited quality limitations in reports, compiles an
+uncovered planned falsification modality into a required node before view
+budgeting, and skips adjudication only when all work is program-owned and no
+review or interval task remains. Public response history includes failed
+structured replies and repair feedback. Qwen uses the vLLM structured-output
+whitespace constraint together with the JSON schema; xgrammar is recommended.
+Reports describe ranked findings without claiming complete ECG coverage.
+See [v43 trace fixes and validation](../docs/ecgagent_v43_trace_fixes.md).
+
+All public entry points, including `ECGDiagnosticAgent(...)`, default to
+`compact`. Select `workflow="legacy"` explicitly for the five-phase protocol.
+Planning has a record-specific ceiling of 3–6 independent candidates; the
+merged shortlist has at most 10 candidates and 15 exact tool views. Requested
+cross-domain review views reserve up to two slots. Candidate selection uses
+urgency, uncovered domains, usable measurement support and marginal view cost.
+These routing scores are not diagnostic confidence.
+
+Qwen and DeepSeek receive the current phase explicitly: planning disables
+thinking; adjudication follows the backend's thinking setting. Qwen additionally
+uses `thinking_token_budget=768` (constructor option; `None` disables the cap),
+limited to at most one third of the requested completion budget. This requires
+the repository's vLLM 0.24 API and preserves room for the structured answer.
+The effective setting is recorded per request.
+
+Compact phases allow one local JSON/structure repair, reusing the same plan and
+evidence without additional tools. A truncated reply gets a bounded larger
+completion cap. This does not enable repeated clinical reconsideration:
+`max_revisions` remains a legacy-workflow control. Whole-record retries share
+the original record deadline. HTTP attempts disable hidden SDK retries and
+recalculate their remaining deadline. Local MedGemma queue waits are bounded;
+already-running synchronous GPU kernels cannot be preempted by this interface.
+
+Evidence atoms retain values, units, reliability and caveats. Model-owned nodes
+have a minimum display bundle, packed before optional evidence; cross-lead
+views preserve the selected fields across leads. Missing or compressed-away
+minimum evidence is audited and leaves the model node unknown. These are display
+coverage floors, not sufficient diagnostic criteria. Raw deterministic evidence
+continues to use the complete tool results. Planning includes bounded measured
+ST/T, Q-wave and voltage extremes without assigning diagnostic flags.
+
+`analysis.json` now separates full-cohort direct-label metrics from historical
+verified-only comparisons. Missing, stale, failed and unverified results are
+abstentions in the full-cohort metrics. It also records candidate-proposal
+coverage, model-node evidence visibility, local repairs, per-phase latency,
+logical model requests and tokens. `diagnosis_manifest.json` records actual
+batch wall time, worker count and executed records per second (excluding reuse).
+Historical artifacts without request-level telemetry are not assigned invented
+latency/token measurements.
+
+Compare saved runs at different worker counts on the same input cohort:
+
+```bash
+.venv/bin/python -m ecgagent.performance output_workers1 output_workers2 output_workers4 \
+  --output performance_comparison.json
+```
+
+The comparison reads existing artifacts and makes no model calls. Select a
+worker count using throughput together with P95 latency, failure rate and
+full-cohort label metrics; increasing concurrency alone is not an accuracy fix.

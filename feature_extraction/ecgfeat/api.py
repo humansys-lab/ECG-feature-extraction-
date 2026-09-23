@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import asdict
 
 import numpy as np
 
@@ -44,6 +45,7 @@ from .models import (
 )
 from .preprocess import analysis_signal, lowpass_filter, resample_ecg
 from .p_wave_engine import (
+    PWaveConfig,
     backfill_missing_p_from_robust_engine,
     build_p_wave_assessments,
     finalize_p_wave_states,
@@ -65,6 +67,9 @@ from .quality import (
 from .r_localization import apply_hybrid_r_localization
 from .wave_localization import apply_hybrid_wave_localization
 from .st_localization import apply_hybrid_st_measurement
+from .st_baseline import calibrated_st_signal, adaptive_st_signal
+from .refinement import RefinementConfig
+from .boundary_refinement import correct_p_boundaries
 from .t_wave_refinement import refine_t_wave_boundaries
 from .representative import build_representative_beats_with_meta
 from .rhythm_rules import (
@@ -770,6 +775,11 @@ def _copy_qt_measurements(target: Any, source: Any) -> None:
         "qtc_bazett_ms",
         "qtc_fridericia_ms",
         "qt_dispersion_ms",
+        "qt_dispersion_independent_ms",
+        "qt_dispersion_p90_p10_ms",
+        "qt_dispersion_source",
+        "qt_dispersion_used_leads",
+        "qt_dispersion_legacy_excluded_leads",
         "qt_source",
         "qt_used_leads",
         "qt_reliability",
@@ -1321,6 +1331,10 @@ def _pacing_qrs_cleaned_single_lead_rescue(
             ecg_detect,
             fs,
             leads=(lead_index,),
+            # Compare single-lead energy candidates on the same II timing
+            # reference as the original multi-lead detections. This is an
+            # explicit pacing-capture reference, not an implicit excluded lead.
+            fiducial_lead=1,
         )
         candidate_r_locs = np.asarray(candidate.r_locs, dtype=int)
         if len(candidate_r_locs) < len(raw_r_locs):
@@ -1754,7 +1768,21 @@ class ECGFeatureExtractor:
         enable_hybrid_wave_localization: bool = True,
         enable_hybrid_st_measurement: bool = True,
         enable_t_wave_refinement: bool = True,
+        st_amplitude_source: str = "analysis",
+        refinement: Optional[RefinementConfig] = None,
+        input_mode: str = "standard",
     ) -> None:
+        if input_mode not in {"standard", "limited"}:
+            raise ValueError("input_mode must be 'standard' or 'limited'")
+        self.input_mode = input_mode
+        if st_amplitude_source not in {"analysis", "calibrated_pr", "adaptive_pr_tp"}:
+            raise ValueError("st_amplitude_source must be 'analysis', 'calibrated_pr' or 'adaptive_pr_tp'")
+        if refinement is not None and not isinstance(refinement, RefinementConfig):
+            raise TypeError("refinement must be a RefinementConfig")
+        self.refinement = refinement or RefinementConfig()
+        if st_amplitude_source != "analysis" and not enable_hybrid_st_measurement:
+            raise ValueError("calibrated_pr requires enable_hybrid_st_measurement=True")
+        self.st_amplitude_source = st_amplitude_source
         self.fs_internal = fs_internal  # None = use native input fs
         self.mains_freq = mains_freq
         self.lp_hz = lp_hz
@@ -1794,7 +1822,10 @@ class ECGFeatureExtractor:
             lead_names=lead_names,
             amplitude_unit=input_unit,
             gain_uv_per_lsb=input_gain,
+            **({"allow_limited_leads": True} if self.input_mode == "limited" else {}),
         )
+        available_leads = input_contract.get("available_leads")
+        quality_options = {"available_leads": available_leads} if available_leads is not None else {}
 
         ecg_rs = resample_ecg(ecg, fs, fs_run)
         mains_freq_run = _resolve_mains_frequency(ecg_rs, fs_run, self.mains_freq)
@@ -1816,15 +1847,26 @@ class ECGFeatureExtractor:
             mains_hz=mains_freq_run,
             adc_full_scale_mv=adc_full_scale_mv,
         )
-        raw_record_quality = summarize_record_quality(raw_quality)
+        raw_record_quality = summarize_record_quality(raw_quality, **quality_options)
         quality = compute_quality(
             ecg_an,
             fs_run,
             mains_hz=mains_freq_run,
             adc_full_scale_mv=adc_full_scale_mv,
         )
-        record_quality = summarize_record_quality(quality)
-        lead_reversal = detect_limb_lead_reversal(ecg_an) if self.enable_lead_reversal else {}
+        record_quality = summarize_record_quality(quality, **quality_options)
+        refinement_kwargs = {"refinement": self.refinement} if self.refinement.enabled else {}
+        qrs_options = ({"quality": quality, "quality_reference": True}
+                       if self.refinement.qrs_quality_reference else {})
+        if available_leads is not None:
+            qrs_options["leads"] = tuple(STANDARD_12_LEADS.index(name) for name in available_leads)
+        if self.refinement.qrs_adaptive_consensus:
+            qrs_options["adaptive_consensus"] = True
+            qrs_options["quality"] = quality
+        rep_left_ms = 450 if self.refinement.representative_robust else 300
+        representative_options = ({"left_ms": rep_left_ms, "robust_alignment": True}
+                                  if self.refinement.representative_robust else {})
+        lead_reversal = detect_limb_lead_reversal(ecg_an) if self.enable_lead_reversal and available_leads is None else {}
         pacing_detection_cache = (
             prepare_pacing_detection_cache(ecg_rs, fs_run)
             if self.enable_pacing
@@ -1849,11 +1891,11 @@ class ECGFeatureExtractor:
                 and str(pacing_result.get("state") or "off") == "on"
                 and len(pacing_result["spike_times"]) >= _PACING_QRS_RESCUE_MIN_CAPTURE_BEATS
             ):
-                pre_despike_qrs_result = detect_qrs_multilead_with_meta(ecg_det, fs_run)
+                pre_despike_qrs_result = detect_qrs_multilead_with_meta(ecg_det, fs_run, **qrs_options)
             ecg_measure = remove_pacing_spikes(ecg_an, pacing_result["spike_times"], fs_run)
             ecg_detect = lowpass_filter(ecg_measure, fs_run, cutoff_hz=self.lp_hz, order=4)
 
-        qrs_result = detect_qrs_multilead_with_meta(ecg_detect, fs_run)
+        qrs_result = detect_qrs_multilead_with_meta(ecg_detect, fs_run, **qrs_options)
         r_locs = np.asarray(qrs_result.r_locs, dtype=int)
         pacing_qrs_rescue = _pacing_qrs_rescue_evidence(
             pacing_result=pacing_result,
@@ -1898,7 +1940,7 @@ class ECGFeatureExtractor:
                 if validated_spike_times:
                     ecg_measure = remove_pacing_spikes(ecg_an, validated_spike_times, fs_run)
                     ecg_detect = lowpass_filter(ecg_measure, fs_run, cutoff_hz=self.lp_hz, order=4)
-                qrs_result = detect_qrs_multilead_with_meta(ecg_detect, fs_run)
+                qrs_result = detect_qrs_multilead_with_meta(ecg_detect, fs_run, **qrs_options)
                 r_locs = np.asarray(qrs_result.r_locs, dtype=int)
                 if not validated_spike_times:
                     pacing_qrs_rescue = {
@@ -1952,6 +1994,7 @@ class ECGFeatureExtractor:
             compensated_qrs = detect_qrs_multilead_with_meta(
                 compensated_detect,
                 fs_run,
+                **qrs_options,
             )
             compensated_r = np.asarray(compensated_qrs.r_locs, dtype=int)
             qrs_alignment_ms = None
@@ -2033,7 +2076,8 @@ class ECGFeatureExtractor:
             else []
         )
         beat_groups = (
-            cluster_beats(ecg_measure, r_locs, fs_run, paced_beat_ids=paced_beat_ids)
+            cluster_beats(ecg_measure, r_locs, fs_run, paced_beat_ids=paced_beat_ids,
+                          **({"preserve_outliers": True} if self.refinement.grouping_outliers else {}))
             if self.compute_grouping
             else {1: list(range(len(r_locs)))}
         )
@@ -2068,6 +2112,7 @@ class ECGFeatureExtractor:
             beat_groups,
             fs_run,
             paced_beat_ids=paced_beat_ids,
+            **representative_options,
         )
         beat_features = delineate_beats(
             ecg_measure, fs_run, r_locs,
@@ -2078,6 +2123,8 @@ class ECGFeatureExtractor:
             pacing_spike_times=pacing_result["spike_times"],
             quality=quality,
             qrs_low_slope_guard=qrs_result.fallback_used,
+            rep_left_ms=rep_left_ms,
+            **refinement_kwargs,
         )
         if self.enable_hybrid_r_localization:
             apply_hybrid_r_localization(
@@ -2163,6 +2210,7 @@ class ECGFeatureExtractor:
         # Refine T only after the QRS terminal-tail decision.  T onset is a
         # guard for that rescue, so changing it earlier creates a circular
         # dependency and can suppress a valid late QRS offset.
+        t_fusion_audit: List[Dict[str, Any]] = []
         if self.enable_t_wave_refinement:
             refine_t_wave_boundaries(
                 beat_features,
@@ -2170,6 +2218,10 @@ class ECGFeatureExtractor:
                 r_locs=r_locs,
                 fs=fs_run,
                 quality=quality,
+                **({"fusion_audit": t_fusion_audit} if (self.refinement.t_correlated_fusion
+                    or self.refinement.t_boundary_projection or self.refinement.t_sequence_selection
+                    or self.refinement.t_projection_offset_only or self.refinement.t_sequence_offset_only) else {}),
+                **refinement_kwargs,
             )
             if self.enable_hybrid_st_measurement:
                 apply_hybrid_st_measurement(
@@ -2179,6 +2231,11 @@ class ECGFeatureExtractor:
                     fs=fs_run,
                     quality=quality,
                 )
+        p_config_kwargs = dict(model_arbitration=self.refinement.p_model_arbitration,
+                               multiple_candidates=self.refinement.p_multiple_candidates)
+        if available_leads is not None:
+            p_config_kwargs.update(minimum_informative_leads=min(2, len(available_leads)),
+                                   minimum_independent_groups=1)
         p_wave_assessments = build_p_wave_assessments(
             ecg_measure,
             fs_run,
@@ -2187,8 +2244,15 @@ class ECGFeatureExtractor:
             quality,
             beat_groups=beat_groups,
             acquisition_qc=acquisition_qc,
+            **({"config": PWaveConfig(**p_config_kwargs)}
+               if available_leads is not None or self.refinement.p_model_arbitration or self.refinement.p_multiple_candidates else {}),
         )
         atrial_events = extract_atrial_events(beat_features, quality, r_locs, fs_run, ecg=ecg_measure)
+        atrial_validation_audit: Dict[str, Any] = {}
+        if self.refinement.atrial_event_validation:
+            from .atrial_validation import validate_atrial_events
+            atrial_events = validate_atrial_events(atrial_events, ecg_measure, fs_run, beat_features,
+                                                  quality, audit=atrial_validation_audit)
         atrial_residual = build_qrst_subtracted_residual(
             ecg_measure,
             fs_run,
@@ -2223,6 +2287,30 @@ class ECGFeatureExtractor:
             for assessment in p_wave_assessments
         ]
         finalize_p_wave_states(p_wave_assessments, af_afl_summary)
+        p_corrections = []
+        if self.refinement.p_boundary_correction:
+            p_corrections = correct_p_boundaries(beat_features, p_wave_assessments, ecg_measure, fs_run)
+            if p_corrections:
+                if self.enable_hybrid_st_measurement:
+                    # Hybrid ST uses the accepted P offset to choose its PR
+                    # baseline. Correcting P invalidates that measurement.
+                    apply_hybrid_st_measurement(
+                        beat_features, measurement_ecg=ecg_measure,
+                        r_locs=r_locs, fs=fs_run, quality=quality,
+                    )
+                # Rebuild dependent atrial evidence once, then reapply the
+                # rhythm gate to the pristine boundary verdict (not a verdict
+                # already destructively finalized by the previous rhythm).
+                atrial_events = extract_atrial_events(beat_features, quality, r_locs, fs_run, ecg=ecg_measure)
+                if self.refinement.atrial_event_validation:
+                    atrial_events = validate_atrial_events(atrial_events, ecg_measure, fs_run, beat_features,
+                                                          quality, audit=atrial_validation_audit)
+                organized_p_ratio = compute_organized_p_ratio(atrial_events, len(r_locs))
+                pr_dispersion_ms = compute_pr_dispersion_ms(atrial_events)
+                af_afl_summary = _classify_af_afl(rr_ms, atrial_residual, organized_p_ratio, pr_dispersion_ms)
+                for assessment, (accepted, reasons, state) in zip(p_wave_assessments, pristine_p_wave_states):
+                    assessment.accepted, assessment.reject_reasons, assessment.p_state = accepted, list(reasons), state
+                finalize_p_wave_states(p_wave_assessments, af_afl_summary)
         # Ordering note: the backfill must stay downstream of a finalize, not be
         # deferred to the restore below.  Its AF-safety rests entirely on the
         # `assessment.accepted` gate, which only excludes AF_LIKE /
@@ -2251,9 +2339,10 @@ class ECGFeatureExtractor:
             measurement_rep_groups,
             fs_run,
             paced_beat_ids=paced_beat_ids,
+            **representative_options,
         ) if measurement_rep_groups else ({}, {})
         representative_beat_features = []
-        rep_center = int(0.300 * fs_run)
+        rep_center = int(rep_left_ms * fs_run / 1000)
         if dominant_group_id in measurement_representative:
             # Propagate pacing flag so the representative beat uses the T024
             # minimum-QRS-width constraint (Part 2).  Spike times are omitted
@@ -2268,6 +2357,7 @@ class ECGFeatureExtractor:
                 np.asarray([rep_center], dtype=int),
                 paced_beat_ids=rep_paced_ids,
                 paced_qrs_floor_beat_ids=rep_paced_floor_ids,
+                **refinement_kwargs,
             )
             if self.enable_t_wave_refinement:
                 refine_t_wave_boundaries(
@@ -2275,6 +2365,7 @@ class ECGFeatureExtractor:
                     measurement_ecg=measurement_representative[dominant_group_id],
                     r_locs=np.asarray([rep_center], dtype=int),
                     fs=fs_run,
+                    **refinement_kwargs,
                 )
             if self.enable_hybrid_st_measurement:
                 apply_hybrid_st_measurement(
@@ -2283,8 +2374,69 @@ class ECGFeatureExtractor:
                     r_locs=np.asarray([rep_center], dtype=int),
                     fs=fs_run,
                 )
+        st_baseline_metadata: Dict[str, Any] = {"source": self.st_amplitude_source}
+        if self.st_amplitude_source in {"calibrated_pr", "adaptive_pr_tp"}:
+            # This explicitly selected amplitude path uses the calibrated
+            # signal, with the same accepted timing/spike transformations.
+            raw_st = ecg_rs
+            if pacing_result["spike_times"]:
+                raw_st = remove_pacing_spikes(raw_st, pacing_result["spike_times"], fs_run)
+            if acquisition_qc.get("automatic_compensation_applied"):
+                raw_st, _ = apply_channel_delay_compensation(raw_st, approved_delays)
+            baseline_builder = adaptive_st_signal if self.st_amplitude_source == "adaptive_pr_tp" else calibrated_st_signal
+            st_baseline = baseline_builder(
+                raw_st, fs_run, beat_features, mains_hz=mains_freq_run
+            )
+            apply_hybrid_st_measurement(
+                beat_features, measurement_ecg=st_baseline.signal,
+                r_locs=r_locs, fs=fs_run, quality=quality,
+            )
+            st_representatives, _ = build_representative_beats_with_meta(
+                st_baseline.signal, r_locs, measurement_rep_groups, fs_run,
+                paced_beat_ids=paced_beat_ids,
+                **representative_options,
+            ) if measurement_rep_groups else ({}, {})
+            if dominant_group_id in st_representatives and representative_beat_features:
+                apply_hybrid_st_measurement(
+                    representative_beat_features,
+                    measurement_ecg=st_representatives[dominant_group_id],
+                    r_locs=np.asarray([rep_center], dtype=int), fs=fs_run,
+                )
+            for feature in [*beat_features, *representative_beat_features]:
+                if feature.lead in st_baseline.unavailable_leads:
+                    feature.st_hybrid_reliable = False
+                    feature.st_hybrid_unreliable_reason = "insufficient_calibrated_pr_anchors"
+                    feature.st_pattern_class = "unknown"
+            if st_baseline.valid_mask is not None:
+                for feature in beat_features:
+                    li = STANDARD_12_LEADS.index(feature.lead)
+                    j = feature.st_hybrid_j_index if feature.st_hybrid_j_index is not None else feature.qrs.offset
+                    # All amplitude samples through J+80 ms (including the
+                    # local averaging radius) require supported baseline.
+                    st_end = int(j) + int(round(.086 * fs_run)) + 1 if j is not None else 0
+                    if (j is None or not 0 <= int(j) < st_end <= ecg_rs.shape[1]
+                            or not np.all(st_baseline.valid_mask[li, int(j):st_end])):
+                        feature.st_hybrid_reliable = False
+                        feature.st_hybrid_unreliable_reason = "baseline_anchor_support_insufficient"
+                        feature.st_pattern_class = "unknown"
+                # Representative time coordinates are not original-record
+                # coordinates; report only if every selected donor supports ST.
+                for feature in representative_beat_features:
+                    donors = [b for b in beat_features if b.lead == feature.lead and b.beat_id in measurement_beat_ids]
+                    if not donors or any(not b.st_hybrid_reliable for b in donors):
+                        feature.st_hybrid_reliable = False
+                        feature.st_hybrid_unreliable_reason = "representative_donor_baseline_uncertain"
+                        feature.st_pattern_class = "unknown"
+                st_baseline_metadata.update(anchor_sources=st_baseline.anchor_sources,
+                    valid_sample_fraction={lead: float(np.mean(st_baseline.valid_mask[i])) for i, lead in enumerate(STANDARD_12_LEADS)},
+                    uncertainty_semantics="heuristic_mv_envelope_not_calibrated_probability")
+            st_baseline_metadata.update(
+                anchor_counts=st_baseline.anchor_counts,
+                unavailable_leads=list(st_baseline.unavailable_leads),
+                validation_status="experimental_not_default",
+            )
         adjacent_precordial_correlations: Dict[str, float] = {}
-        if self.enable_lead_reversal and representative_beat_features and dominant_group_id in measurement_representative:
+        if self.enable_lead_reversal and available_leads is None and representative_beat_features and dominant_group_id in measurement_representative:
             lead_qrs_bounds = {
                 bf.lead: (bf.qrs.onset, bf.qrs.offset) for bf in representative_beat_features
             }
@@ -2885,6 +3037,12 @@ class ECGFeatureExtractor:
                     ).items()
                 },
             },
+            "st_amplitude_signal": st_baseline_metadata,
+            "confidence_semantics": {
+                "qrs_detector_confidence": "uncalibrated_energy_margin_score",
+                "qt_confidence": "uncalibrated_local_evidence_score_not_accuracy_probability",
+                "qt_reporting_gate": "global_features.qt_reportable",
+            },
             "qrs_detector": qrs_result,
             "qrs_detector_agreement": qrs_detector_agreement,
             "pacing_qrs_rescue": pacing_qrs_rescue,
@@ -2933,6 +3091,11 @@ class ECGFeatureExtractor:
         }
         if meta is not None:
             metadata["patient_meta"] = meta
+        if self.refinement.enabled:
+            metadata["refinement"] = {"config": asdict(self.refinement),
+                "status": "experimental_requires_cohort_validation", "p_boundary_corrections": p_corrections,
+                "atrial_event_validation": atrial_validation_audit,
+                "t_interval_status": "heuristic_uncalibrated", "native_t_fusion": t_fusion_audit}
 
         _apply_qt_reject_gate(global_features, record_quality.get("record_grade"))
 
@@ -2947,6 +3110,43 @@ class ECGFeatureExtractor:
             p_wave_assessments=p_wave_assessments,
             metadata=metadata,
         )
+        if available_leads is not None:
+            # A limited-lead extraction is a measurement contract, not a
+            # synthetic 12-lead diagnostic report. Keep physical channel names
+            # in the input contract and remove empty computational slots.
+            ecg_features.quality = {k: v for k, v in quality.items() if k in available_leads}
+            ecg_features.beat_features = [b for b in beat_features if b.lead in available_leads]
+            ecg_features.representative_leads = {k: v for k, v in representative_leads.items() if k in available_leads}
+            for name in ("p_axis_deg", "qrs_axis_deg", "t_axis_deg", "st_axis_deg", "qrs_t_angle_deg", "transition_zone"):
+                setattr(global_features, name, None)
+            global_features.t_axis_reliable = False
+            global_features.qt_reportable = False
+            global_features.qt_unreliable_reasons = list(dict.fromkeys(
+                [*global_features.qt_unreliable_reasons, "limited_lead_measurement_only"]))
+            if not input_contract["anatomical_names_known"] or "V1" not in available_leads:
+                global_features.ptf_v1_mv_ms = None
+            if not input_contract["anatomical_names_known"]:
+                for feature in ecg_features.beat_features:
+                    feature.ptf_v1_mv_ms = None
+                for representative in ecg_features.representative_leads.values():
+                    representative.params["ptf_v1_mv_ms"] = None
+                global_features.t_fusion_reliable = False
+                global_features.t_fusion_lead_groups = ["supplied_channels"]
+            metadata["lead_order"] = list(available_leads)
+            metadata["diagnostic_gate"] = {
+                **metadata["diagnostic_gate"], "state": "stop", "allowed_domains": [],
+                "stop_reasons": ["limited_lead_measurement_only"], "suppressed_domains": ["all_diagnosis"],
+            }
+            metadata["limited_lead_capabilities"] = {
+                "mode": "measurements_only", "available_leads": available_leads,
+                "channel_to_slot": input_contract["lead_slot_map"],
+                "available": ["beat_detection", "per_channel_delineation", "atrial_events", "intervals"],
+                "unavailable": ["frontal_axes", "twelve_lead_diagnosis", "lead_reversal_diagnosis"],
+                "p_acceptance": "quality_and_boundary_agreement_on_supplied_channels",
+                "qt_reportability": "raw_intervals_only_no_twelve_lead_reportability_claim",
+            }
+            metadata["clinical_interpretation"] = {"status": "not_applicable_limited_lead_measurements"}
+            return ecg_features
         ecg_features.interpretation = interpret(ecg_features)
         ecg_features.metadata["clinical_interpretation"] = analyze_clinical(
             ecg_features,

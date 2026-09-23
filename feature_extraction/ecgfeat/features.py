@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 import numpy as np
 
+from .dispersion import QTDispersion, summarize_qt_dispersion
 from .measurement_paths import build_qt_path_decision
 from .models import (
     GlobalFeatures,
@@ -168,9 +169,6 @@ _PR_CONSENSUS_SHORT_OUTLIER_GAP_MS = 50.0
 _PR_CONSENSUS_CLUSTER_RAW_SUPPORT_MS = 35.0
 _PR_CONSENSUS_CLUSTER_MIN_RAW_SUPPORT = 2
 _PR_CONSENSUS_LONG_RAW_RESCUE_MIN_DELTA_MS = 25.0
-_QT_DISPERSION_CORE_ACTIVATION_MS = 80.0
-_QT_DISPERSION_CORE_CLUSTER_MS = 45.0
-_QT_DISPERSION_CORE_MIN_LEADS = 3
 _T_AXIS_STABLE_LIMB_MAX_RR_CV = 0.08
 _T_AXIS_STABLE_LIMB_MAX_QRS_MS = 120.0
 _T_AXIS_STABLE_LIMB_MIN_LEADS = 5
@@ -3459,12 +3457,12 @@ def _backfill_representative_qt_from_core(
         rep.params["representative_qt_backfilled"] = True
 
 
-def _raw_qt_dispersion(
+def _qt_dispersion_summary(
     representative_leads: Dict[str, "RepresentativeLeadFeatures"],
     qrs_ms: Optional[float],
-) -> Optional[float]:
-    values: List[float] = []
-    for rep in representative_leads.values():
+) -> QTDispersion:
+    values: Dict[str, float] = {}
+    for lead, rep in representative_leads.items():
         if not rep.params.get("reliable_for_qt", False):
             continue
         if not _has_visible_t_for_qt(rep):
@@ -3478,25 +3476,16 @@ def _raw_qt_dispersion(
         qt = _valid_measurement("qt_ms", rep.params.get("qt_ms"))
         if qt is None or not _qt_value_allowed_for_qrs_width(qt, qrs_ms):
             continue
-        values.append(float(qt))
-    if len(values) < 2:
-        return None
-    values = sorted(values)
-    raw_dispersion = float(np.max(values) - np.min(values))
-    if raw_dispersion >= _QT_DISPERSION_CORE_ACTIVATION_MS:
-        clusters: List[List[float]] = []
-        for start_idx, start in enumerate(values):
-            cluster = [
-                value
-                for value in values[start_idx:]
-                if value - start <= _QT_DISPERSION_CORE_CLUSTER_MS
-            ]
-            if len(cluster) >= _QT_DISPERSION_CORE_MIN_LEADS:
-                clusters.append(cluster)
-        if clusters:
-            core = max(clusters, key=lambda cluster: (len(cluster), -float(np.ptp(cluster))))
-            return float(np.max(core) - np.min(core))
-    return raw_dispersion
+        values[lead] = float(qt)
+    return summarize_qt_dispersion(values)
+
+
+def _raw_qt_dispersion(
+    representative_leads: Dict[str, "RepresentativeLeadFeatures"],
+    qrs_ms: Optional[float],
+) -> Optional[float]:
+    """Full independent-lead range, without compact-cluster truncation."""
+    return _qt_dispersion_summary(representative_leads, qrs_ms).independent_ms
 
 
 _LIMB_LEADS = {"I", "II", "III", "aVR", "aVL", "aVF"}
@@ -4786,7 +4775,8 @@ def compute_global_features(
         dict.fromkeys(part for part in qt_confidence_parts if part)
     ) or None
 
-    qt_disp = _raw_qt_dispersion(representative_leads, qrs)
+    qt_dispersion = _qt_dispersion_summary(representative_leads, qrs)
+    qt_disp = qt_dispersion.legacy_ms
     rr_sec = float(np.median(rr_ms) / 1000.0) if len(rr_ms) > 0 else None
     qtc_b = float(qt / np.sqrt(rr_sec)) if qt and rr_sec and rr_sec > 0 else None   # Bazett:     QTcB = QT / √RR
     qtc_f = float(qt / np.cbrt(rr_sec)) if qt and rr_sec and rr_sec > 0 else None   # Fridericia: QTcF = QT / RR^(1/3)  (cbrt = exact ⅓, more precise than 0.33)
@@ -5193,6 +5183,11 @@ def compute_global_features(
         t_axis_deg=t_axis,
         st_axis_deg=st_axis,
         qt_dispersion_ms=qt_disp,
+        qt_dispersion_independent_ms=qt_dispersion.independent_ms,
+        qt_dispersion_p90_p10_ms=qt_dispersion.p90_p10_ms,
+        qt_dispersion_source=qt_dispersion.legacy_source,
+        qt_dispersion_used_leads=list(qt_dispersion.used_leads),
+        qt_dispersion_legacy_excluded_leads=list(qt_dispersion.legacy_excluded_leads),
         p_duration_ms=p_duration,
         p_duration_source=p_duration_source,
         p_duration_used_leads=p_duration_used_leads,

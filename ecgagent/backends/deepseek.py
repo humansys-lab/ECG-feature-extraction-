@@ -29,7 +29,16 @@ from typing import Any, Mapping, Sequence
 
 from ..evidence.ledger import visible_citations
 from ..evidence.model_view import MODEL_EVIDENCE_VIEW_VERSION
+from ..evidence.packing import (
+    DEFAULT_MAX_RETAINED_EVIDENCE_CHARS,
+    DEFAULT_MAX_REQUIRED_EVIDENCE_CHARS,
+    DEFAULT_REQUIRED_EVIDENCE_HEADROOM_CHARS,
+    EvidencePackingPolicy,
+    evidence_citation_label,
+    pack_evidence_rows,
+)
 from .base import BackendCapabilities, LLMResponse, ToolCall, ToolOutcome
+from .request_budget import openai_completion
 
 DEFAULT_BASE_URL = "https://api.deepseek.com/v1"
 DEFAULT_MODEL = "deepseek-v4-pro"
@@ -37,7 +46,6 @@ DEFAULT_MAX_TOKENS = 16384
 # Reasoning turns over a long tool transcript are slow; the default SDK timeout
 # is far too tight for the synthesis turn.
 DEFAULT_TIMEOUT_S = 600.0
-DEFAULT_MAX_RETAINED_EVIDENCE_CHARS = 16_000
 
 _PREFETCH_EVIDENCE_PREFIX = (
     "PROGRAM-PREFETCHED PATIENT EVIDENCE. Cite only the displayed Qn ids; "
@@ -72,6 +80,8 @@ class DeepSeekBackend:
     thinking: bool = True
     reasoning_effort: str = "high"
     max_retained_evidence_chars: int = DEFAULT_MAX_RETAINED_EVIDENCE_CHARS
+    max_required_evidence_chars: int | None = DEFAULT_MAX_REQUIRED_EVIDENCE_CHARS
+    required_evidence_headroom_chars: int = DEFAULT_REQUIRED_EVIDENCE_HEADROOM_CHARS
     user_id: str = "ecgagent"
     client: Any = None
     name: str = "deepseek"
@@ -82,6 +92,7 @@ class DeepSeekBackend:
     hard_phase_guards: bool = False
     capabilities: BackendCapabilities = field(
         default=BackendCapabilities(
+            request_context=True,
             native_tool_calls=True,
             structured_output_level="json",
             citation_aliases=True,
@@ -100,9 +111,12 @@ class DeepSeekBackend:
         default_factory=list,
         repr=False,
     )
+    _effective_evidence_chars: int | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self.evidence_packing_policy()  # Validate before creating a client.
         self.capabilities = BackendCapabilities(
+            request_context=True,
             native_tool_calls=True,
             structured_output_level="json",
             citation_aliases=True,
@@ -142,6 +156,8 @@ class DeepSeekBackend:
         max_tokens: int | None = None,
         response_schema: dict[str, Any] | None = None,
         require_tool_call: bool = False,
+        phase: str | None = None,
+        deadline: float | None = None,
     ) -> LLMResponse:
         request_messages: list[dict[str, Any]] = [
             {"role": "system", "content": system + _CITATION_SYSTEM_NOTE},
@@ -154,7 +170,7 @@ class DeepSeekBackend:
                 {
                     "role": "user",
                     "content": _JSON_MODE_NOTE.format(
-                        schema=json.dumps(response_schema, ensure_ascii=False, indent=2)
+                        schema=json.dumps(response_schema, ensure_ascii=False, separators=(",", ":"))
                     ),
                 }
             )
@@ -165,11 +181,7 @@ class DeepSeekBackend:
         # entire completion on hidden reasoning and returned no JSON in two
         # consecutive live probes. Preserve thinking for the evidence-backed
         # adjudication where it can improve clinical synthesis.
-        compact_plan_turn = any(
-            "COMPACT PLAN" in str(message.get("content") or "")
-            for message in messages
-            if isinstance(message, Mapping)
-        )
+        compact_plan_turn = phase == "plan"
         request_thinking = bool(
             self.thinking and not require_tool_call and not compact_plan_turn
         )
@@ -194,7 +206,10 @@ class DeepSeekBackend:
             # json_object guarantees parseable JSON, not the right JSON.
             kwargs["response_format"] = {"type": "json_object"}
 
-        completion = self.client.chat.completions.create(**kwargs)
+        completion = openai_completion(
+            self.client, kwargs, deadline=deadline, timeout=self.timeout,
+            max_retries=self.max_retries,
+        )
         choice = completion.choices[0]
         message = choice.message
         usage = _usage_dict(completion)
@@ -278,6 +293,49 @@ class DeepSeekBackend:
     def user_turn(self, text: str) -> dict[str, Any]:
         return {"role": "user", "content": text}
 
+    def begin_evidence_batch(self, phase: str) -> None:
+        """Packets are call-local; aliases and historical traces stay intact."""
+
+    def reset_session(self) -> None:
+        self.turns.clear()
+        self.reasoning.clear()
+        self._citation_aliases.clear()
+        self._alias_pointers.clear()
+        self._citation_sequence = 0
+        self._tool_context_trace.clear()
+        self._effective_evidence_chars = None
+
+    def new_session(self) -> "DeepSeekBackend":
+        """Return isolated audit state while reusing the thread-safe client."""
+
+        return DeepSeekBackend(
+            model=self.model,
+            max_tokens=self.max_tokens,
+            base_url=self.base_url,
+            api_key=self.api_key,
+            timeout=self.timeout,
+            max_retries=self.max_retries,
+            thinking=self.thinking,
+            reasoning_effort=self.reasoning_effort,
+            max_retained_evidence_chars=self.max_retained_evidence_chars,
+            max_required_evidence_chars=self.max_required_evidence_chars,
+            required_evidence_headroom_chars=self.required_evidence_headroom_chars,
+            user_id=self.user_id,
+            client=self.client,
+            name=self.name,
+            max_tool_calls_per_turn=self.max_tool_calls_per_turn,
+            hard_phase_guards=self.hard_phase_guards,
+        )
+
+    def evidence_packing_policy(self) -> EvidencePackingPolicy:
+        """Return the current shared policy, including orchestrator overrides."""
+
+        return EvidencePackingPolicy(
+            max_retained_evidence_chars=self.max_retained_evidence_chars,
+            max_required_evidence_chars=self.max_required_evidence_chars,
+            required_evidence_headroom_chars=self.required_evidence_headroom_chars,
+        )
+
     def _citation_alias(self, pointer: str) -> str:
         pointer = str(pointer).removeprefix("ev:")
         existing = self._citation_aliases.get(pointer)
@@ -291,24 +349,7 @@ class DeepSeekBackend:
 
     @staticmethod
     def _citation_label(pointer: str) -> str:
-        parts = [
-            part
-            for part in str(pointer).removeprefix("ev:").split("/")
-            if part
-        ]
-        if not parts:
-            return "evidence"
-        if len(parts) >= 4 and parts[0] == "representative_leads":
-            return f"{parts[1]}.{parts[-1]}"
-        if len(parts) >= 3 and parts[0] == "p_wave_assessments":
-            return f"p_assessment[{parts[1]}].{parts[-1]}"
-        if len(parts) >= 4 and parts[:2] == ["rhythm_inputs", "p_events"]:
-            return f"p_event[{parts[2]}].{parts[-1]}"
-        if len(parts) >= 3 and parts[0] == "beat_features":
-            return f"beat[{parts[1]}].{parts[-1]}"
-        if parts[0] == "global_features":
-            return f"global.{parts[-1]}"
-        return ".".join(parts[-3:])[-72:]
+        return evidence_citation_label(pointer)
 
     def _aliased_result(self, outcome: ToolOutcome) -> Any:
         raw = str(outcome.model_text or outcome.text or "")
@@ -349,68 +390,16 @@ class DeepSeekBackend:
     def _prefetch_packet(self, outcomes: Sequence[ToolOutcome]) -> str:
         """Pack complete evidence atoms fairly across exact prefetched views."""
 
-        packed: list[dict[str, Any]] = []
-        atom_sources: list[tuple[dict[str, Any], list[dict[str, Any]], int]] = []
-        for outcome in outcomes:
-            result = self._aliased_result(outcome)
-            row = {
-                "tool": outcome.name,
-                "arguments": dict(outcome.arguments),
-                "is_error": bool(outcome.is_error),
-                "result": result,
-            }
-            if (
-                isinstance(result, dict)
-                and str(result.get("contract") or "").startswith(
-                    "ecgagent.model-evidence."
-                )
-                and isinstance(result.get("evidence"), list)
-            ):
-                atoms = [
-                    dict(atom)
-                    for atom in result.get("evidence") or []
-                    if isinstance(atom, dict)
-                ]
-                source_omitted = max(
-                    0, int(result.get("omitted_atom_count") or 0)
-                )
-                shell = {
-                    key: value
-                    for key, value in result.items()
-                    if key not in {"evidence", "omitted_atom_count", "omission_policy"}
-                }
-                shell["evidence"] = []
-                shell["omitted_atom_count"] = len(atoms) + source_omitted
-                row["result"] = shell
-                atom_sources.append((row, atoms, source_omitted))
-            packed.append(row)
-
-        def size() -> int:
-            return len(
-                json.dumps(
-                    packed,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    default=str,
-                )
-            )
-
-        max_atoms = max((len(atoms) for _, atoms, _ in atom_sources), default=0)
-        for atom_index in range(max_atoms):
-            for row, atoms, source_omitted in reversed(atom_sources):
-                if atom_index >= len(atoms):
-                    continue
-                result = row["result"]
-                selected = result["evidence"]
-                selected.append(atoms[atom_index])
-                result["omitted_atom_count"] = (
-                    len(atoms) - len(selected) + source_omitted
-                )
-                if size() > self.max_retained_evidence_chars:
-                    selected.pop()
-                    result["omitted_atom_count"] = (
-                        len(atoms) - len(selected) + source_omitted
-                    )
+        rows = [
+            {"tool": outcome.name, "arguments": dict(outcome.arguments),
+             "result": self._aliased_result(outcome)} for outcome in outcomes
+        ]
+        self._effective_evidence_chars = self.evidence_packing_policy().effective_limit(rows)
+        packed = pack_evidence_rows(rows, self._effective_evidence_chars)
+        by_signature = {
+            (str(row["tool"]), json.dumps(row["arguments"], sort_keys=True)): row
+            for row in packed
+        }
 
         packet_json = json.dumps(
             packed,
@@ -419,7 +408,8 @@ class DeepSeekBackend:
             default=str,
         )
         packet = _PREFETCH_EVIDENCE_PREFIX + packet_json
-        for outcome, row in zip(outcomes, packed):
+        for outcome in outcomes:
+            row = by_signature.get((outcome.name, json.dumps(dict(outcome.arguments), sort_keys=True)), {})
             candidates = tuple(
                 outcome.model_citations
                 if outcome.model_text is not None
@@ -434,6 +424,12 @@ class DeepSeekBackend:
                 aliases=self._alias_pointers,
                 allow_exact=False,
             )
+            result = row.get("result")
+            omitted = (
+                int(result.get("omitted_atom_count") or 0)
+                if isinstance(result, dict) and isinstance(result.get("evidence"), list)
+                else outcome.model_omitted_count + len(candidates) - len(visible)
+            )
             parts = str(outcome.call_id).split("-", 3)
             self._tool_context_trace.append(
                 {
@@ -444,8 +440,11 @@ class DeepSeekBackend:
                     "model_context_text": row_text,
                     "original_chars": len(str(outcome.text or "")),
                     "model_context_chars": len(row_text),
-                    "truncated_for_model": len(visible) < len(candidates),
-                    "candidate_citations": list(candidates),
+                    "truncated_for_model": bool(omitted),
+                    "raw_touched_citations": list(outcome.citations),
+                    "candidate_citations": list(outcome.model_candidate_citations or candidates),
+                    "atomic_view_citations": list(candidates),
+                    "omitted_atom_count": omitted,
                     "visible_citations": list(visible),
                 }
             )
@@ -529,7 +528,7 @@ class DeepSeekBackend:
             "user_id": self.user_id,
             "context_compaction": {
                 "tool_result_contract": MODEL_EVIDENCE_VIEW_VERSION,
-                "max_retained_evidence_chars": self.max_retained_evidence_chars,
+                **self.evidence_packing_policy().audit_config(self._effective_evidence_chars),
                 "citation_format": "Q{sequence}",
                 "citation_alias_count": len(self._alias_pointers),
             },

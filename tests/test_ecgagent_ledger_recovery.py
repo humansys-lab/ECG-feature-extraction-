@@ -301,6 +301,7 @@ def test_agent_partitions_guard_problems_into_fatal_and_remediated():
     """The classifier must actually be reachable from the diagnostic profile."""
 
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="LR002"),
         backend=ScriptedBackend(script=[]),
     )
@@ -320,6 +321,7 @@ def test_a_profile_without_the_hook_keeps_every_problem_fatal():
         pass
 
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="LR003"),
         backend=ScriptedBackend(script=[]),
     )
@@ -335,6 +337,7 @@ def test_ledger_evidence_ids_are_declared_as_citation_tokens():
     """Otherwise the sanitizer reads a copied-out id as citing nothing."""
 
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="LR004"),
         backend=ScriptedBackend(script=[]),
     )

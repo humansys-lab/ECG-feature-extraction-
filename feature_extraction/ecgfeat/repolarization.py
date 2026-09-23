@@ -84,9 +84,6 @@ def _sign(value: float, *, min_abs: float = 0.015) -> int:
 
 
 def _trapz(y: np.ndarray) -> float:
-    trapezoid = getattr(np, "trapezoid", None)
-    if trapezoid is not None:
-        return float(trapezoid(y))
     return float(trapezoid(y))
 
 

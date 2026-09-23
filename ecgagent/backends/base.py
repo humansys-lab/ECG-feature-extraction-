@@ -27,6 +27,7 @@ class BackendCapabilities:
     orchestrated_prefetch: bool = False
     enforce_phase_coverage: bool = False
     max_parallel_tool_calls: int = 1
+    request_context: bool = False
 
     @property
     def hard_phase_guards(self) -> bool:
@@ -164,6 +165,8 @@ class LLMBackend(Protocol):
         max_tokens: int,
         response_schema: dict[str, Any] | None = None,
         require_tool_call: bool = False,
+        phase: str | None = None,
+        deadline: float | None = None,
     ) -> LLMResponse:
         """One model turn.
 

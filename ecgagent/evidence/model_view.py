@@ -14,14 +14,14 @@ cited.  The model never has to transcribe a value into intermediate state.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
 
 from .ledger import visible_citations
 from .store import EvidenceStore, EvidenceValue
 
 
-MODEL_EVIDENCE_VIEW_VERSION = "ecgagent.model-evidence.v4"
+MODEL_EVIDENCE_VIEW_VERSION = "ecgagent.model-evidence.v6"
 DEFAULT_VIEW_CHAR_LIMIT = 6_000
 OVERVIEW_VIEW_CHAR_LIMIT = 14_000
 DEFAULT_MAX_ATOMS = 48
@@ -34,6 +34,12 @@ _INDEXED_GROUP_LIMIT = 8
 _LEAD_GROUP_LIMIT = 12
 
 _TOOL_FIELD_PRIORITY: dict[str, tuple[str, ...]] = {
+    "get_diagnostic_overview": (
+        "age", "sex", "state", "heart_rate_bpm", "pr_ms", "qrs_ms",
+        "qt_reportable", "qtc_fridericia_ms", "qrs_axis_deg",
+        "st_hybrid_j_mv", "t_amp_mv", "q_duration_ms", "r_amp_mv", "s_amp_mv",
+        "background_rr_regular", "p_axis_deg", "qt_reliability",
+    ),
     "get_rhythm_profile": (
         "atrial_rhythm_available",
         "background_rr_regular",
@@ -387,6 +393,7 @@ class ModelEvidenceView:
     omitted_count: int
     atom_count: int
     original_chars: int
+    required_evidence: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
     def to_audit(self) -> dict[str, Any]:
         return {
@@ -401,6 +408,59 @@ class ModelEvidenceView:
         }
 
 
+def minimum_evidence(
+    values: list[EvidenceValue], *, tool: str, arguments: Mapping[str, Any],
+) -> list[EvidenceValue]:
+    """A per-view display floor preserves row identities and reliability atoms.
+
+    Explicit field requests take precedence; profile views use their existing
+    discriminating field ordering. Each cross-lead row gets up to three fields;
+    beat/event samples retain up to three rows with the same field set.
+    """
+    if tool == "get_diagnostic_overview":
+        keys = {"/metadata/patient_meta/age", "/metadata/patient_meta/age_days",
+                "/metadata/patient_meta/sex", "/metadata/input_contract/amplitude_calibration",
+                "/metadata/input_contract/amplitude_output_unit", "/metadata/diagnostic_gate/state"}
+        return [value for value in values if value.pointer in keys]
+    if tool == "get_waveform_review":
+        # Keep provenance/status together with complete rows. An availability
+        # flag alone must never be the only content of a morphology review.
+        rows = {}
+        summary = []
+        for value in values:
+            parts = value.pointer.split("/")
+            if "/observations/" in value.pointer:
+                key = "/".join(parts[:6])
+                rows.setdefault(key, []).append(value)
+            else:
+                summary.append(value)
+        profiles = set()
+        for key, atoms in rows.items():
+            profile = key.split("/")[3]
+            if profile not in profiles:
+                summary.extend(atoms)
+                profiles.add(profile)
+        return summary
+    if tool == "get_interval_waveform_context":
+        return _interval_contract_prefix(values, arguments)[:2]
+    groups: dict[tuple[str, str], list[EvidenceValue]] = {}
+    for value in values:
+        group = _evidence_group(value, tool=tool) or ("summary", "summary")
+        groups.setdefault(group, []).append(value)
+    fields = tuple(arguments.get("fields") or _field_priority(tool, arguments))[:3]
+    chosen: list[EvidenceValue] = []
+    indexed = [key for key in groups if key[0] in {"beat", "atrial_event", "p_assessment"}]
+    sampled = set(_evenly_spaced(indexed, 3))
+    for key, group in groups.items():
+        if key in indexed and key not in sampled:
+            continue
+        # QRS measurement bundles already contain an inseparable per-lead DTO.
+        ordered = sorted(group, key=lambda item: fields.index(_field_name(item))
+                         if _field_name(item) in fields else len(fields))
+        chosen.extend(ordered[:3])
+    return list({item.pointer: item for item in chosen}.values())
+
+
 def build_model_evidence_view(
     store: EvidenceStore,
     *,
@@ -410,6 +470,7 @@ def build_model_evidence_view(
     citations: Iterable[str],
     char_limit: int | None = None,
     max_atoms: int | None = None,
+    required_by: tuple[str, ...] = (),
 ) -> ModelEvidenceView:
     """Materialize a bounded atomic view from one successful tool result.
 
@@ -442,6 +503,8 @@ def build_model_evidence_view(
         if is_overview
         else DEFAULT_MAX_ATOMS
     )
+    if limit < 2:
+        raise ValueError("char_limit must fit at least an empty JSON object")
     base: dict[str, Any] = {
         "contract": MODEL_EVIDENCE_VIEW_VERSION,
         "tool": str(tool),
@@ -462,32 +525,52 @@ def build_model_evidence_view(
         tool=str(tool),
         arguments=dict(arguments or {}),
     )
+    # These are display minima, not diagnostic criteria. Keep the leading
+    # discriminating fields together for every requested lead / sampled row.
+    minimum = minimum_evidence(ordered_evidence, tool=str(tool), arguments=dict(arguments or {})) if required_by else []
+    required_pointers = {item.pointer for item in minimum}
+    ordered_evidence = [*minimum, *(item for item in ordered_evidence if item.pointer not in required_pointers)]
+    from .packing import json_size
+
+    # Do not discard half a required cross-lead bundle before the shared
+    # packet packer even sees it. Explicit caller limits remain hard limits.
+    if minimum:
+        if max_atoms is None:
+            atom_limit = max(atom_limit, len(minimum))
+        if char_limit is None:
+            mandatory_atoms = [{**_atom(item), "required_by": list(required_by)} for item in minimum]
+            minimum_size = json_size({**base, "evidence": mandatory_atoms,
+                                     "omitted_atom_count": len(resolved) - len(minimum)})
+            limit = min(24000, max(limit, minimum_size + 512))
+
     selected: list[EvidenceValue] = []
+    base["omitted_atom_count"] = len(resolved)
+    base["omission_policy"] = "Only displayed value-bearing atoms are citable. Missing required evidence leaves a node unknown."
+    used = json_size(base)
     for evidence in ordered_evidence:
         if len(selected) >= atom_limit:
+            break
+        atom = _atom(evidence)
+        if evidence.pointer in required_pointers:
+            atom["required_by"] = list(required_by)
+        old = base["omitted_atom_count"]
+        cost = json_size(atom) + bool(selected) + len(str(old - 1)) - len(str(old))
+        if used + cost > limit:
             continue
-        candidate_payload = dict(base)
-        candidate_payload["evidence"] = [
-            *base["evidence"],
-            _atom(evidence),
-        ]
-        candidate_payload["omitted_atom_count"] = max(
-            0,
-            len(resolved) - len(candidate_payload["evidence"]),
-        )
-        if len(_render(candidate_payload)) > limit:
-            continue
-        base = candidate_payload
+        base["evidence"].append(atom)
+        base["omitted_atom_count"] -= 1
+        used += cost
         selected.append(evidence)
 
-    omitted = max(0, len(resolved) - len(selected))
+    omitted = len(resolved) - len(selected)
     base["omitted_atom_count"] = omitted
-    if omitted:
-        base["omission_policy"] = (
-            "Omitted atoms are not model-visible or citable; request a narrower "
-            "measurement view when one is required."
-        )
     rendered = _render(base)
+    if len(rendered) > limit:
+        # A pathological tiny budget may not even fit the metadata shell.
+        # Keep the tool result nonempty so backends never fall back to raw text.
+        rendered = "{}"
+        selected = []
+        omitted = len(resolved)
     selected_pointers = tuple(evidence.pointer for evidence in selected)
     return ModelEvidenceView(
         text=rendered,
@@ -496,6 +579,7 @@ def build_model_evidence_view(
         omitted_count=omitted,
         atom_count=len(selected),
         original_chars=len(original),
+        required_evidence={node: tuple(item.pointer for item in minimum) for node in required_by},
     )
 
 

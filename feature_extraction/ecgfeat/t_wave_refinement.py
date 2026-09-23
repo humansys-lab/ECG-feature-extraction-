@@ -9,6 +9,9 @@ from scipy.signal import savgol_filter
 from .models import LeadBeatFeatures, LeadQuality, STANDARD_12_LEADS, WaveBounds
 from .numeric import trapezoid
 from .preprocess import lowpass_filter
+from .refinement import RefinementConfig
+from .boundary_refinement import t_onset_change_point
+from .classical_candidates import BoundaryState, boundary_projection, select_boundary_sequence
 
 
 _INDEPENDENT_LEADS = ("I", "II", "V1", "V2", "V3", "V4", "V5", "V6")
@@ -61,6 +64,8 @@ class TFusionResult:
     selected_cluster_lead_groups: tuple[str, ...] = ()
     selected_cluster_methods: tuple[str, ...] = ()
     reliability_reasons: tuple[str, ...] = ()
+    effective_support: float | None = None
+    interval_status: str = "heuristic_uncalibrated"
 
 
 @dataclass(frozen=True)
@@ -207,6 +212,7 @@ def robust_t_offset_fusion(
     methods: Sequence[str] | None = None,
     lead_groups: Sequence[str] | None = None,
     cluster_radius_ms: float = 25.0,
+    account_for_correlation: bool = False,
 ) -> TFusionResult:
     """Temporal clustering → cluster scoring → MAD/Huber T-offset fusion."""
 
@@ -229,6 +235,13 @@ def robust_t_offset_fusion(
         )
         if np.isfinite(index) and np.isfinite(weight) and float(weight) > 0.0
     ]
+    if account_for_correlation:
+        unique = {}
+        for row in rows:
+            key = row[0], row[2]
+            if key not in unique or row[1] > unique[key][1]:
+                unique[key] = row
+        rows = list(unique.values())
     if fs <= 0 or len(rows) < 2:
         return TFusionResult(
             center_index=None,
@@ -248,6 +261,20 @@ def robust_t_offset_fusion(
     names = [item[2] for item in rows]
     method_names = [item[3] for item in rows]
     group_names = [item[4] for item in rows]
+    if account_for_correlation:
+        # SQI weights are relative evidence, not calibrated inverse variances.
+        # Uniform rescaling and duplicate methods on one source add no data.
+        raw_weights = raw_weights / np.max(raw_weights)
+        for source in set(names):
+            indices_for_source = np.asarray([i for i, name in enumerate(names) if name == source])
+            total = float(np.sum(raw_weights[indices_for_source]))
+            if total > 1.0:
+                raw_weights[indices_for_source] /= total
+        for group, cap in (("limb", 1.0), ("derived", 0.5)):
+            mask = np.asarray([name == group for name in group_names])
+            total = float(np.sum(raw_weights[mask]))
+            if total > cap:
+                raw_weights[mask] *= cap / total
 
     radius_samples = max(1.0, float(cluster_radius_ms) * float(fs) / 1000.0)
     clusters = _temporal_clusters(
@@ -314,7 +341,21 @@ def robust_t_offset_fusion(
 
     support = int(np.sum(inlier_mask))
     latest = float(np.percentile(inlier_values, 85))
-    standard_error_ms = mad_ms / np.sqrt(max(float(np.sum(inlier_weights)), 1e-6))
+    effective_support = None
+    if account_for_correlation:
+        blocks = {}
+        for index in np.flatnonzero(inlier_mask):
+            source, group = names[index], group_names[index]
+            if group == "derived":
+                continue  # RMS/PC1 reuse the observed leads, not new evidence.
+            block = "limb" if group == "limb" else source
+            blocks[block] = blocks.get(block, 0.0) + raw_weights[index]
+        block_weights = np.asarray(list(blocks.values()))
+        effective_support = (float(np.sum(block_weights)**2 / np.sum(block_weights**2))
+                             if block_weights.size else 1.0)
+        standard_error_ms = mad_ms / np.sqrt(max(effective_support, 1.0))
+    else:
+        standard_error_ms = mad_ms / np.sqrt(max(float(np.sum(inlier_weights)), 1e-6))
     half_width_samples = 1.96 * standard_error_ms * float(fs) / 1000.0
     used = tuple(name for name, keep in zip(names, inlier_mask) if keep)
     excluded = tuple(name for name, keep in zip(names, inlier_mask) if not keep)
@@ -355,6 +396,7 @@ def robust_t_offset_fusion(
         selected_cluster_lead_groups=used_groups,
         selected_cluster_methods=used_methods,
         reliability_reasons=tuple(reasons),
+        effective_support=effective_support,
     )
 
 
@@ -546,6 +588,7 @@ def mallat_t_boundaries(
     search_start: int,
     search_end: int,
     low_amplitude: bool = False,
+    detail: np.ndarray | None = None,
 ) -> tuple[int | None, int | None]:
     """Return deterministic Mallat-style T onset/offset candidates."""
 
@@ -557,7 +600,7 @@ def mallat_t_boundaries(
     if peak_i is None or fs <= 0 or not (lo + 3 < peak_i < hi - 3):
         return None, None
 
-    detail = np.abs(_mallat_detail(values, fs))
+    detail = np.abs(_mallat_detail(values, fs)) if detail is None else detail
     window = detail[lo : hi + 1]
     if window.size < 8:
         return None, None
@@ -929,6 +972,138 @@ def _t_sqi(
     return score, hard_pass, float(weight)
 
 
+def _classical_t_refinement(candidates, by_beat, ecg, ecg_t, r_values, fs, settings, audit, quality):
+    """Experimental signal-level projection and joint T-pair selection.
+
+    Projected evidence is corroboration, never an extra independent lead in
+    fusion. Local boundaries are changed only with local signal support.
+    """
+    if settings.t_boundary_projection or settings.t_projection_offset_only:
+        for beat_id, items in by_beat.items():
+            usable = [candidates[(beat_id, f.lead)] for f in items
+                      if f.lead in _INDEPENDENT_LEADS and (beat_id, f.lead) in candidates
+                      and (quality is None or getattr(quality.get(f.lead), "reliable_for_t", False))
+                      and candidates[(beat_id, f.lead)].snr_db >= 6
+                      and candidates[(beat_id, f.lead)].amplitude_mv >= .025]
+            if len(usable) < 2:
+                continue
+            reference = usable[0].feature
+            lo, hi = _search_window(reference, r_values, fs, ecg.shape[1])
+            indices = [STANDARD_12_LEADS.index(c.feature.lead) for c in usable]
+            matrix = ecg_t[indices, lo:hi + 1]
+            noise = ecg[indices, lo:hi + 1] - matrix
+            peak = int(round(float(np.median([c.feature.t.peak for c in usable])))) - lo
+            if not 0 < peak < hi - lo:
+                continue
+            projected = {}
+            for boundary in (("onset", "offset") if settings.t_boundary_projection else ("offset",)):
+                positions = [getattr(c.feature.t, boundary) for c in usable
+                             if getattr(c.feature.t, boundary) is not None]
+                if len(positions) < 2:
+                    continue
+                center = int(round(float(np.median(positions)))) - lo
+                result = boundary_projection(matrix, noise, center=center, fs=fs)
+                if result is None:
+                    continue
+                signal, coherence = result
+                bounds = mallat_t_boundaries(signal, fs=fs, peak=peak,
+                    search_start=0, search_end=len(signal) - 1, low_amplitude=False)
+                value = bounds[0 if boundary == "onset" else 1]
+                if value is not None:
+                    projected[boundary] = int(value + lo)
+            for candidate in [candidates[(beat_id, f.lead)] for f in items if (beat_id, f.lead) in candidates]:
+                f = candidate.feature
+                if (candidate.snr_db < 6 or "paced_beat" in f.flags
+                        or (quality is not None and not getattr(quality.get(f.lead), "reliable_for_t", False))):
+                    continue
+                before = [f.t.onset, f.t.offset]
+                on = projected.get("onset")
+                local_on = candidate.onset_candidates.get("mallat")
+                if (on is not None and local_on is not None and f.t.onset is not None
+                        and candidate.amplitude_mv >= .12
+                        and abs(on - local_on) <= .024 * fs
+                        and .008 * fs <= abs(on - f.t.onset) <= .024 * fs
+                        and (f.qrs.offset is None or on > f.qrs.offset + .012 * fs)
+                        and on < f.t.peak):
+                    candidate.onset_candidates["boundary_projection"] = on
+                    candidate.selected_onset = on
+                    _update_t_onset_only(candidate, fs=fs)
+                off = projected.get("offset")
+                corroboration = [candidate.offset_candidates[k] for k in ("mallat", "trapezium")
+                                 if k in candidate.offset_candidates]
+                if (off is not None and f.t.offset is not None and len(corroboration) == 2
+                        and (candidate.suspect or candidate.amplitude_mv < .20)
+                        and max(abs(v - off) for v in corroboration) <= .016 * fs
+                        and .008 * fs <= abs(off - f.t.offset) <= .060 * fs
+                        and f.t.peak < off <= hi):
+                    candidate.offset_candidates["boundary_projection"] = off
+                    candidate.selected_onset = f.t.onset
+                    candidate.selected_offset = off
+                    candidate.selected_method = "local_boundary_projection"
+                    _update_t_measurements(candidate, fs=fs)
+                after = [f.t.onset, f.t.offset]
+                if before != after:
+                    f.flags.append("t_local_boundary_projection")
+                    if audit is not None:
+                        audit.append({"method": "boundary_projection", "beat_id": beat_id,
+                                  "lead": f.lead, "before": before, "after": after,
+                                  "physical_sources": [c.feature.lead for c in usable]})
+    if not (settings.t_sequence_selection or settings.t_sequence_offset_only):
+        return
+    for lead in STANDARD_12_LEADS:
+        ordered = sorted((c for (_, l), c in candidates.items() if l == lead), key=lambda c: c.feature.beat_id)
+        rows, anchors, rr, widths = [], [], [], []
+        for candidate in ordered:
+            f = candidate.feature
+            anchors.append(int(r_values[f.beat_id]))
+            rr.append(_rr_samples(r_values, f.beat_id, fs))
+            widths.append((f.qrs.offset - f.qrs.onset) if f.qrs.offset is not None and f.qrs.onset is not None else 0)
+            original = (f.t.onset, f.t.offset)
+            if (None in original or candidate.snr_db < 6 or "paced_beat" in f.flags
+                    or f.qrs.offset is None or f.qrs.onset is None
+                    or (quality is not None and not getattr(quality.get(lead), "reliable_for_t", False))):
+                rows.append([])
+                continue
+            # A zero-cost retain state prevents an unsupported replacement.
+            states = [BoundaryState(*original, 0.)]
+            onsets = ((set(candidate.onset_candidates.values()) | {original[0]})
+                      if settings.t_sequence_selection else {original[0]})
+            offsets = set(candidate.offset_candidates.values()) | {original[1]}
+            for on in sorted(onsets):
+                for off in sorted(offsets):
+                    if (on, off) == original:
+                        continue
+                    if not f.qrs.offset + .010 * fs < on < f.t.peak < off:
+                        continue
+                    if (abs(on - original[0]) > .050 * fs or abs(off - original[1]) > .060 * fs
+                            or not .06 * fs <= off - on <= .40 * fs):
+                        continue
+                    # Preserve strong high-amplitude native offsets; local
+                    # candidate agreement is required for an offset change.
+                    if off != original[1] and (not candidate.suspect and candidate.amplitude_mv >= .20):
+                        continue
+                    if off != original[1] and sum(abs(v - off) <= .016 * fs for v in candidate.offset_candidates.values()) < 2:
+                        continue
+                    if on != original[0] and candidate.amplitude_mv < .12:
+                        continue
+                    cost = .15 + .20 * (abs(on - original[0]) + abs(off - original[1])) / (.04 * fs)
+                    states.append(BoundaryState(on, off, cost))
+            rows.append(states)
+        selected = select_boundary_sequence(rows, anchors, rr, widths, fs)
+        for candidate, states, index in zip(ordered, rows, selected):
+            if index is None or index == 0:
+                continue
+            f, state = candidate.feature, states[index]
+            before = [f.t.onset, f.t.offset]
+            candidate.selected_onset, candidate.selected_offset = state.onset, state.offset
+            candidate.selected_method = "joint_t_sequence"
+            _update_t_measurements(candidate, fs=fs)
+            f.flags.append("t_joint_sequence_selected")
+            if audit is not None:
+                audit.append({"method": "joint_t_sequence", "beat_id": f.beat_id,
+                              "lead": f.lead, "before": before, "after": [f.t.onset, f.t.offset]})
+
+
 def refine_t_wave_boundaries(
     beat_features: Sequence[LeadBeatFeatures],
     *,
@@ -936,10 +1111,13 @@ def refine_t_wave_boundaries(
     r_locs: np.ndarray,
     fs: int,
     quality: Mapping[str, LeadQuality] | None = None,
+    refinement: RefinementConfig | None = None,
+    fusion_audit: list[dict] | None = None,
 ) -> None:
     """Apply T-specific candidates, SQI, derived leads and robust fusion in place."""
 
     ecg = np.asarray(measurement_ecg, dtype=float)
+    settings = refinement or RefinementConfig()
     r_values = np.asarray(r_locs, dtype=int)
     if ecg.ndim != 2 or fs <= 0 or r_values.size == 0:
         return
@@ -959,6 +1137,9 @@ def refine_t_wave_boundaries(
             by_beat.setdefault(beat_id, []).append(feature)
 
     candidates: dict[tuple[int, str], _LeadTCandidates] = {}
+    # Every beat of a lead shares this exact filtered signal. Keep the cache
+    # within this invocation so it cannot retain another record's waveform.
+    detail_by_lead: dict[str, np.ndarray] = {}
     for beat_id, items in by_beat.items():
         r_index = int(r_values[beat_id])
         for feature in items:
@@ -980,6 +1161,8 @@ def refine_t_wave_boundaries(
                 lo=lo,
                 hi=hi,
             )
+            if feature.lead not in detail_by_lead:
+                detail_by_lead[feature.lead] = np.abs(_mallat_detail(filtered, fs))
             wave_on, wave_off = mallat_t_boundaries(
                 filtered,
                 fs=fs,
@@ -987,6 +1170,7 @@ def refine_t_wave_boundaries(
                 search_start=lo,
                 search_end=hi,
                 low_amplitude=amplitude < 0.200,
+                detail=detail_by_lead[feature.lead],
             )
             trap_off = trapezium_t_offset(
                 filtered,
@@ -1033,6 +1217,15 @@ def refine_t_wave_boundaries(
                 selected_method=method,
                 suspect=suspect,
             )
+            if settings.t_onset_change_point and snr_db >= 8.0 and amplitude >= .12:
+                change = t_onset_change_point(filtered, lo, peak, fs)
+                # Require another local method to corroborate the ST-to-T
+                # transition, and never move directly into QRS.
+                if (change is not None and wave_on is not None
+                        and abs(change - wave_on) <= .020 * fs
+                        and (feature.qrs.offset is None or change > feature.qrs.offset + .012 * fs)):
+                    candidate.onset_candidates["change_point"] = change
+                    candidate.selected_onset = int(round(.5 * (change + wave_on)))
             candidates[(beat_id, feature.lead)] = candidate
             feature.t_wavelet_onset_index = wave_on
             feature.t_wavelet_offset_index = wave_off
@@ -1045,234 +1238,284 @@ def refine_t_wave_boundaries(
             )
             _update_t_onset_only(candidate, fs=fs)
 
-    # Cross-beat stability is measured on lead-local offset relative to the
-    # shared R fiducial, so rate changes do not masquerade as boundary jitter.
-    for lead in STANDARD_12_LEADS:
-        lead_candidates = [
-            candidate
-            for (beat_id, candidate_lead), candidate in candidates.items()
-            if candidate_lead == lead and candidate.selected_offset is not None
-        ]
-        offsets_ms = [
-            (float(candidate.selected_offset) - float(r_values[candidate.feature.beat_id]))
-            * 1000.0
-            / fs
-            for candidate in lead_candidates
-        ]
-        stability_ms = _mad_sigma(offsets_ms) if len(offsets_ms) >= 2 else 10.0
-        for candidate in lead_candidates:
-            score, hard_pass, weight = _t_sqi(
-                candidate,
-                stability_ms=stability_ms,
+    # Finish established local/cross-lead repairs before experimental changes.
+    # Re-fuse afterward without re-running repairs: otherwise an offset-only
+    # proposal can suppress the baseline onset rescue on a different lead.
+    classical_enabled = bool(settings.t_boundary_projection or settings.t_sequence_selection
+                             or settings.t_projection_offset_only or settings.t_sequence_offset_only)
+    for classical_pass in range(2 if classical_enabled else 1):
+        if classical_pass:
+            _classical_t_refinement(candidates, by_beat, ecg, ecg_t, r_values, fs,
+                                    settings, fusion_audit, quality)
+        # Cross-beat stability is measured on lead-local offset relative to the
+        # shared R fiducial, so rate changes do not masquerade as boundary jitter.
+        for lead in STANDARD_12_LEADS:
+            lead_candidates = [
+                candidate
+                for (beat_id, candidate_lead), candidate in candidates.items()
+                if candidate_lead == lead and candidate.selected_offset is not None
+            ]
+            offsets_ms = [
+                (float(candidate.selected_offset) - float(r_values[candidate.feature.beat_id]))
+                * 1000.0
+                / fs
+                for candidate in lead_candidates
+            ]
+            stability_ms = _mad_sigma(offsets_ms) if len(offsets_ms) >= 2 else 10.0
+            for candidate in lead_candidates:
+                score, hard_pass, weight = _t_sqi(
+                    candidate,
+                    stability_ms=stability_ms,
+                    quality=quality,
+                )
+                feature = candidate.feature
+                feature.t_boundary_stability_ms = float(stability_ms)
+                feature.t_sqi_score = score
+                feature.t_sqi_pass = hard_pass
+                feature.t_fusion_weight = weight
+
+        for beat_id, items in by_beat.items():
+            beat_candidates = [
+                candidates[(beat_id, feature.lead)]
+                for feature in items
+                if (beat_id, feature.lead) in candidates
+            ]
+            derived = _derived_candidates(
+                ecg_t,
+                features=items,
+                r_locs=r_values,
+                beat_id=beat_id,
+                fs=fs,
                 quality=quality,
             )
-            feature = candidate.feature
-            feature.t_boundary_stability_ms = float(stability_ms)
-            feature.t_sqi_score = score
-            feature.t_sqi_pass = hard_pass
-            feature.t_fusion_weight = weight
 
-    for beat_id, items in by_beat.items():
-        beat_candidates = [
-            candidates[(beat_id, feature.lead)]
-            for feature in items
-            if (beat_id, feature.lead) in candidates
-        ]
-        derived = _derived_candidates(
-            ecg_t,
-            features=items,
-            r_locs=r_values,
-            beat_id=beat_id,
-            fs=fs,
-            quality=quality,
-        )
-
-        def fuse() -> TFusionResult:
-            hard = [
-                candidate
-                for candidate in beat_candidates
-                if candidate.selected_offset is not None
-                and candidate.feature.t_sqi_pass
-            ]
-            usable = hard if len(hard) >= 4 else [
-                candidate
-                for candidate in beat_candidates
-                if candidate.selected_offset is not None
-                and float(candidate.feature.t_sqi_score or 0.0) >= 0.15
-            ]
-            indices = [int(candidate.selected_offset) for candidate in usable]
-            weights = [
-                max(float(candidate.feature.t_fusion_weight or 0.0), 1e-3)
-                for candidate in usable
-            ]
-            sources = [candidate.feature.lead for candidate in usable]
-            methods = [candidate.selected_method for candidate in usable]
-            lead_groups = [_source_group(candidate.feature.lead) for candidate in usable]
-            for name, (_onset, offset, weight) in derived.items():
-                if offset is not None:
-                    indices.append(int(offset))
-                    weights.append(float(weight))
-                    sources.append(name)
-                    methods.append("derived")
-                    lead_groups.append("derived")
-            return robust_t_offset_fusion(
-                indices,
-                weights,
-                sources,
-                fs=fs,
-                methods=methods,
-                lead_groups=lead_groups,
-            )
-
-        fusion = fuse()
-        # A suspect early local endpoint can only move to a later independent
-        # candidate when at least two other lead/derived endpoints support it.
-        if (
-            fusion.center_index is not None
-            and fusion.reliable
-            and fusion.mad_ms is not None
-            and fusion.mad_ms <= 12.0
-        ):
-            for candidate in beat_candidates:
-                selected = candidate.selected_offset
-                if not candidate.suspect or selected is None:
-                    continue
-                if selected >= fusion.center_index - int(round(0.020 * fs)):
-                    continue
-                later = [
-                    value
-                    for value in candidate.offset_candidates.values()
-                    if value > selected + int(round(0.020 * fs))
-                    and abs(value - fusion.center_index) <= int(round(0.030 * fs))
+            def fuse() -> TFusionResult:
+                hard = [
+                    candidate
+                    for candidate in beat_candidates
+                    if candidate.selected_offset is not None
+                    and candidate.feature.t_sqi_pass
                 ]
-                support = sum(
-                    1
-                    for other in beat_candidates
-                    if other is not candidate
-                    and other.selected_offset is not None
-                    and abs(other.selected_offset - fusion.center_index)
-                    <= int(round(0.030 * fs))
+                usable = hard if len(hard) >= 4 else [
+                    candidate
+                    for candidate in beat_candidates
+                    if candidate.selected_offset is not None
+                    and float(candidate.feature.t_sqi_score or 0.0) >= 0.15
+                ]
+                indices = [int(candidate.selected_offset) for candidate in usable]
+                weights = [
+                    max(float(candidate.feature.t_fusion_weight or 0.0), 1e-3)
+                    for candidate in usable
+                ]
+                sources = [candidate.feature.lead for candidate in usable]
+                methods = [candidate.selected_method for candidate in usable]
+                lead_groups = [_source_group(candidate.feature.lead) for candidate in usable]
+                for name, (_onset, offset, weight) in derived.items():
+                    if offset is not None:
+                        indices.append(int(offset))
+                        weights.append(float(weight))
+                        sources.append(name)
+                        methods.append("derived")
+                        lead_groups.append("derived")
+                return robust_t_offset_fusion(
+                    indices,
+                    weights,
+                    sources,
+                    fs=fs,
+                    methods=methods,
+                    lead_groups=lead_groups,
+                    account_for_correlation=settings.t_correlated_fusion,
                 )
-                support += sum(
-                    1
-                    for _name, (_onset, offset, _weight) in derived.items()
-                    if offset is not None
-                    and abs(offset - fusion.center_index) <= int(round(0.030 * fs))
-                )
-                if later and support >= 2:
-                    candidate.selected_offset = int(round(float(np.median(later))))
-                    candidate.selected_method = (
-                        f"{candidate.selected_method}_cross_lead_late_tail"
-                    )
-                    _update_t_measurements(candidate, fs=fs, rescue=True)
-            fusion = fuse()
 
-        morphology = _assess_t_fusion_morphology(
-            fusion,
-            beat_candidates,
-            derived,
-            fs=fs,
-        )
-        statistical_fusion_reliable = fusion.reliable
-        fusion = replace(
-            fusion,
-            reliable=morphology.reliable,
-            reliability_reasons=morphology.reasons,
-        )
-        derived_offsets = [
-            offset for _onset, offset, _weight in derived.values() if offset is not None
-        ]
-        rms_on, rms_off, _ = derived.get("RMS", (None, None, 0.0))
-        pc1_on, pc1_off, _ = derived.get("PC1", (None, None, 0.0))
-        qrs_onsets = [
-            int(feature.qrs.onset)
-            for feature in items
-            if feature.qrs.onset is not None
-            and (
-                quality is None
-                or bool(getattr(quality.get(feature.lead), "reliable_for_qrs", False))
-            )
-        ]
-        global_qrs_on = (
-            int(round(float(np.percentile(qrs_onsets, 15)))) if qrs_onsets else None
-        )
-        for feature in items:
-            feature.t_offset_robust_center_index = fusion.center_index
-            feature.t_offset_latest_p85_index = fusion.latest_p85_index
-            feature.t_offset_fusion_ci_low_index = fusion.ci_low_index
-            feature.t_offset_fusion_ci_high_index = fusion.ci_high_index
-            feature.t_offset_fusion_support = fusion.support
-            feature.t_offset_fusion_mad_ms = fusion.mad_ms
-            feature.t_offset_fusion_ci_half_width_ms = (
-                float(
-                    (fusion.ci_high_index - fusion.ci_low_index)
-                    * 500.0
-                    / fs
-                )
-                if fusion.ci_low_index is not None
-                and fusion.ci_high_index is not None
-                else None
-            )
-            feature.t_offset_fusion_used_leads = ",".join(fusion.used_sources) or None
-            feature.t_offset_fusion_excluded_leads = (
-                ",".join(fusion.excluded_sources) or None
-            )
-            feature.t_offset_fusion_reliable = fusion.reliable
-            feature.t_offset_statistical_fusion_reliable = (
-                statistical_fusion_reliable
-            )
-            feature.t_offset_cluster_count = fusion.cluster_count
-            feature.t_offset_selected_cluster_score = fusion.selected_cluster_score
-            feature.t_offset_selected_cluster_support = (
-                fusion.selected_cluster_support
-            )
-            feature.t_offset_selected_cluster_lead_groups = (
-                ",".join(fusion.selected_cluster_lead_groups) or None
-            )
-            feature.t_offset_selected_cluster_methods = (
-                ",".join(fusion.selected_cluster_methods) or None
-            )
-            feature.t_offset_fusion_reliability_reason = (
-                ",".join(fusion.reliability_reasons) or "reliable"
-            )
-            feature.t_peak_consensus_index = morphology.t_peak_consensus_index
-            feature.t_global_tpte_ms = morphology.tpte_ms
-            feature.t_offset_derived_disagreement_ms = (
-                morphology.derived_disagreement_ms
-            )
-            feature.t_offset_tail_incomplete_leads = (
-                ",".join(morphology.tail_incomplete_leads) or None
-            )
-            feature.t_offset_systematic_early_risk = (
-                morphology.systematic_early_risk
-            )
-            feature.t_offset_morphology_guard_pass = morphology.reliable
-            feature.t_rms_onset_index = rms_on
-            feature.t_rms_offset_index = rms_off
-            feature.t_pc1_onset_index = pc1_on
-            feature.t_pc1_offset_index = pc1_off
-            feature.t_derived_spread_ms = (
-                float(np.ptp(derived_offsets) * 1000.0 / fs)
-                if len(derived_offsets) >= 2
-                else 0.0 if derived_offsets else None
-            )
-            # An unreliable refinement never erases the existing consensus
-            # measurement.  It simply declines to overwrite it and marks the
-            # record non-reportable downstream, preserving a numeric audit
-            # trail for comparison and later rescue paths.
+            fusion = fuse()
+            if not classical_pass and settings.t_bidirectional and fusion.reliable and fusion.center_index is not None:
+                for candidate in beat_candidates:
+                    feature = candidate.feature
+                    original = feature.t.offset
+                    alternatives = [candidate.offset_candidates[name] for name in ("mallat", "trapezium")
+                                    if name in candidate.offset_candidates]
+                    if (original is None or len(alternatives) < 2 or not candidate.suspect
+                            or candidate.snr_db < 6.0 or np.ptp(alternatives) > .016 * fs):
+                        continue
+                    target = int(round(float(np.median(alternatives))))
+                    shift_ms = (target - original) * 1000.0 / fs
+                    support = {other.feature.lead for other in beat_candidates
+                               if other.feature.lead in _INDEPENDENT_LEADS
+                               and other is not candidate and other.selected_offset is not None
+                               and abs(other.selected_offset - target) <= .020 * fs}
+                    if (not 12 <= abs(shift_ms) <= 80 or len(support) < 3
+                            or abs(target - fusion.center_index) > .025 * fs):
+                        continue
+                    # Shortening requires quiet evidence after the candidate;
+                    # extending requires visible residual activity after old end.
+                    a, b = sorted((target, original))
+                    residual = np.abs(candidate.filtered[a:b + 1] - candidate.baseline)
+                    active = bool(residual.size and np.median(residual) > .08 * candidate.amplitude_mv)
+                    if (shift_ms < 0 and active) or (shift_ms > 0 and not active):
+                        continue
+                    candidate.selected_offset = target
+                    candidate.selected_onset = feature.t.onset
+                    candidate.selected_method = "corroborated_bidirectional_t"
+                    feature.t_offset_original_index = original
+                    feature.t_offset_repaired_index = target
+                    feature.t_offset_repair_delta_ms = shift_ms
+                    feature.t_offset_repair_reason = "independent_methods_and_leads"
+                    _update_t_measurements(candidate, fs=fs)
+                fusion = fuse()
+            # A suspect early local endpoint can only move to a later independent
+            # candidate when at least two other lead/derived endpoints support it.
             if (
-                fusion.reliable
-                and global_qrs_on is not None
+                not classical_pass
                 and fusion.center_index is not None
+                and fusion.reliable
+                and fusion.mad_ms is not None
+                and fusion.mad_ms <= 12.0
             ):
-                feature.qt_consensus_ms = float(
-                    (fusion.center_index - global_qrs_on) * 1000.0 / fs
+                for candidate in beat_candidates:
+                    selected = candidate.selected_offset
+                    if not candidate.suspect or selected is None:
+                        continue
+                    if selected >= fusion.center_index - int(round(0.020 * fs)):
+                        continue
+                    later = [
+                        value
+                        for value in candidate.offset_candidates.values()
+                        if value > selected + int(round(0.020 * fs))
+                        and abs(value - fusion.center_index) <= int(round(0.030 * fs))
+                    ]
+                    support = sum(
+                        1
+                        for other in beat_candidates
+                        if other is not candidate
+                        and other.selected_offset is not None
+                        and abs(other.selected_offset - fusion.center_index)
+                        <= int(round(0.030 * fs))
+                    )
+                    support += sum(
+                        1
+                        for _name, (_onset, offset, _weight) in derived.items()
+                        if offset is not None
+                        and abs(offset - fusion.center_index) <= int(round(0.030 * fs))
+                    )
+                    if later and support >= 2:
+                        candidate.selected_offset = int(round(float(np.median(later))))
+                        candidate.selected_method = (
+                            f"{candidate.selected_method}_cross_lead_late_tail"
+                        )
+                        _update_t_measurements(candidate, fs=fs, rescue=True)
+                fusion = fuse()
+
+            morphology = _assess_t_fusion_morphology(
+                fusion,
+                beat_candidates,
+                derived,
+                fs=fs,
+            )
+            statistical_fusion_reliable = fusion.reliable
+            fusion = replace(
+                fusion,
+                reliable=morphology.reliable,
+                reliability_reasons=morphology.reasons,
+            )
+            derived_offsets = [
+                offset for _onset, offset, _weight in derived.values() if offset is not None
+            ]
+            rms_on, rms_off, _ = derived.get("RMS", (None, None, 0.0))
+            pc1_on, pc1_off, _ = derived.get("PC1", (None, None, 0.0))
+            qrs_onsets = [
+                int(feature.qrs.onset)
+                for feature in items
+                if feature.qrs.onset is not None
+                and (
+                    quality is None
+                    or bool(getattr(quality.get(feature.lead), "reliable_for_qrs", False))
                 )
-            if (
-                fusion.reliable
-                and global_qrs_on is not None
-                and fusion.latest_p85_index is not None
-            ):
-                feature.qt_latest_p85_ms = float(
-                    (fusion.latest_p85_index - global_qrs_on) * 1000.0 / fs
+            ]
+            global_qrs_on = (
+                int(round(float(np.percentile(qrs_onsets, 15)))) if qrs_onsets else None
+            )
+            if fusion_audit is not None:
+                fusion_audit.append({"beat_id": int(beat_id), "support": fusion.support,
+                                     "effective_support": fusion.effective_support,
+                                     "interval_status": fusion.interval_status,
+                                     "ci_low_index": fusion.ci_low_index, "ci_high_index": fusion.ci_high_index})
+            for feature in items:
+                feature.t_offset_robust_center_index = fusion.center_index
+                feature.t_offset_latest_p85_index = fusion.latest_p85_index
+                feature.t_offset_fusion_ci_low_index = fusion.ci_low_index
+                feature.t_offset_fusion_ci_high_index = fusion.ci_high_index
+                feature.t_offset_fusion_support = fusion.support
+                feature.t_offset_fusion_mad_ms = fusion.mad_ms
+                feature.t_offset_fusion_ci_half_width_ms = (
+                    float(
+                        (fusion.ci_high_index - fusion.ci_low_index)
+                        * 500.0
+                        / fs
+                    )
+                    if fusion.ci_low_index is not None
+                    and fusion.ci_high_index is not None
+                    else None
                 )
+                feature.t_offset_fusion_used_leads = ",".join(fusion.used_sources) or None
+                feature.t_offset_fusion_excluded_leads = (
+                    ",".join(fusion.excluded_sources) or None
+                )
+                feature.t_offset_fusion_reliable = fusion.reliable
+                feature.t_offset_statistical_fusion_reliable = (
+                    statistical_fusion_reliable
+                )
+                feature.t_offset_cluster_count = fusion.cluster_count
+                feature.t_offset_selected_cluster_score = fusion.selected_cluster_score
+                feature.t_offset_selected_cluster_support = (
+                    fusion.selected_cluster_support
+                )
+                feature.t_offset_selected_cluster_lead_groups = (
+                    ",".join(fusion.selected_cluster_lead_groups) or None
+                )
+                feature.t_offset_selected_cluster_methods = (
+                    ",".join(fusion.selected_cluster_methods) or None
+                )
+                feature.t_offset_fusion_reliability_reason = (
+                    ",".join(fusion.reliability_reasons) or "reliable"
+                )
+                feature.t_peak_consensus_index = morphology.t_peak_consensus_index
+                feature.t_global_tpte_ms = morphology.tpte_ms
+                feature.t_offset_derived_disagreement_ms = (
+                    morphology.derived_disagreement_ms
+                )
+                feature.t_offset_tail_incomplete_leads = (
+                    ",".join(morphology.tail_incomplete_leads) or None
+                )
+                feature.t_offset_systematic_early_risk = (
+                    morphology.systematic_early_risk
+                )
+                feature.t_offset_morphology_guard_pass = morphology.reliable
+                feature.t_rms_onset_index = rms_on
+                feature.t_rms_offset_index = rms_off
+                feature.t_pc1_onset_index = pc1_on
+                feature.t_pc1_offset_index = pc1_off
+                feature.t_derived_spread_ms = (
+                    float(np.ptp(derived_offsets) * 1000.0 / fs)
+                    if len(derived_offsets) >= 2
+                    else 0.0 if derived_offsets else None
+                )
+                # An unreliable refinement never erases the existing consensus
+                # measurement.  It simply declines to overwrite it and marks the
+                # record non-reportable downstream, preserving a numeric audit
+                # trail for comparison and later rescue paths.
+                if (
+                    fusion.reliable
+                    and global_qrs_on is not None
+                    and fusion.center_index is not None
+                ):
+                    feature.qt_consensus_ms = float(
+                        (fusion.center_index - global_qrs_on) * 1000.0 / fs
+                    )
+                if (
+                    fusion.reliable
+                    and global_qrs_on is not None
+                    and fusion.latest_p85_index is not None
+                ):
+                    feature.qt_latest_p85_ms = float(
+                        (fusion.latest_p85_index - global_qrs_on) * 1000.0 / fs
+                    )

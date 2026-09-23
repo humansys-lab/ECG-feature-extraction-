@@ -1,9 +1,21 @@
 from __future__ import annotations
 
 from fractions import Fraction
+from functools import lru_cache
 
 import numpy as np
 from scipy.signal import butter, filtfilt, iirnotch, resample_poly
+
+
+@lru_cache(maxsize=128)
+def _butter_coefficients(order: int, cutoff: float | tuple[float, float], kind: str):
+    # Coefficients depend only on filter parameters, never on patient samples.
+    return butter(order, cutoff, btype=kind)
+
+
+@lru_cache(maxsize=32)
+def _notch_coefficients(mains_hz: float, q: float, fs: float):
+    return iirnotch(w0=mains_hz, Q=q, fs=fs)
 
 
 def _safe_filtfilt(b, a, x: np.ndarray) -> np.ndarray:
@@ -43,7 +55,7 @@ def bandpass_filter(x: np.ndarray, fs: int, low_hz: float, high_hz: float, order
     nyq = fs / 2.0
     low = max(low_hz / nyq, 1e-6)
     high = min(high_hz / nyq, 0.999)
-    b, a = butter(order, [low, high], btype="bandpass")
+    b, a = _butter_coefficients(order, (low, high), "bandpass")
     return _safe_filtfilt(b, a, x)
 
 
@@ -54,7 +66,7 @@ def highpass_filter(x: np.ndarray, fs: int, cutoff_hz: float, order: int = 2) ->
     if cutoff_hz <= 0.0:
         raise ValueError("cutoff_hz must be greater than zero")
     cutoff = min(max(cutoff_hz / nyq, 1e-6), 0.99)
-    b, a = butter(order, cutoff, btype="highpass")
+    b, a = _butter_coefficients(order, cutoff, "highpass")
     return _safe_filtfilt(b, a, x)
 
 
@@ -65,7 +77,7 @@ def lowpass_filter(x: np.ndarray, fs: int, cutoff_hz: float, order: int = 2) -> 
     if cutoff_hz <= 0.0:
         raise ValueError("cutoff_hz must be greater than zero")
     cutoff = min(max(cutoff_hz / nyq, 1e-6), 0.99)
-    b, a = butter(order, cutoff, btype="lowpass")
+    b, a = _butter_coefficients(order, cutoff, "lowpass")
     return _safe_filtfilt(b, a, x)
 
 
@@ -77,7 +89,7 @@ def notch_filter(x: np.ndarray, fs: int, mains_hz: int = 50, q: float = 30.0) ->
         raise ValueError("mains_hz must be greater than zero")
     if float(mains_hz) >= 0.99 * nyq:
         return x.copy()
-    b, a = iirnotch(w0=mains_hz, Q=q, fs=fs)
+    b, a = _notch_coefficients(mains_hz, q, fs)
     return _safe_filtfilt(b, a, x)
 
 
@@ -104,10 +116,12 @@ def remove_baseline_median(x: np.ndarray, fs: int, win1_ms: int = 200, win2_ms: 
 
 
 def analysis_signal(ecg: np.ndarray, fs: int, mains_hz: int = 50) -> np.ndarray:
-    """Measurement-grade signal: baseline removal + mains notch only.
+    """Established delineation signal: median baseline removal and mains notch.
 
-    No low-pass is applied so that peak amplitudes (R, P, T, ST) are
-    preserved for accurate amplitude measurements.
+    No low-pass is applied. Median subtraction can still attenuate prolonged
+    ST/T deflections; calibrated_st_signal provides a separate opt-in amplitude
+    path using measured PR anchors. Keep this default stable until a replacement
+    has passed both delineation and independent amplitude validation.
     """
     x = remove_baseline_median(ecg, fs)
     x = notch_filter(x, fs, mains_hz=mains_hz)

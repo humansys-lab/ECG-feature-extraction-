@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import sqrt
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -52,6 +51,8 @@ class PWaveConfig:
     minimum_ci_half_width_ms: float = 4.0
     ci_scale: float = 1.0
     update_legacy_consensus: bool = True
+    model_arbitration: bool = False
+    multiple_candidates: bool = False
 
 
 def _lead_group(lead: str) -> str:
@@ -223,59 +224,8 @@ def _kalman_baseline_pass(
         floor=1e-4,
     )
     measurement_variance = max(noise * noise, 1e-8)
-    dt = 1.0 / float(fs)
-    process_level = measurement_variance * 2e-3
-    process_slope = measurement_variance * 2e-1
-    state_level = initial
-    state_slope = 0.0
-    covariance_00 = measurement_variance * 4.0
-    covariance_01 = 0.0
-    covariance_10 = 0.0
-    covariance_11 = measurement_variance
-    levels = np.zeros(n, dtype=float)
-    variances = np.zeros(n, dtype=float)
-    for index in range(n):
-        # This is the same two-state (level, slope) Kalman filter as the
-        # previous matrix formulation, expanded into scalar arithmetic.  The
-        # state dimension is fixed at two, so allocating and multiplying tiny
-        # arrays for every sample only adds interpreter/BLAS dispatch cost.
-        state_level = state_level + dt * state_slope
-        predicted_00 = (
-            covariance_00
-            + dt * (covariance_10 + covariance_01)
-            + dt * dt * covariance_11
-            + process_level
-        )
-        predicted_01 = covariance_01 + dt * covariance_11
-        predicted_10 = covariance_10 + dt * covariance_11
-        predicted_11 = covariance_11 + process_slope
-        covariance_00 = predicted_00
-        covariance_01 = predicted_01
-        covariance_10 = predicted_10
-        covariance_11 = predicted_11
-        if mask[index] and np.isfinite(y[index]):
-            innovation = float(y[index] - state_level)
-            innovation_variance = max(
-                covariance_00 + measurement_variance,
-                1e-12,
-            )
-            gain_level = covariance_00 / innovation_variance
-            gain_slope = covariance_10 / innovation_variance
-            # Huber-limit a contaminated "quiet" observation.
-            limit = 3.0 * sqrt(innovation_variance)
-            innovation = min(limit, max(-limit, innovation))
-            state_level += gain_level * innovation
-            state_slope += gain_slope * innovation
-
-            old_00 = covariance_00
-            old_01 = covariance_01
-            covariance_00 = (1.0 - gain_level) * old_00
-            covariance_01 = (1.0 - gain_level) * old_01
-            covariance_10 = covariance_10 - gain_slope * old_00
-            covariance_11 = covariance_11 - gain_slope * old_01
-        levels[index] = state_level
-        variances[index] = max(covariance_00, 0.0)
-    return levels, np.sqrt(variances)
+    from ._kalman import run_kalman
+    return run_kalman(y, mask, fs, initial, measurement_variance)
 
 
 def _state_space_baseline(
@@ -422,6 +372,7 @@ def _coarse_p_window(
     activity: np.ndarray,
     quiet_mask: np.ndarray,
     fs: int,
+    activity_thresholds: Optional[Tuple[float, float]] = None,
 ) -> Tuple[int, int, int]:
     qrs_on = _median_index(
         getattr(getattr(item, "qrs", None), "onset", None) for item in items
@@ -437,13 +388,10 @@ def _coarse_p_window(
     search_hi = max(search_lo + 2, qrs_reference - int(round(0.008 * fs)))
     search_hi = min(activity.size - 1, search_hi)
     segment = activity[search_lo : search_hi + 1]
-    quiet_values = activity[quiet_mask]
-    if quiet_values.size >= 16:
-        low_threshold = float(np.quantile(quiet_values, 0.95))
-        high_threshold = float(np.quantile(quiet_values, 0.995))
-    else:
-        low_threshold = float(np.quantile(activity, 0.60))
-        high_threshold = float(np.quantile(activity, 0.90))
+    low_threshold, high_threshold = (
+        _activity_thresholds(activity, quiet_mask)
+        if activity_thresholds is None else activity_thresholds
+    )
     low_threshold = max(low_threshold, float(np.median(segment)))
     regions = _connected_regions(segment >= low_threshold, search_lo)
     seeds = [
@@ -495,6 +443,13 @@ def _coarse_p_window(
         # the baseline-corrected multi-lead window in the caller.
         svd_dimension = 2 if usable.size >= 6 and len(set(seeds)) >= 2 else 1
     return int(start), int(stop), int(svd_dimension)
+
+
+def _activity_thresholds(activity: np.ndarray, quiet_mask: np.ndarray) -> Tuple[float, float]:
+    quiet = activity[quiet_mask]
+    if quiet.size >= 16:
+        return float(np.quantile(quiet, 0.95)), float(np.quantile(quiet, 0.995))
+    return float(np.quantile(activity, 0.60)), float(np.quantile(activity, 0.90))
 
 
 def _svd_dimension(
@@ -2012,6 +1967,8 @@ def _reconcile_parallel_consensus_models(
     legacy_onset: Optional[int],
     legacy_offset: Optional[int],
     fs: int,
+    evidence_arbitration: bool = False,
+    legacy_confidence: float = 0.5,
 ) -> None:
     """Require the established and robust models to corroborate one another.
 
@@ -2037,6 +1994,44 @@ def _reconcile_parallel_consensus_models(
         return
     robust_onset = int(assessment.robust_onset)
     robust_offset = int(assessment.robust_offset)
+    if evidence_arbitration:
+        # The interval remains an uncalibrated model-disagreement envelope;
+        # moving a point estimate must never leave it outside its own bounds.
+        for boundary, robust, legacy in (("onset", robust_onset, int(legacy_onset)),
+                                         ("offset", robust_offset, int(legacy_offset))):
+            low = getattr(assessment, boundary + "_ci_low")
+            high = getattr(assessment, boundary + "_ci_high")
+            setattr(assessment, boundary + "_ci_low", min(robust, legacy, low if low is not None else robust))
+            setattr(assessment, boundary + "_ci_high", max(robust, legacy, high if high is not None else robust))
+        assessment.strict_onset = min(robust_onset, int(legacy_onset),
+                                     assessment.strict_onset if assessment.strict_onset is not None else robust_onset)
+        assessment.strict_offset = max(robust_offset, int(legacy_offset),
+                                      assessment.strict_offset if assessment.strict_offset is not None else robust_offset)
+        gap = max(abs(robust_onset - int(legacy_onset)),
+                  abs(robust_offset - int(legacy_offset))) * 1000.0 / fs
+        robust_confidence = min(assessment.onset_confidence, assessment.offset_confidence)
+        if gap > 30.0:
+            strong = (robust_confidence >= 0.65 and len(assessment.valid_leads) >= 4
+                      and len(assessment.valid_lead_groups) >= 2)
+            if strong and legacy_confidence < 0.45:
+                assessment.global_detector_method += "+robust_evidence_selected"
+                return
+            if legacy_confidence >= 0.65 and robust_confidence < 0.45:
+                assessment.robust_onset, assessment.robust_offset = int(legacy_onset), int(legacy_offset)
+                assessment.global_detector_method += "+legacy_evidence_selected"
+                return
+            # Distinct wave hypotheses must not be averaged into a third,
+            # unsupported location. Retain evidence but decline acceptance.
+            assessment.accepted = False
+            assessment.p_state = OVERLAP_UNCERTAIN
+            assessment.reject_reasons = sorted(set(assessment.reject_reasons + [MODEL_DISAGREEMENT]))
+            assessment.global_detector_method += "+unresolved_model_disagreement"
+            return
+        weight = robust_confidence / max(robust_confidence + legacy_confidence, 1e-9)
+        assessment.robust_onset = int(round(weight * robust_onset + (1 - weight) * legacy_onset))
+        assessment.robust_offset = int(round(weight * robust_offset + (1 - weight) * legacy_offset))
+        assessment.global_detector_method += "+evidence_weighted_agreement"
+        return
     reconciled_onset = int(round(0.50 * robust_onset + 0.50 * int(legacy_onset)))
     early_offset = min(robust_offset, int(legacy_offset))
     late_offset = max(robust_offset, int(legacy_offset))
@@ -2116,6 +2111,32 @@ def _reconcile_parallel_consensus_models(
     assessment.global_detector_method += "+parallel_legacy_model_reconciliation"
 
 
+def _assessment_score(assessment: PWaveBeatAssessment) -> float:
+    return (2.0 * float(assessment.accepted)
+            + min(assessment.onset_confidence, assessment.offset_confidence)
+            + 0.05 * min(len(assessment.valid_leads), 8)
+            - 0.1 * len(assessment.reject_reasons))
+
+
+def _alternate_p_windows(activity, r_locs, beat_id, fs, thresholds, original):
+    r = int(r_locs[beat_id])
+    rr = r - int(r_locs[beat_id - 1]) if beat_id else int(.65 * fs)
+    lo, hi = max(0, r - min(int(.45 * fs), int(.65 * rr))), max(0, r - int(.04 * fs))
+    regions = _connected_regions(activity[lo:hi] >= thresholds[0], lo)
+    ranked = []
+    for start, stop in regions:
+        if np.max(activity[start:stop + 1]) < thresholds[1]:
+            continue
+        start, stop = max(lo, start - int(.025 * fs)), min(hi, stop + int(.025 * fs))
+        if stop - start < int(.05 * fs):
+            continue
+        overlap = max(0, min(stop, original[1]) - max(start, original[0]))
+        if overlap >= .6 * min(stop - start, original[1] - original[0]):
+            continue
+        ranked.append((float(np.sum(activity[start:stop + 1])), start, stop))
+    return [(start, stop) for _, start, stop in sorted(ranked, reverse=True)[:2]]
+
+
 def build_p_wave_assessments(
     ecg: np.ndarray,
     fs: int,
@@ -2162,25 +2183,10 @@ def build_p_wave_assessments(
         fs,
     )
     observation_distance = _distance_to_observation(quiet_mask)
+    activity_thresholds = _activity_thresholds(activity, quiet_mask)
     by_beat = _features_by_beat(beat_features)
     feature_map = _features_by_beat_lead(beat_features)
-    assessments: List[PWaveBeatAssessment] = []
-    for beat_id in range(len(r_values)):
-        items = by_beat.get(beat_id, [])
-        coarse_start, coarse_stop, _fallback_dimension = _coarse_p_window(
-            beat_id,
-            r_values,
-            items,
-            activity,
-            quiet_mask,
-            fs,
-        )
-        svd_dimension = _svd_dimension(
-            corrected_detection,
-            coarse_start,
-            coarse_stop,
-            usable_leads,
-        )
+    def assess_window(beat_id, items, coarse_start, coarse_stop, svd_dimension):
         qrs_on = _median_index(
             getattr(getattr(item, "qrs", None), "onset", None)
             for item in items
@@ -2257,7 +2263,7 @@ def build_p_wave_assessments(
                 t_reconstruction_validated=reconstruction_validated,
                 ta_ambiguous=ta_ambiguous,
             )
-        assessment = _fuse_beat(
+        return _fuse_beat(
             beat_id=beat_id,
             per_lead=per_lead,
             fs=fs,
@@ -2268,6 +2274,40 @@ def build_p_wave_assessments(
             t_reconstruction_available=bool(t_meta.get("available")),
             config=settings,
         )
+
+    assessments: List[PWaveBeatAssessment] = []
+    for beat_id in range(len(r_values)):
+        items = by_beat.get(beat_id, [])
+        coarse_start, coarse_stop, _fallback_dimension = _coarse_p_window(
+            beat_id,
+            r_values,
+            items,
+            activity,
+            quiet_mask,
+            fs,
+            activity_thresholds=activity_thresholds,
+        )
+        svd_dimension = _svd_dimension(
+            corrected_detection,
+            coarse_start,
+            coarse_stop,
+            usable_leads,
+        )
+        assessment = assess_window(beat_id, items, coarse_start, coarse_stop, svd_dimension)
+        if settings.multiple_candidates and (not assessment.accepted or min(
+                assessment.onset_confidence, assessment.offset_confidence) < 0.55):
+            alternatives = _alternate_p_windows(
+                activity, r_values, beat_id, fs, activity_thresholds,
+                (coarse_start, coarse_stop),
+            )
+            for alt_start, alt_stop in alternatives:
+                alternate_dimension = _svd_dimension(
+                    corrected_detection, alt_start, alt_stop, usable_leads,
+                )
+                candidate = assess_window(beat_id, items, alt_start, alt_stop, alternate_dimension)
+                if _assessment_score(candidate) > _assessment_score(assessment) + 0.15:
+                    assessment = candidate
+                    assessment.global_detector_method += "+alternative_window"
         legacy_onset = _median_index(
             getattr(item, "p_onset_consensus_index", None)
             for item in items
@@ -2281,6 +2321,12 @@ def build_p_wave_assessments(
             legacy_onset=legacy_onset,
             legacy_offset=legacy_offset,
             fs=fs,
+            evidence_arbitration=settings.model_arbitration,
+            legacy_confidence=float(np.median([
+                min(float(getattr(item, "p_onset_confidence", None) or 0.0),
+                    float(getattr(item, "p_offset_confidence", None) or 0.0))
+                for item in items
+            ])) if items else 0.0,
         )
         assessments.append(assessment)
         if settings.update_legacy_consensus:

@@ -20,11 +20,11 @@ import statistics
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from ..evidence.store import EvidenceStore
+from ..evidence.store import EvidenceStore, STANDARD_LEAD_ORDER
 from .runtime import bool_env
 
 
-DETERMINISTIC_PATHWAY_FACTS_VERSION = "ecgagent.deterministic-pathway-facts.v2"
+DETERMINISTIC_PATHWAY_FACTS_VERSION = "ecgagent.deterministic-pathway-facts.v3"
 
 
 @dataclass(frozen=True)
@@ -233,8 +233,59 @@ def program_owns_pathway_step(code: str, step_id: str) -> bool:
 def _finite(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    number = float(value)
+    try:
+        number = float(value)
+    except (OverflowError, ValueError):
+        return None
     return number if math.isfinite(number) else None
+
+
+def _fraction(value: Any) -> float | None:
+    number = _finite(value)
+    return number if number is not None and 0 <= number <= 1 else None
+
+
+def _count(value: Any) -> int | None:
+    number = _finite(value)
+    return int(number) if number is not None and number >= 0 and number.is_integer() else None
+
+
+def _identifier(value: Any) -> int | None:
+    return value if type(value) is int and value >= 0 else None
+
+
+def _standard_leads(value: Any) -> set[str]:
+    if not isinstance(value, list) or any(
+        not isinstance(lead, str) or lead not in STANDARD_LEAD_ORDER for lead in value
+    ):
+        return set()
+    return set(value)
+
+
+class _AuditedPointers(set[str]):
+    """Record even failed availability checks, so missing inputs are auditable."""
+
+    def __init__(self, pointers: set[str]) -> None:
+        super().__init__(pointers)
+        self.reads: dict[str, None] = {}
+
+    def __contains__(self, pointer: object) -> bool:
+        if isinstance(pointer, str):
+            self.reads[pointer] = None
+        return super().__contains__(pointer)
+
+
+def _pointer_exists(store: EvidenceStore, pointer: str) -> bool:
+    missing = object()
+    return store.raw(pointer, missing) is not missing
+
+
+def _structural_value(store: EvidenceStore, available: set[str], pointer: str) -> Any:
+    # Structural integrity checks may inspect identities outside the selected
+    # table. They may veto support, but cannot supply a positive measurement.
+    if isinstance(available, _AuditedPointers):
+        available.reads[pointer] = None
+    return store.raw(pointer, None)
 
 
 def _fact(
@@ -274,19 +325,26 @@ def _dominant_group(
     store: EvidenceStore,
     available: set[str],
 ) -> tuple[str, Mapping[str, Any], dict[str, str]] | None:
-    groups = store.raw("/groups", {})
+    groups = _structural_value(store, available, "/groups")
     if not isinstance(groups, Mapping):
         return None
-    dominant_id = ""
+    dominant_ids: list[str] = []
+    incomplete_flags = False
     for group_id, row in groups.items():
         if not isinstance(row, Mapping):
+            incomplete_flags = True
             continue
         pointer = f"/groups/{group_id}/flags/dominant_group"
-        if pointer in available and row.get("flags", {}).get("dominant_group") is True:
-            dominant_id = str(group_id)
-            break
+        dominant = _available_value(store, available, pointer)
+        incomplete_flags = incomplete_flags or type(dominant) is not bool
+        if dominant is True:
+            dominant_ids.append(str(group_id))
+    if len(dominant_ids) > 1 or (dominant_ids and incomplete_flags):
+        return None
+    dominant_id = dominant_ids[0] if dominant_ids else ""
     if not dominant_id:
-        candidate = str(store.raw("/metadata/representative_group_id", "") or "")
+        candidate_value = _available_value(store, available, "/metadata/representative_group_id")
+        candidate = str(candidate_value) if candidate_value is not None else ""
         if f"/groups/{candidate}/mean_qrs_ms" in available:
             dominant_id = candidate
     row = groups.get(dominant_id)
@@ -307,12 +365,9 @@ def _p_assessment_rows(
     available: set[str],
 ) -> list[tuple[int, Mapping[str, Any]]]:
     rows: list[tuple[int, Mapping[str, Any]]] = []
-    for index, row in enumerate(store.document.get("p_wave_assessments") or []):
-        if not isinstance(row, Mapping):
-            continue
-        if f"/p_wave_assessments/{index}/accepted" not in available:
-            continue
-        rows.append((index, row))
+    assessments = _structural_value(store, available, "/p_wave_assessments")
+    for index, row in enumerate(assessments if isinstance(assessments, list) else []):
+        rows.append((index, row if isinstance(row, Mapping) else {}))
     return rows
 
 
@@ -351,24 +406,23 @@ def _p_reliability_fact(
             )
             if pointer in available
         )
-        accepted = row.get("accepted") is True
-        ta_ambiguous = row.get("ta_ambiguous") is True
+        accepted_value = _available_value(store, available, accepted_pointer)
+        accepted = accepted_value is True
+        ambiguity = _available_value(store, available, ambiguous_pointer)
+        ta_ambiguous = ambiguity is not False
         onset_confidence = (
-            _finite(row.get("onset_confidence"))
+            _fraction(row.get("onset_confidence"))
             if onset_pointer in available
             else None
         )
         offset_confidence = (
-            _finite(row.get("offset_confidence"))
+            _fraction(row.get("offset_confidence"))
             if offset_pointer in available
             else None
         )
-        valid_leads = (
-            row.get("valid_leads")
-            if valid_leads_pointer in available
-            and isinstance(row.get("valid_leads"), list)
-            else []
-        )
+        valid_leads = _standard_leads(_available_value(store, available, valid_leads_pointer))
+        raw_reasons = _available_value(store, available, reasons_pointer)
+        reasons_valid = isinstance(raw_reasons, list) and all(isinstance(reason, str) for reason in raw_reasons)
         reject_reasons = {
             str(reason).upper()
             for reason in (
@@ -379,8 +433,6 @@ def _p_reliability_fact(
             )
         }
         ambiguous += int(ta_ambiguous)
-        if accepted and not ta_ambiguous:
-            clean.append(index)
         # ``accepted`` is not an independent absence test: upstream may set it
         # false solely because an AF-like rhythm classifier fired.  Conversely,
         # a rejected row can still contain a strong, multilead P-boundary
@@ -394,9 +446,11 @@ def _p_reliability_fact(
             and offset_confidence is not None
             and onset_confidence >= policy.p_boundary_min_confidence
             and offset_confidence >= policy.p_boundary_min_confidence
-        ) or "RHYTHM_ORGANIZED_ATRIAL_ACTIVITY" in reject_reasons
+        )
         if boundary_candidate:
             independent_boundaries.append(index)
+        if accepted and boundary_candidate and reasons_valid and not reject_reasons:
+            clean.append(index)
 
         technically_limited = any(
             token in reason
@@ -411,8 +465,13 @@ def _p_reliability_fact(
         )
         if (
             not ta_ambiguous
+            and accepted_value is False
+            and onset_confidence is not None
+            and offset_confidence is not None
+            and reasons_valid
             and len(valid_leads) >= policy.p_boundary_min_leads
             and not technically_limited
+            and "RHYTHM_ORGANIZED_ATRIAL_ACTIVITY" not in reject_reasons
         ):
             absence_analyzable.append(index)
     clean_fraction = len(clean) / len(rows)
@@ -472,7 +531,8 @@ def _p_reliability_fact(
                 metrics=metrics,
             )
         if (
-            len(absence_analyzable) >= policy.min_sequence_events
+            len(absence_analyzable) == len(rows)
+            and len(absence_analyzable) >= policy.min_sequence_events
             and not independent_boundaries
             and not clean
         ):
@@ -515,19 +575,26 @@ def _p_reliability_fact(
     )
 
 
+_ATRIAL_FIELDS = (
+    "p_event_id", "association_type", "confidence", "source_leads",
+    "associated_qrs_beat_id", "time_ms", "pr_ms",
+)
+
+
 def _atrial_event_rows(
     store: EvidenceStore,
     available: set[str],
 ) -> list[tuple[int, Mapping[str, Any]]]:
-    rows: list[tuple[int, Mapping[str, Any]]] = []
-    for index, row in enumerate(
-        store.document.get("rhythm_inputs", {}).get("p_events") or []
-    ):
-        if not isinstance(row, Mapping):
-            continue
-        if f"/rhythm_inputs/p_events/{index}/association_type" not in available:
-            continue
-        rows.append((index, row))
+    events = _structural_value(store, available, "/rhythm_inputs/p_events")
+    if not isinstance(events, list):
+        return []
+    rows = []
+    for index, event in enumerate(events):
+        root = f"/rhythm_inputs/p_events/{index}"
+        rows.append((index, {
+            name: _available_value(store, available, f"{root}/{name}")
+            for name in _ATRIAL_FIELDS
+        }))
     return rows
 
 
@@ -535,17 +602,104 @@ def _qualified_atrial_events(
     rows: Sequence[tuple[int, Mapping[str, Any]]],
     policy: DeterministicPathwayPolicy,
 ) -> list[tuple[int, Mapping[str, Any]]]:
-    result: list[tuple[int, Mapping[str, Any]]] = []
+    """Qualify explicit quality and unique identities, never truthy defaults."""
+    ids = [_identifier(row.get("p_event_id")) for _, row in rows]
+    times = [_finite(row.get("time_ms")) for _, row in rows]
+    result = []
     for index, row in rows:
-        confidence = _finite(row.get("confidence"))
-        leads = row.get("source_leads")
-        lead_count = len({str(lead) for lead in leads}) if isinstance(leads, list) else 0
-        if confidence is not None and confidence < policy.atrial_event_min_confidence:
+        confidence = _fraction(row.get("confidence"))
+        event_id = _identifier(row.get("p_event_id"))
+        time = _finite(row.get("time_ms"))
+        association = row.get("association_type")
+        if (
+            confidence is None or confidence < policy.atrial_event_min_confidence
+            or len(_standard_leads(row.get("source_leads"))) < policy.atrial_event_min_leads
+            or event_id is None or ids.count(event_id) != 1
+            or time is None or time < 0 or times.count(time) != 1
+            or association not in ("conducted", "blocked", "retrograde")
+        ):
             continue
-        if leads is not None and lead_count < policy.atrial_event_min_leads:
+        qrs_id = row.get("associated_qrs_beat_id")
+        pr = _finite(row.get("pr_ms"))
+        if association == "blocked":
+            if qrs_id is not None or row.get("pr_ms") is not None:
+                continue
+        elif _identifier(qrs_id) is None or pr is None or (association == "conducted" and pr <= 0):
             continue
         result.append((index, row))
     return result
+
+
+def _validated_atrial_events(
+    store: EvidenceStore, available: set[str], policy: DeterministicPathwayPolicy,
+) -> tuple[list[tuple[int, Mapping[str, Any]]], int]:
+    rows = _atrial_event_rows(store, available)
+    qualified = _qualified_atrial_events(rows, policy)
+    # Structural checks may veto support but do not supply a positive
+    # measurement outside the selected tool view.
+    beats = _structural_value(store, available, "/rhythm_inputs/beats")
+    if not isinstance(beats, list):
+        return [], len(rows)
+    qrs: dict[int, list[float | None]] = {}
+    for index, beat in enumerate(beats):
+        if not isinstance(beat, Mapping):
+            continue
+        root = f"/rhythm_inputs/beats/{index}"
+        beat_id = _identifier(_structural_value(store, available, f"{root}/beat_id"))
+        time = _finite(_structural_value(store, available, f"{root}/r_time_ms"))
+        if beat_id is not None:
+            qrs.setdefault(beat_id, []).append(time)
+    valid_times = [values[0] for values in qrs.values()
+                   if len(values) == 1 and values[0] is not None and values[0] >= 0]
+    if len(valid_times) != len(beats) or len(set(valid_times)) != len(beats):
+        return [], len(rows)
+    if valid_times != sorted(valid_times):
+        return [], len(rows)
+    expected_count = _structural_value(store, available, "/metadata/n_beats")
+    if expected_count is not None and (_count(expected_count) is None or expected_count != len(beats)):
+        return [], len(rows)
+    duration = _structural_value(store, available, "/metadata/duration_sec")
+    if duration is not None:
+        duration = _finite(duration)
+        if duration is None or duration <= 0 or any(time > duration * 1000 for time in valid_times):
+            return [], len(rows)
+    actual_beats = _structural_value(store, available, "/beats")
+    if actual_beats is not None:
+        if not isinstance(actual_beats, list):
+            return [], len(rows)
+        actual_ids = [
+            _identifier(_structural_value(store, available, f"/beats/{index}/beat_id"))
+            for index in range(len(actual_beats))
+        ]
+        if (None in actual_ids or len(set(actual_ids)) != len(actual_ids)
+                or set(actual_ids) != set(qrs)):
+            return [], len(rows)
+    result = []
+    for index, row in qualified:
+        root = f"/rhythm_inputs/p_events/{index}"
+        # Explicit nulls, not absent fields, demonstrate no association.
+        if any(f"{root}/{name}" not in available or not _pointer_exists(store, f"{root}/{name}") for name in _ATRIAL_FIELDS):
+            continue
+        time = float(row["time_ms"])
+        if duration is not None and time > duration * 1000:
+            continue
+        if row["association_type"] == "blocked":
+            if not valid_times or not min(valid_times) < time < max(valid_times):
+                continue
+        else:
+            values = qrs.get(_identifier(row["associated_qrs_beat_id"]), [])
+            if len(values) != 1 or values[0] is None:
+                continue
+            qrs_time = values[0]
+            if row["association_type"] == "conducted" and time >= qrs_time:
+                continue
+            if row["association_type"] == "retrograde" and time <= qrs_time:
+                continue
+        result.append((index, row))
+    if any(right[1]["time_ms"] <= left[1]["time_ms"] for left, right in zip(rows, rows[1:])
+           if _finite(left[1].get("time_ms")) is not None and _finite(right[1].get("time_ms")) is not None):
+        return [], len(rows)
+    return result, len(rows)
 
 
 def _one_to_one_av_fact(
@@ -553,19 +707,24 @@ def _one_to_one_av_fact(
     available: set[str],
     policy: DeterministicPathwayPolicy,
 ) -> DeterministicFact:
-    rows = _qualified_atrial_events(_atrial_event_rows(store, available), policy)
+    rows, total_rows = _validated_atrial_events(store, available, policy)
     if len(rows) < policy.min_sequence_events:
         return _fact(
             "unknown",
             "insufficient_atrial_events_for_one_to_one",
             metrics={"analyzed_atrial_events": len(rows)},
         )
-    types = [str(row.get("association_type") or "") for _, row in rows]
     conducted = [(index, row) for index, row in rows if row.get("association_type") == "conducted"]
     blocked = [(index, row) for index, row in rows if row.get("association_type") == "blocked"]
     retrograde = [(index, row) for index, row in rows if row.get("association_type") == "retrograde"]
     qrs_ids = [row.get("associated_qrs_beat_id") for _, row in conducted]
     unique_qrs = {value for value in qrs_ids if value is not None}
+    timeline = _structural_value(store, available, "/rhythm_inputs/beats")
+    associated_times = [beat["r_time_ms"] for beat in timeline if beat["beat_id"] in unique_qrs]
+    interval_qrs_ids = {
+        beat["beat_id"] for beat in timeline
+        if associated_times and min(associated_times) <= beat["r_time_ms"] <= max(associated_times)
+    }
     conducted_fraction = len(conducted) / len(rows)
     inputs = [f"/rhythm_inputs/p_events/{index}/association_type" for index, _ in rows]
     evidence_rows = (blocked or retrograde or conducted)[:3]
@@ -585,10 +744,12 @@ def _one_to_one_av_fact(
         "unique_associated_qrs_count": len(unique_qrs),
     }
     if (
-        not blocked
+        len(rows) == total_rows
+        and not blocked
         and not retrograde
         and conducted_fraction >= 0.90
         and len(unique_qrs) == len(conducted)
+        and unique_qrs == interval_qrs_ids
     ):
         return _fact(
             "pass",
@@ -619,7 +780,7 @@ def _repeated_blocked_fact(
     available: set[str],
     policy: DeterministicPathwayPolicy,
 ) -> DeterministicFact:
-    rows = _qualified_atrial_events(_atrial_event_rows(store, available), policy)
+    rows, total_rows = _validated_atrial_events(store, available, policy)
     blocked = [(index, row) for index, row in rows if row.get("association_type") == "blocked"]
     inputs = [f"/rhythm_inputs/p_events/{index}/association_type" for index, _ in rows]
     evidence = [
@@ -641,7 +802,7 @@ def _repeated_blocked_fact(
             inputs=inputs,
             metrics=metrics,
         )
-    if len(rows) >= policy.min_sequence_events and not blocked:
+    if len(rows) == total_rows and len(rows) >= policy.min_sequence_events and not blocked:
         return _fact(
             "fail",
             "no_blocked_event_in_analyzable_sequence",
@@ -683,11 +844,23 @@ def _sequential_av_fact(
     candidate_only = _available_value(store, available, candidate_pointer)
     if not isinstance(ratios, list):
         return _fact("unknown", "av_sequence_summary_unavailable")
-    numeric_ratios = [int(value) for value in ratios if isinstance(value, (int, float))]
-    numeric_prs = [float(value) for value in prs if isinstance(value, (int, float))] if isinstance(prs, list) else []
-    dropped_indices = [int(value) for value in indices if isinstance(value, (int, float))] if isinstance(indices, list) else []
+    if (
+        any(_count(value) is None for value in ratios)
+        or not isinstance(prs, list)
+        or any(_finite(value) is None or value <= 0 for value in prs)
+        or not isinstance(indices, list)
+        or any(_count(value) is None or value >= len(ratios) for value in indices)
+        or len(set(indices)) != len(indices)
+        or type(dropped) is not bool or type(candidate_only) is not bool
+    ):
+        return _fact("unknown", "invalid_or_incomplete_av_sequence_summary")
+    numeric_ratios = [int(value) for value in ratios]
+    numeric_prs = [float(value) for value in prs]
+    dropped_indices = [int(value) for value in indices]
+    if (dropped is False and dropped_indices) or any(numeric_ratios[index] < 2 for index in dropped_indices):
+        return _fact("unknown", "contradictory_av_sequence_summary")
     ratio_counts = {value: numeric_ratios.count(value) for value in sorted(set(numeric_ratios))}
-    pr_mean = statistics.fmean(numeric_prs) if numeric_prs else None
+    pr_mean = sum(value / len(numeric_prs) for value in numeric_prs) if numeric_prs else None
     pr_sd = statistics.pstdev(numeric_prs) if len(numeric_prs) >= 2 else None
     inputs = [pointer for pointer in (ratio_pointer, pr_pointer, dropped_pointer, indices_pointer, candidate_pointer) if pointer in available]
     evidence = [
@@ -718,7 +891,7 @@ def _sequential_av_fact(
         if (
             dropped is True
             and len(dropped_indices) >= policy.min_repeated_events
-            and candidate_only is not True
+            and candidate_only is False
         ):
             return _fact(
                 "pass",
@@ -727,7 +900,7 @@ def _sequential_av_fact(
                 inputs=inputs,
                 metrics=metrics,
             )
-        if all(value == 1 for value in numeric_ratios) and dropped is False:
+        if all(value == 1 for value in numeric_ratios) and dropped is False and candidate_only is False:
             return _fact(
                 "fail",
                 "stable_one_atrial_event_per_rr_without_drop",
@@ -746,7 +919,9 @@ def _sequential_av_fact(
         stable_one_to_one = (
             all(value == 1 for value in numeric_ratios)
             and dropped is False
+            and candidate_only is False
             and pr_sd is not None
+            and len(numeric_prs) >= policy.min_sequence_events
             and pr_sd <= 20.0
         )
         if stable_one_to_one:
@@ -784,7 +959,7 @@ def _interval_status_fact(
                 "/global_features/qtc_fridericia_ms",
                 "/global_features/qtc_bazett_ms",
             )
-            if _available_number(store, available, pointer) is not None
+            if (_available_number(store, available, pointer) or 0) > 0
         ),
         "",
     )
@@ -797,7 +972,7 @@ def _interval_status_fact(
     inputs = [pointer for pointer, _ in evidence if pointer in available]
     metrics = {"qt_reportable": reportable, "qt_reliability": reliability, "qtc_pointer": qtc_pointer or None}
     bad = {"unreliable", "unavailable", "not_reportable", "low_confidence"}
-    if reportable is True and reliability not in bad and qtc_pointer:
+    if reportable is True and reliability in {"reliable", "rescued"} and qtc_pointer:
         return _fact("pass", "qt_interval_reportable", evidence, inputs=inputs, metrics=metrics)
     if reportable is False or reliability in bad:
         return _fact("unknown", "qt_interval_not_reportable", evidence, inputs=inputs, metrics=metrics)
@@ -812,15 +987,14 @@ def _qt_threshold_fact(
 ) -> DeterministicFact:
     reportable = _available_value(store, available, "/global_features/qt_reportable")
     reliability = str(_available_value(store, available, "/global_features/qt_reliability") or "").lower()
-    bad = {"unreliable", "unavailable", "not_reportable", "low_confidence"}
-    if reportable is not True or reliability in bad:
+    if reportable is not True or reliability not in {"reliable", "rescued"}:
         return _fact("unknown", "qtc_threshold_requires_reportable_interval")
     qtc_pointer = "/global_features/qtc_fridericia_ms"
     qtc = _available_number(store, available, qtc_pointer)
     if qtc is None:
         qtc_pointer = "/global_features/qtc_bazett_ms"
         qtc = _available_number(store, available, qtc_pointer)
-    if qtc is None:
+    if qtc is None or qtc <= 0:
         return _fact("unknown", "qtc_measurement_unavailable")
     inputs = [
         qtc_pointer,
@@ -878,7 +1052,7 @@ def _qrs_duration_fact(
         return _fact("unknown", "dominant_qrs_group_unavailable")
     _, _, pointers = found
     qrs = _available_number(store, available, pointers["qrs"])
-    if qrs is None:
+    if qrs is None or qrs <= 0:
         return _fact("unknown", "dominant_qrs_duration_unavailable")
     evidence = [(pointers["qrs"], "Programmatic read of dominant morphology-group QRS duration")]
     metrics = {"dominant_mean_qrs_ms": round(qrs, 3)}
@@ -924,7 +1098,10 @@ def _representative_group_fact(
     ]
     inputs = [pointer for pointer, _ in evidence if pointer in available]
     metrics = {"member_count": count, "member_pct": pct, "longest_run": run}
-    if count is None or pct is None:
+    if (
+        _count(count) is None or count <= 0 or pct is None or not 0 < pct <= 100
+        or (run is not None and (_count(run) is None or not 0 < run <= count))
+    ):
         return _fact("unknown", "representative_group_counts_unavailable", evidence, inputs=inputs, metrics=metrics)
     if count >= policy.min_representative_beats and pct >= policy.representative_member_pct:
         return _fact("pass", "morphology_group_is_representative", evidence, inputs=inputs, metrics=metrics)
@@ -940,24 +1117,29 @@ def _premature_timing_fact(
 ) -> DeterministicFact:
     rows: list[tuple[int, float, float | None]] = []
     inputs: list[str] = []
-    for index, beat in enumerate(store.document.get("beats") or []):
+    incomplete = False
+    beats = _structural_value(store, available, "/beats")
+    for index, beat in enumerate(beats if isinstance(beats, list) else []):
         if not isinstance(beat, Mapping):
+            incomplete = True
             continue
         prev_pointer = f"/beats/{index}/rr_prev_ms"
         next_pointer = f"/beats/{index}/rr_next_ms"
         if prev_pointer not in available:
+            incomplete = True
             continue
         prev_rr = _finite(beat.get("rr_prev_ms"))
         next_rr = _finite(beat.get("rr_next_ms")) if next_pointer in available else None
-        if prev_rr is None:
+        if prev_rr is None or prev_rr <= 0:
+            incomplete = incomplete or not (index == 0 and beat.get("rr_prev_ms") is None)
             continue
         rows.append((index, prev_rr, next_rr))
         inputs.append(prev_pointer)
         if next_pointer in available:
             inputs.append(next_pointer)
-    if len(rows) < policy.min_sequence_events:
+    if incomplete or len(rows) < policy.min_sequence_events:
         return _fact("unknown", "insufficient_rr_intervals_for_prematurity", inputs=inputs, metrics={"rr_count": len(rows)})
-    baseline = statistics.median([prev for _, prev, _ in rows])
+    baseline = statistics.median([prev / 2 for _, prev, _ in rows]) * 2
     premature = [row for row in rows if row[1] < policy.premature_rr_ratio * baseline]
     supported = [row for row in premature if row[2] is not None and row[2] > policy.compensatory_pause_ratio * baseline]
     chosen = supported or premature
@@ -1000,20 +1182,23 @@ def _robust_background_rr_regular_fact(
 
     rows: list[tuple[int, float]] = []
     inputs: list[str] = []
-    for index, beat in enumerate(store.document.get("beats") or []):
+    beats = _structural_value(store, available, "/beats")
+    for index, beat in enumerate(beats if isinstance(beats, list) else []):
         if not isinstance(beat, Mapping):
-            continue
+            return None
         pointer = f"/beats/{index}/rr_prev_ms"
         if pointer not in available:
-            continue
+            return None
         prev_rr = _finite(beat.get("rr_prev_ms"))
-        if prev_rr is None:
+        if prev_rr is None or prev_rr <= 0:
+            if index != 0 or beat.get("rr_prev_ms") is not None:
+                return None
             continue
         rows.append((index, prev_rr))
         inputs.append(pointer)
     if len(rows) < policy.min_sequence_events:
         return None
-    baseline = statistics.median([rr for _, rr in rows])
+    baseline = statistics.median([rr / 2 for _, rr in rows]) * 2
     if baseline <= 0:
         return None
     tolerance = policy.background_regular_rr_tolerance_fraction * baseline
@@ -1045,13 +1230,22 @@ def _pvc_morphology_fact(
     available: set[str],
     policy: DeterministicPathwayPolicy,
 ) -> DeterministicFact:
-    groups = store.raw("/groups", {})
+    groups = _structural_value(store, available, "/groups")
     if not isinstance(groups, Mapping):
         return _fact("unknown", "morphology_groups_unavailable")
     candidates: list[tuple[str, float, float, float]] = []
     inputs: list[str] = []
+    complete = True
     for group_id, row in groups.items():
-        if not isinstance(row, Mapping) or row.get("flags", {}).get("dominant_group") is True:
+        if not isinstance(row, Mapping):
+            complete = False
+            continue
+        dominant_pointer = f"/groups/{group_id}/flags/dominant_group"
+        dominant = _available_value(store, available, dominant_pointer)
+        if dominant is True:
+            continue
+        if dominant is not False:
+            complete = False
             continue
         qrs_pointer = f"/groups/{group_id}/mean_qrs_ms"
         count_pointer = f"/groups/{group_id}/member_count"
@@ -1059,7 +1253,9 @@ def _pvc_morphology_fact(
         qrs = _available_number(store, available, qrs_pointer)
         count = _available_number(store, available, count_pointer)
         pct = _available_number(store, available, pct_pointer)
-        if qrs is None or count is None or pct is None:
+        if (qrs is None or qrs <= 0 or _count(count) is None or count <= 0
+                or pct is None or not 0 < pct <= 100):
+            complete = False
             continue
         candidates.append((str(group_id), qrs, count, pct))
         inputs.extend((qrs_pointer, count_pointer, pct_pointer))
@@ -1098,7 +1294,7 @@ def _pvc_morphology_fact(
             inputs=inputs,
             metrics=metrics,
         )
-    if candidates and narrow and len(narrow) == len(candidates):
+    if complete and candidates and narrow and len(narrow) == len(candidates):
         group_id = narrow[0][0]
         return _fact(
             "fail",
@@ -1116,10 +1312,10 @@ def _wide_complex_sequence_fact(
     code: str,
     policy: DeterministicPathwayPolicy,
 ) -> DeterministicFact:
-    groups = store.raw("/groups", {})
+    groups = _structural_value(store, available, "/groups")
     if not isinstance(groups, Mapping):
         return _fact("unknown", "morphology_groups_unavailable")
-    rows: list[tuple[str, float, float, float]] = []
+    rows: list[tuple[str, float, float, float | None]] = []
     inputs: list[str] = []
     for group_id, group in groups.items():
         if not isinstance(group, Mapping):
@@ -1130,19 +1326,22 @@ def _wide_complex_sequence_fact(
         qrs = _available_number(store, available, qrs_pointer)
         run = _available_number(store, available, run_pointer)
         rate = _available_number(store, available, rate_pointer)
-        if qrs is None or run is None:
+        count = _available_number(store, available, f"/groups/{group_id}/member_count")
+        if (qrs is None or qrs <= 0 or _count(run) is None or run <= 0
+                or _count(count) is None or run > count
+                or (rate is not None and rate <= 0)):
             continue
-        rows.append((str(group_id), qrs, run, rate or 0.0))
+        rows.append((str(group_id), qrs, run, rate))
         inputs.extend(pointer for pointer in (qrs_pointer, run_pointer, rate_pointer) if pointer in available)
     qualifying = [row for row in rows if row[1] >= 120.0 and row[2] >= 3]
     if code == "wide_complex_tachycardia":
-        qualifying = [row for row in qualifying if row[3] > 100.0]
+        qualifying = [row for row in qualifying if row[3] is not None and row[3] > 100.0]
     metrics = {
         "analyzed_group_count": len(rows),
         "qualifying_wide_run_count": len(qualifying),
     }
     if qualifying:
-        group_id, qrs, run, rate = max(qualifying, key=lambda row: (row[2], row[3]))
+        group_id, qrs, run, rate = max(qualifying, key=lambda row: (row[2], row[3] or 0.0))
         evidence = [
             (f"/groups/{group_id}/mean_qrs_ms", "Programmatic confirmation of QRS widening in a consecutive morphology group"),
             (f"/groups/{group_id}/longest_run", "Programmatic confirmation of the longest run of the wide-QRS morphology"),
@@ -1150,7 +1349,7 @@ def _wide_complex_sequence_fact(
         if code == "wide_complex_tachycardia":
             evidence.append((f"/groups/{group_id}/mean_ventr_rate_bpm", "Programmatic confirmation that the consecutive wide-QRS morphology group reaches tachycardia"))
         return _fact("pass", "representative_consecutive_wide_complex_sequence", evidence, inputs=inputs, metrics={**metrics, "qrs_ms": qrs, "longest_run": run, "rate_bpm": rate})
-    if rows and all(row[1] < 110.0 or row[2] < 3 for row in rows):
+    if rows and len(rows) == len(groups) and all(row[1] < 110.0 or row[2] < 3 for row in rows):
         group_id = rows[0][0]
         return _fact(
             "fail",
@@ -1180,10 +1379,14 @@ def _territorial_low_voltage_fact(
             for field in ("r_amp_mv", "s_amp_mv", "q_amp_mv")
         ]
         values = [_available_number(store, available, pointer) for pointer in pointers]
-        if values[0] is None or values[1] is None:
+        reliable = _available_value(store, available, f"/representative_leads/{lead}/params/reliable_for_qrs")
+        if (reliable is not True or any(value is None for value in values)
+                or values[0] < 0 or values[1] > 0 or values[2] > 0):
             continue
         positive = max(0.0, *(value for value in values if value is not None))
         negative = min(0.0, *(value for value in values if value is not None))
+        if not math.isfinite(positive - negative):
+            continue
         amplitudes[lead] = positive - negative
         inputs.extend(pointer for pointer, value in zip(pointers, values) if value is not None)
     metrics = {
@@ -1228,9 +1431,9 @@ def _pacing_fact(
         "sensing_value": f"{root}/sensing_failure_suspected/value",
     }
     values = {name: _available_value(store, available, pointer) for name, pointer in pointers.items()}
-    spike_count = _finite(values["spikes"])
-    associated = _finite(values["associated"])
-    capture = _finite(values["capture"])
+    spike_count = _count(values["spikes"])
+    associated = _fraction(values["associated"])
+    capture = _fraction(values["capture"])
     inputs = [pointer for pointer in pointers.values() if pointer in available]
     metrics = {
         "state": values["state"],
@@ -1240,8 +1443,16 @@ def _pacing_fact(
         "evidence_conflicted": values["conflicted"],
         "supports_measurement_routing": values["routing"],
     }
+    if (spike_count is None or values["conflicted"] is not False
+            or not isinstance(values["state"], str)
+            or values["state"].lower() not in {"on", "off", "none", "candidate", "uncertain"}):
+        return _fact("unknown", "pacing_quality_or_count_incomplete", inputs=inputs, metrics=metrics)
+    state = values["state"].lower()
+    if ((state in {"off", "none"} and spike_count > 0)
+            or (state == "on" and spike_count == 0)):
+        return _fact("unknown", "contradictory_pacing_evidence", inputs=inputs, metrics=metrics)
     if step_id == "pacing_marker_support":
-        if spike_count == 0 or str(values["state"] or "").lower() in {"off", "none", "false"}:
+        if spike_count == 0 and state in {"off", "none"}:
             return _fact("fail", "no_pacing_markers", [(pointers["spikes"], "Programmatic check found no pacing spikes")], inputs=inputs, metrics=metrics)
         positive = (
             spike_count is not None
@@ -1261,19 +1472,24 @@ def _pacing_fact(
             )
         return _fact("unknown", "pacing_markers_candidate_or_conflicted", inputs=inputs, metrics=metrics)
     if code == "pacing_sensing_failure_suspected":
-        if values["sensing_available"] is not True:
+        if values["sensing_available"] is not True or type(values["sensing_value"]) is not bool:
             return _fact("unknown", "sensing_failure_detector_unavailable", inputs=inputs, metrics=metrics)
         status = "pass" if values["sensing_value"] is True else "fail"
         return _fact(status, "sensing_failure_flag_true" if status == "pass" else "sensing_failure_flag_false", [(pointers["sensing_value"], "Programmatic read of the sensing-failure detector result")], inputs=inputs, metrics=metrics)
+    if type(values["capture_failure"]) is not bool:
+        return _fact("unknown", "capture_failure_flag_unavailable", inputs=inputs, metrics=metrics)
+    if (values["capture_failure"] is True and capture is not None
+            and capture >= policy.pacing_strong_capture_fraction):
+        return _fact("unknown", "contradictory_pacing_evidence", inputs=inputs, metrics=metrics)
     if code == "pacing_failure_to_capture_suspected":
-        if values["capture_failure"] is True or (
-            spike_count is not None
+        if (
+            values["capture_failure"] is True
             and spike_count >= policy.pacing_min_spikes
             and capture is not None
             and capture < policy.pacing_failure_fraction
         ):
             return _fact("pass", "repeated_spikes_with_low_capture_alignment", [(pointers["capture_failure"], "Programmatic read of the failure-to-capture detector result"), (pointers["capture"], "Programmatic calculation of post-spike capture alignment")], inputs=inputs, metrics=metrics)
-        if capture is not None and capture >= policy.pacing_strong_capture_fraction:
+        if spike_count >= policy.pacing_min_spikes and capture is not None and capture >= policy.pacing_strong_capture_fraction:
             return _fact("fail", "stable_capture_refutes_failure_to_capture", [(pointers["capture"], "Programmatic confirmation of a stable spike-QRS capture relationship")], inputs=inputs, metrics=metrics)
         return _fact("unknown", "capture_failure_not_established", inputs=inputs, metrics=metrics)
     if spike_count is None or associated is None or capture is None:
@@ -1298,13 +1514,9 @@ def _voltage_validity_fact(
 ) -> DeterministicFact:
     """Decide whether a QRS-voltage criterion is applicable to this record.
 
-    Cornell/Peguero/Sokolow-Lyon all assume normal ventricular activation.
-    Ventricular pacing, a complete bundle-branch block or a marked IVCD widen
-    depolarization and inflate the same amplitudes the criteria measure, so a
-    positive voltage sum carries no hypertrophy information under those
-    conditions.  This runs as an ``invalidator``: only a demonstrated
-    invalidating condition blocks the candidate, and an unmeasurable
-    precondition never costs a true positive.
+    Ventricular activation and pacing context determine whether the pathway's
+    voltage criteria apply. Missing context remains unknown; placement and
+    whether the prerequisite is required are owned by the selected pathway.
     """
 
     if step_id == "voltage_criteria_pacing_valid":
@@ -1322,7 +1534,9 @@ def _voltage_validity_fact(
             "ventricular_pacing_present": values["ventricular"],
         }
         state = str(values["state"] or "").strip().lower()
-        if values["ventricular"] is True or state == "on":
+        if (values["ventricular"] is True and state in {"off", "none"}) or (values["ventricular"] is False and state == "on"):
+            return _fact("unknown", "contradictory_ventricular_pacing_state", inputs=inputs, metrics=metrics)
+        if values["ventricular"] is True:
             return _fact(
                 "fail",
                 "voltage_criteria_invalid_under_ventricular_pacing",
@@ -1341,7 +1555,7 @@ def _voltage_validity_fact(
             return _fact(
                 "pass",
                 "no_ventricular_pacing_detected",
-                [(pointers["state"], "Programmatic confirmation that ventricular pacing was not detected")],
+                [(pointers["ventricular"] if values["ventricular"] is False else pointers["state"], "Programmatic confirmation that ventricular pacing was not detected")],
                 inputs=inputs,
                 metrics=metrics,
             )
@@ -1362,7 +1576,7 @@ def _voltage_validity_fact(
         "mean_qrs_ms": qrs_ms,
         "invalid_at_or_above_ms": policy.voltage_criteria_invalid_qrs_ms,
     }
-    if qrs_ms is None:
+    if qrs_ms is None or qrs_ms <= 0:
         return _fact(
             "unknown",
             "dominant_qrs_duration_unavailable",
@@ -1386,7 +1600,7 @@ def _voltage_validity_fact(
     )
 
 
-def resolve_additional_deterministic_step(
+def _resolve_additional_deterministic_step(
     store: EvidenceStore,
     *,
     code: str,
@@ -1401,7 +1615,7 @@ def resolve_additional_deterministic_step(
         pr = _available_number(store, available_pointers, pointer)
         availability_pointer = "/rhythm_inputs/record/availability/pr_available"
         availability = _available_value(store, available_pointers, availability_pointer)
-        if pr is None or availability is False:
+        if pr is None or pr <= 0 or availability is not True:
             return _fact("unknown", "pr_measurement_unavailable", inputs=[p for p in (pointer, availability_pointer) if p in available_pointers])
         evidence = [(pointer, "Programmatic definition-level assessment using the global reportable PR interval")]
         inputs = [pointer] + ([availability_pointer] if availability_pointer in available_pointers else [])
@@ -1470,7 +1684,8 @@ def resolve_additional_deterministic_step(
             "atrial_rate_bpm": atrial_rate,
             "p_axis_deg": p_axis,
         }
-        if heart_rate is None or atrial_rate is None or p_axis is None:
+        if (heart_rate is None or heart_rate <= 0 or atrial_rate is None
+                or atrial_rate <= 0 or p_axis is None or not -180 <= p_axis <= 180):
             return _fact(
                 "unknown",
                 "sinus_mechanism_components_incomplete",
@@ -1546,7 +1761,7 @@ def resolve_additional_deterministic_step(
                 inputs=inputs,
                 metrics=metrics,
             )
-        if localized is not None or requires_validation is not None:
+        if type(localized) is bool and type(requires_validation) is bool:
             return _fact(
                 "pass",
                 "no_joint_unresolved_atrial_candidate_stream_flag",
@@ -1564,7 +1779,7 @@ def resolve_additional_deterministic_step(
     if step_id == "irregular_ventricular_response":
         pointer = "/rhythm_inputs/af_afl/rr_cv"
         rr_cv = _available_number(store, available_pointers, pointer)
-        if rr_cv is None:
+        if rr_cv is None or rr_cv < 0:
             return _fact("unknown", "rr_variability_unavailable")
         evidence = [(pointer, "Programmatic assessment of irregularity using the coefficient of variation of the complete RR sequence")]
         if rr_cv >= policy.irregular_rr_pass_cv:
@@ -1576,7 +1791,7 @@ def resolve_additional_deterministic_step(
         consensus_pointer = "/rhythm_inputs/af_afl/f_wave_multilead_consensus"
         confidence_pointer = "/rhythm_inputs/af_afl/f_wave_confidence"
         consensus = _available_value(store, available_pointers, consensus_pointer)
-        confidence = _available_number(store, available_pointers, confidence_pointer)
+        confidence = _fraction(_available_value(store, available_pointers, confidence_pointer))
         evidence = [(consensus_pointer, "Programmatic read of multilead consensus for fibrillatory-wave candidates"), (confidence_pointer, "Programmatic read of fibrillatory-wave candidate confidence")]
         inputs = [pointer for pointer, _ in evidence if pointer in available_pointers]
         if consensus is True and confidence is not None and confidence >= 0.50:
@@ -1623,7 +1838,9 @@ def resolve_additional_deterministic_step(
             s_pointer = f"/representative_leads/{lead}/params/s_amp_mv"
             r_amp = _available_number(store, available_pointers, r_pointer)
             s_amp = _available_number(store, available_pointers, s_pointer)
-            if r_amp is None or s_amp is None or abs(s_amp) < 1e-6:
+            reliable = _available_value(store, available_pointers, f"/representative_leads/{lead}/params/reliable_for_qrs")
+            if (reliable is not True or r_amp is None or s_amp is None
+                    or r_amp < 0 or s_amp > 0 or abs(s_amp) < 1e-6):
                 continue
             ratios[lead] = max(0.0, r_amp) / abs(s_amp)
             inputs.extend((r_pointer, s_pointer))
@@ -1678,23 +1895,38 @@ def resolve_additional_deterministic_step(
         r_values: dict[str, float] = {}
         ratios: dict[str, float] = {}
         inputs: list[str] = []
+        invalid_sign_leads: list[str] = []
         for lead in leads:
             r_pointer = f"/representative_leads/{lead}/params/r_amp_mv"
             s_pointer = f"/representative_leads/{lead}/params/s_amp_mv"
             r_amp = _available_number(store, available_pointers, r_pointer)
             s_amp = _available_number(store, available_pointers, s_pointer)
+            reliable = _available_value(store, available_pointers, f"/representative_leads/{lead}/params/reliable_for_qrs")
             if r_amp is None or s_amp is None:
+                continue
+            # ecgfeat exports signed amplitudes (R >= 0, S <= 0). Taking
+            # abs(S) on an invalid positive S can fabricate an early R/S=1
+            # transition in QS-like leads; preserve this as uncertain input.
+            if r_amp < 0 or s_amp > 0:
+                invalid_sign_leads.append(lead)
+                inputs.extend((r_pointer, s_pointer))
+                continue
+            if reliable is not True or (r_amp == 0 and s_amp == 0):
                 continue
             r_values[lead] = max(0.0, r_amp)
             ratios[lead] = math.inf if abs(s_amp) < 1e-6 else max(0.0, r_amp) / abs(s_amp)
             inputs.extend((r_pointer, s_pointer))
         metrics: dict[str, Any] = {
+            "invalid_amplitude_sign_leads": invalid_sign_leads,
             "analyzable_precordial_leads": len(ratios),
             "r_s_ratios": {
                 lead: (round(value, 4) if math.isfinite(value) else "inf")
                 for lead, value in ratios.items()
             },
         }
+        if invalid_sign_leads:
+            return _fact("unknown", "invalid_signed_r_s_amplitudes",
+                         inputs=inputs, metrics=metrics)
         if len(ratios) < len(leads):
             return _fact(
                 "unknown",
@@ -1753,6 +1985,29 @@ def resolve_additional_deterministic_step(
     if code in _PACING_CODES and step_id in {"pacing_marker_support", "capture_relation_support"}:
         return _pacing_fact(store, available_pointers, code, step_id, policy)
     return None
+
+
+def resolve_additional_deterministic_step(
+    store: EvidenceStore,
+    *,
+    code: str,
+    step_id: str,
+    available_pointers: set[str],
+    policy: DeterministicPathwayPolicy = DEFAULT_DETERMINISTIC_PATHWAY_POLICY,
+) -> DeterministicFact | None:
+    """Resolve a fact and audit every consulted measurement/quality pointer."""
+    audited = _AuditedPointers(available_pointers)
+    fact = _resolve_additional_deterministic_step(
+        store, code=code, step_id=step_id, available_pointers=audited, policy=policy,
+    )
+    if fact is None:
+        return None
+    return _fact(
+        fact.status, fact.reason_code,
+        [(pointer, claim) for pointer, claim in fact.evidence
+         if pointer in available_pointers and _pointer_exists(store, pointer)],
+        inputs=[*fact.input_pointers, *audited.reads], metrics=fact.metrics,
+    )
 
 
 __all__ = [

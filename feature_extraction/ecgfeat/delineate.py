@@ -20,6 +20,8 @@ from .repolarization import (
 )
 from .twelve_sl import twelve_sl_wave_measurements_from_signal
 from .u_wave import measure_u_wave
+from .refinement import RefinementConfig
+from .boundary_refinement import sustained_qrs_offset
 
 
 _EXPECTED_POSITIVE_T_LEADS = {"I", "II", "aVF", "V5", "V6"}
@@ -3277,6 +3279,10 @@ def _p_candidate_reselection_reason(candidate: object) -> str:
         method = str(candidate.get("detection_method") or "")
         if method == "composite_qrst_residual_derivative":
             return "raw_atrial_event_context"
+        if method == "phasor_transform":
+            return "phasor_context_alternative"
+        if method == "validated_phasor":
+            return "validated_phasor_context"
     return "higher_context_alternative"
 
 
@@ -3512,7 +3518,7 @@ def _apply_p_candidate_reselection(
         if "paced_beat" in flags or "retrograde_p" in flags:
             continue
         has_raw_atrial_candidate = any(
-            _p_candidate_reselection_reason(candidate) == "raw_atrial_event_context"
+            _p_candidate_reselection_reason(candidate) in {"raw_atrial_event_context", "validated_phasor_context"}
             for candidate in candidates
         )
         old_peak = feature.p.peak
@@ -3548,7 +3554,7 @@ def _apply_p_candidate_reselection(
                 continue
             if old_peak is not None and peak == old_peak:
                 continue
-            if missing_original_p and reason != "raw_atrial_event_context":
+            if missing_original_p and reason not in {"raw_atrial_event_context", "validated_phasor_context"}:
                 continue
             measurement = _measure_p_candidate_from_peak(
                 sig=ecg[li],
@@ -6810,6 +6816,7 @@ def delineate_beats(
     pacing_spike_times: Optional[List[int]] = None,
     quality: Optional[Dict[str, object]] = None,
     qrs_low_slope_guard: bool = False,
+    refinement: Optional[RefinementConfig] = None,
 ) -> List[LeadBeatFeatures]:
     """
     Delineate P/QRS/T boundaries for every beat × lead.
@@ -6855,7 +6862,7 @@ def delineate_beats(
     T_END_PRIOR_MARGIN = int(0.030 * fs)
 
     out: List[LeadBeatFeatures] = []
-    p_alternatives_by_key: Dict[Tuple[int, str], List[PCandidateAlternative]] = {}
+    p_alternatives_by_key: Dict[Tuple[int, str], List[object]] = {}
     # Previous beat's measured T-offset per lead (absolute sample index), used
     # to keep the next beat's P search window from picking up the decaying
     # T-tail when the TP interval is short (fast rate / P-on-T).
@@ -7079,6 +7086,9 @@ def delineate_beats(
                     rr_prev_ms,
                     enable_low_slope_guard=qrs_low_slope_guard,
                 )
+
+            if refinement is not None and refinement.qrs_terminal_multiscale:
+                qrs_off = sustained_qrs_offset(sig, qrs_on, qrs_off, local_r, fs)
 
             # T024 paced-beat branch — Part 1: clamp QRS onset to be no earlier
             # than the spike.  The energy walk on the de-spiked signal should
@@ -8102,6 +8112,50 @@ def delineate_beats(
                     quality=quality,
                     alternatives_by_key=p_alternatives_by_key,
                 )
+        if refinement is not None and (refinement.p_phasor_candidates or refinement.p_pathology_candidates):
+            from .classical_candidates import phasor_p_candidates
+            from .atrial_validation import p_waveform_evidence
+            p_filtered = lowpass_filter(ecg, fs, 15.) if refinement.p_pathology_candidates else None
+            p_support_leads = [j for j in (0, 1, 6, 7, 8, 9, 10, 11)
+                               if np.std(ecg[j]) > 1e-8
+                               and (quality is None or getattr(quality.get(STANDARD_12_LEADS[j]), "reliable_for_p", False))] if refinement.p_pathology_candidates else []
+            p_evidence_cache = {}
+
+            def candidate_evidence(index, sample):
+                key = (index, int(sample))
+                if key not in p_evidence_cache:
+                    p_evidence_cache[key] = p_waveform_evidence(ecg[index], p_filtered[index], sample, fs)
+                return p_evidence_cache[key]
+
+            by_beat_lead = {(f.beat_id, f.lead): f for f in out}
+            for feature in out:
+                if (feature.qrs.onset is None or (feature.p.peak is None and not refinement.p_pathology_candidates)
+                        or "paced_beat" in feature.flags or "retrograde_p" in feature.flags
+                        or (quality and not getattr(quality.get(feature.lead), "reliable_for_p", False))):
+                    continue
+                li = STANDARD_12_LEADS.index(feature.lead)
+                qrs_on = int(feature.qrs.onset)
+                rr = int(r_locs[feature.beat_id]-r_locs[feature.beat_id-1]) if feature.beat_id else int(.8*fs)
+                search_width = min(.45*fs, .65*rr) if refinement.p_pathology_candidates else .32*fs
+                lo = max(0, qrs_on - int(search_width))
+                previous = by_beat_lead.get((feature.beat_id - 1, feature.lead))
+                if previous is not None and previous.t.offset is not None:
+                    lo = max(lo, int(previous.t.offset) + int(.02 * fs))
+                hi = qrs_on - int(.025 * fs)
+                baseline, _, _ = _baseline_contract(ecg[li], int(r_locs[feature.beat_id]), fs)
+                alternatives = p_alternatives_by_key.setdefault((feature.beat_id, feature.lead), [])
+                for peak in phasor_p_candidates(ecg[li], lo=lo, hi=hi, baseline=baseline, fs=fs):
+                    method = "phasor_transform"
+                    if refinement.p_pathology_candidates:
+                        local = candidate_evidence(li, peak)
+                        if local is None:
+                            continue
+                        support = [j for j in p_support_leads if candidate_evidence(j, peak) is not None]
+                        if len(support) < 2:
+                            continue
+                        method = "validated_phasor"
+                    if all(abs(peak - _p_candidate_peak(c)) > .016 * fs for c in alternatives):
+                        alternatives.append({"peak": peak, "detection_method": method})
         out = _apply_p_candidate_reselection(
             out,
             ecg=ecg,

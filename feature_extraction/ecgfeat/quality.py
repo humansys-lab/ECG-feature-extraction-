@@ -25,6 +25,11 @@ PACE_SPIKE_LOW_UV = 250.0
 
 def _band_power(x: np.ndarray, fs: int, fmin: float, fmax: float) -> float:
     freqs, psd = welch(x, fs=fs, nperseg=min(len(x), max(256, fs * 2)))
+    return _spectrum_band_power(freqs, psd, fmin, fmax)
+
+
+def _spectrum_band_power(freqs: np.ndarray, psd: np.ndarray, fmin: float, fmax: float) -> float:
+    """Integrate an existing spectrum, preserving the historical masks/order."""
     mask = (freqs >= fmin) & (freqs <= fmax)
     if not np.any(mask):
         return 0.0
@@ -196,7 +201,23 @@ def compute_qrs_detector_agreement(
     }
 
 
-def summarize_record_quality(qualities: Dict[str, LeadQuality]) -> Dict[str, object]:
+def summarize_record_quality(qualities: Dict[str, LeadQuality], *, available_leads=None) -> Dict[str, object]:
+    if available_leads is not None:
+        active = [qualities[name] for name in available_leads if name in qualities]
+        qrs = sum(bool(q.reliable_for_qrs) for q in active)
+        p = sum(bool(q.reliable_for_p) for q in active)
+        qt = sum(bool(q.reliable_for_qt) for q in active)
+        required = min(2, len(available_leads))
+        rejected = ([] if qrs else ["record"]) + ([] if p >= required else ["p_measurement"]) + ([] if qt >= required else ["qt_measurement"])
+        reasons = sorted({code for q in active for code in (q.reason_codes or q.flags)})
+        if len(active) != len(available_leads):
+            rejected = sorted(set(rejected) | {"record"})
+            reasons.append("partial_quality_map")
+        return {"record_grade": "Q3" if "record" in rejected else "Q2" if rejected else "Q1" if reasons else "Q0",
+                "rejected_functions": rejected, "reason_codes": reasons,
+                "n_reliable_qrs_leads": qrs, "n_reliable_p_leads": p, "n_reliable_qt_leads": qt,
+                "diagnostic_gate": "stop" if "record" in rejected else "partial",
+                "quality_scope": "explicitly_supplied_channels", "available_leads": list(available_leads)}
     lead_qualities = [
         quality
         for lead in STANDARD_12_LEADS
@@ -530,20 +551,23 @@ def compute_quality(
     total_band = (0.05, min(150.0, fs / 2.0 - 1.0))
     for i, lead in enumerate(STANDARD_12_LEADS):
         sig = np.asarray(ecg[i], dtype=float)
-        total_power = _band_power(sig, fs, *total_band) + 1e-12
-        baseline_power = _band_power(sig, fs, 0.05, min(0.5, fs / 2.0 - 1.0))
-        diagnostic_power = _band_power(sig, fs, 0.05, min(40.0, fs / 2.0 - 1.0)) + 1e-12
+        freqs, psd = welch(sig, fs=fs, nperseg=min(len(sig), max(256, fs * 2)))
+        def power(fmin: float, fmax: float) -> float:
+            return _spectrum_band_power(freqs, psd, fmin, fmax)
+        total_power = power(*total_band) + 1e-12
+        baseline_power = power(0.05, min(0.5, fs / 2.0 - 1.0))
+        diagnostic_power = power(0.05, min(40.0, fs / 2.0 - 1.0)) + 1e-12
         baseline_wander = float(baseline_power / diagnostic_power)
-        muscle_power = _band_power(sig, fs, 40.0, min(100.0, fs / 2.0 - 1.0)) / total_power
-        powerline_power = _band_power(sig, fs, mains_hz - 1.0, mains_hz + 1.0) / total_power
+        muscle_power = power(40.0, min(100.0, fs / 2.0 - 1.0)) / total_power
+        powerline_power = power(mains_hz - 1.0, mains_hz + 1.0) / total_power
         clipping = _clipping_score(sig)
         flat_std = _flatline_score(sig)
         flat_fraction = _flatline_fraction(
             sig, fs, thresholds.flatline_peak_to_peak_mv
         )
         saturation_fraction = _saturation_fraction(sig, adc_full_scale_mv)
-        psqi_denominator = _band_power(sig, fs, 5.0, min(40.0, fs / 2.0 - 1.0)) + 1e-12
-        p_sqi = _band_power(sig, fs, 5.0, min(15.0, fs / 2.0 - 1.0)) / psqi_denominator
+        psqi_denominator = power(5.0, min(40.0, fs / 2.0 - 1.0)) + 1e-12
+        p_sqi = power(5.0, min(15.0, fs / 2.0 - 1.0)) / psqi_denominator
         k_sqi = _kurtosis_score(sig)
         b_sqi = _bsqi(sig, fs)
         # A slow rhythm can contain a physiologic one-second isoelectric

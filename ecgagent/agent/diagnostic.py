@@ -11,6 +11,7 @@ from dataclasses import replace
 from functools import lru_cache
 import hashlib
 import json
+import math
 import re
 import time
 from typing import Any, Mapping, Sequence
@@ -30,6 +31,7 @@ from ..tools.registry import ToolRegistry, build_default_registry
 from ..verify import VerificationPolicy
 from . import compact_diagnostic_prompts, diagnostic_prompts
 from .diagnostic_ledger import DiagnosticLedger, LedgerPatchError
+from .compact_execution import CompactExecutionMixin, assess_evidence_strength
 from .diagnostic_pathways import (
     build_diagnostic_pathway,
     semantic_candidate_family,
@@ -355,8 +357,9 @@ def diagnostic_phases(store: EvidenceStore) -> tuple[PhaseSpec, ...]:
 
 
 def _diagnostic_prompt_fingerprint() -> str:
-    from ..tools import modalities, query, survey
+    from ..tools import modalities, query, survey, waveform_review
     from ..evidence.model_view import MODEL_EVIDENCE_VIEW_VERSION
+    from ..evidence.packing import EVIDENCE_PACKING_POLICY_VERSION
     from ..knowledge.challenger import (
         CHALLENGE_VERSION,
         KNOWLEDGE_CHALLENGE_SCHEMA,
@@ -417,7 +420,7 @@ def _diagnostic_prompt_fingerprint() -> str:
             json.dumps(
                 [
                     spec.to_openai()
-                    for spec in (*survey.SPECS, *query.SPECS, *modalities.SPECS)
+                    for spec in (*survey.SPECS, *query.SPECS, *modalities.SPECS, *waveform_review.SPECS)
                     if spec.name in DIAGNOSTIC_TOOLS
                 ],
                 sort_keys=True,
@@ -429,6 +432,7 @@ def _diagnostic_prompt_fingerprint() -> str:
             NAVIGATION_VERSION,
             RULE_SECOND_OPINION_VERSION,
             MODEL_EVIDENCE_VIEW_VERSION,
+            EVIDENCE_PACKING_POLICY_VERSION,
         ]
     )
     return hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
@@ -445,7 +449,7 @@ def _shared_knowledge_base() -> Any:
     return KnowledgeBase.from_project()
 
 
-class ECGDiagnosticAgent(ECGAgent):
+class ECGDiagnosticAgent(CompactExecutionMixin, ECGAgent):
     """Dual-channel ECG diagnostician backed by auditable measurements."""
 
     def __init__(
@@ -465,7 +469,7 @@ class ECGDiagnosticAgent(ECGAgent):
             DEFAULT_DIAGNOSTIC_PROTOCOL.knowledge.default_max_chunks
         ),
         knowledge_base: Any = None,
-        workflow: str = "legacy",
+        workflow: str = "compact",
     ) -> None:
         workflow_name = str(workflow or "compact").strip().lower()
         if workflow_name not in {"compact", "legacy"}:
@@ -488,6 +492,16 @@ class ECGDiagnosticAgent(ECGAgent):
             "quality_limitations": [],
         }
         self._compact_decision_audit: dict[str, Any] = {}
+        self._compact_evidence_coverage: dict[str, dict[str, Any]] = {}
+        self._compact_review_calls: list[tuple[str, dict[str, Any]]] = []
+        self._compact_batches: list[list[str]] = []
+        self._compact_batch_audit: list[dict[str, Any]] = []
+        self._compact_update_audit: list[dict[str, Any]] = []
+        self._compact_deferred: list[dict[str, Any]] = []
+        self._compact_candidate_visibility: dict[str, set[str]] = {}
+        self._compact_executed_candidates: set[str] | None = None
+        self._compact_current_call_start = 0
+        self._compact_batch_index = 0
         self._quality_gate = validate_diagnostic_gate(
             diagnostic_store.raw("/metadata/diagnostic_gate", None)
         )
@@ -590,6 +604,14 @@ class ECGDiagnosticAgent(ECGAgent):
                 ),
                 DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_model_evidence_chars,
             )
+            maximum = getattr(backend, "max_required_evidence_chars", None)
+            if maximum is not None:
+                backend.max_required_evidence_chars = min(
+                    maximum, DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_model_required_evidence_chars)
+            if hasattr(backend, "required_evidence_headroom_chars"):
+                backend.required_evidence_headroom_chars = min(
+                    backend.required_evidence_headroom_chars,
+                    DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_required_evidence_headroom_chars)
         super().__init__(
             store=diagnostic_store,
             backend=backend,
@@ -607,7 +629,7 @@ class ECGDiagnosticAgent(ECGAgent):
                 DEFAULT_DIAGNOSTIC_PROTOCOL.runtime.max_consecutive_max_tokens
             ),
             phase_state_retries=(
-                0
+                DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_phase_state_retries
                 if self._compact_workflow
                 else DEFAULT_DIAGNOSTIC_PROTOCOL.runtime.phase_state_retries
             ),
@@ -738,6 +760,55 @@ class ECGDiagnosticAgent(ECGAgent):
         self._emit("[quality_gate] stop; deterministic non-diagnostic output")
         return self._finish(result)
 
+    def _record_evidence_coverage(
+        self, spec: PhaseSpec, required: Mapping[str, tuple[str, ...]],
+    ) -> None:
+        if not self._compact_workflow:
+            return
+        visible = {
+            pointer for call in self.registry.calls[self._compact_current_call_start:]
+            if call.ok and call.phase == spec.key
+            for pointer in call.visible_citations
+        }
+        for node, _tool, _arguments in spec.model_evidence_requirements:
+            pointers = set(required.get(node, ()))
+            missing = pointers - visible
+            self._compact_evidence_coverage[node] = {
+                "required_atom_count": len(pointers),
+                "visible_atom_count": len(pointers & visible),
+                "missing_pointers": sorted(missing),
+                "status": "unavailable" if not pointers else "omitted" if missing else "visible",
+            }
+
+    def _phase_state_problems(
+        self, spec: PhaseSpec, text: str, *, calls_at_start: int, stop_reason: str,
+    ) -> list[str] | None:
+        if not self._compact_workflow or spec.response_schema is None:
+            return super()._phase_state_problems(
+                spec, text, calls_at_start=calls_at_start, stop_reason=stop_reason,
+            )
+        # Compact phases are terminal/structured, which the legacy phase guard
+        # intentionally skips. Validate their structure before committing so a
+        # truncated tail can be repaired without repeating the completed plan.
+        if stop_reason == "max_tokens":
+            return ["phase response was truncated at max_tokens; return complete JSON"]
+        try:
+            parsed = json.loads(text)
+        except (ValueError, TypeError):
+            return ["phase response is not a structured JSON object"]
+        from jsonschema import Draft202012Validator
+
+        if isinstance(parsed, dict) and spec.key == "adjudicate":
+            # Historical compact clients supplied these optional prose fields;
+            # the program already renders them and they never select a node.
+            parsed = {k: v for k, v in parsed.items()
+                      if k not in {"limitations", "human_review_reasons"}}
+        validator = Draft202012Validator(spec.response_schema)
+        return [
+            f"{error.json_path}: {error.message}"
+            for error in list(validator.iter_errors(parsed))[:8]
+        ]
+
     def _normalized_phase_patch(self, value: Mapping[str, Any]) -> Mapping[str, Any]:
         normalizer = getattr(self.backend, "normalize_verdict", None)
         if not callable(normalizer):
@@ -796,6 +867,30 @@ class ECGDiagnosticAgent(ECGAgent):
         text = re.sub(r"\s*([,\uFF0C\u3001])\s*(?=[,\uFF0C\u3001\u3002\uFF1B;])", "", text)
         text = re.sub(r"\s{2,}", " ", text).strip(" \uFF0C,\uFF1B;")
         return text or fallback
+
+    def _compact_report_limitation(self, value: Any) -> str:
+        """Resolve cited measurement limitations before stripping prose aliases."""
+        text = str(value or "")
+        labels = {"qrs_ms": "QRS duration", "pr_ms": "PR interval",
+                  "qt_ms": "QT interval", "qtc_fridericia_ms": "QTc interval",
+                  "t_axis_deg": "T-wave axis", "qrs_axis_deg": "QRS axis"}
+        resolved: list[str] = []
+        for token in dict.fromkeys(re.findall(r"\bQ\d+\b", text)):
+            pointer = self._compact_pointer(token)
+            evidence = self.store.try_resolve(pointer) if pointer else None
+            if evidence is not None and (evidence.caveats or evidence.is_null):
+                label = labels.get(pointer.rsplit("/", 1)[-1], "Referenced measurement")
+                resolved.append(label + (" is unavailable" if evidence.is_null else
+                    " has limited reliability; review its measurement caveats and original waveform"))
+                self._compact_limitation_sources = getattr(self, "_compact_limitation_sources", [])
+                row = {"citation": evidence.citation, "caveats": list(evidence.caveats),
+                       "unavailable": evidence.is_null}
+                if row not in self._compact_limitation_sources:
+                    self._compact_limitation_sources.append(row)
+            elif evidence is None:
+                resolved.append("A requested measurement limitation could not be resolved; human review is required")
+        prose = self._compact_clean_text(self._compact_humanize_limitation(text))
+        return "; ".join(dict.fromkeys([*resolved, *([prose] if prose else [])]))
 
     def _compact_evidence_items(self, value: Any) -> list[dict[str, Any]]:
         """Convert citation/claim pairs to the full atomic evidence shape."""
@@ -860,6 +955,10 @@ class ECGDiagnosticAgent(ECGAgent):
             "citations": [f"ev:{pointer}"],
         }
 
+    def _compact_adult(self) -> bool:
+        patient = self.store.raw("/metadata/patient_meta", {})
+        return resolve_patient_age(patient if isinstance(patient, Mapping) else {}).adult is True
+
     def _compact_deterministic_pathway_step(
         self,
         *,
@@ -885,8 +984,10 @@ class ECGDiagnosticAgent(ECGAgent):
         def number(pointer: str) -> float | None:
             if not visible(pointer):
                 return None
-            value = self.store.raw(pointer, None)
-            return float(value) if isinstance(value, (int, float)) else None
+            resolved = self.store.try_resolve(pointer)
+            value = resolved.value if resolved is not None and resolved.reliable else None
+            return (float(value) if isinstance(value, (int, float))
+                    and not isinstance(value, bool) and math.isfinite(value) else None)
 
         if step_id == "rate_threshold":
             pointer = "/global_features/heart_rate_bpm"
@@ -1090,56 +1191,42 @@ class ECGDiagnosticAgent(ECGAgent):
             return "unknown", evidence
 
         if code == "lvh_voltage_criteria" and step_id == "cross_lead_voltage_criterion":
-            component_pointers = {
-                "r_avl": "/representative_leads/aVL/params/r_amp_mv",
-                "s_v2": "/representative_leads/V2/params/s_amp_mv",
-                "s_v3": "/representative_leads/V3/params/s_amp_mv",
-                "s_v4": "/representative_leads/V4/params/s_amp_mv",
-            }
-            values = {name: number(pointer) for name, pointer in component_pointers.items()}
-            cornell_available = values["r_avl"] is not None and values["s_v3"] is not None
-            peguero_available = values["s_v2"] is not None and values["s_v4"] is not None
-            if not cornell_available and not peguero_available:
-                return "unknown", []
-            # Matches clinical_rules/hypertrophy.py::_adult_lvh exactly: same
-            # sex-string set and same per-criterion threshold and comparison
-            # operator, so this program node cannot diverge from the rule
-            # engine's own definition of the criteria it is replicating.
-            sex = str(self.store.raw("/metadata/patient_meta/sex", "") or "").lower()
-            is_female = sex in {"female", "f", "woman"}
-            cornell_threshold = 2.0 if is_female else 2.8
-            cornell_pass = bool(
-                cornell_available
-                and float(values["r_avl"] or 0.0) + abs(float(values["s_v3"] or 0.0))
-                > cornell_threshold
-            )
-            peguero_threshold = 2.3 if is_female else 2.8
-            peguero_pass = bool(
-                peguero_available
-                and abs(float(values["s_v2"] or 0.0))
-                + abs(float(values["s_v4"] or 0.0))
-                >= peguero_threshold
-            )
-            used = (
-                ("r_avl", "s_v3")
-                if cornell_pass
-                else ("s_v2", "s_v4")
-                if peguero_pass
-                else tuple(name for name, value in values.items() if value is not None)
-            )
-            component_claims = {
-                "r_avl": "Lead aVL R wave is a component measurement of the cross-lead voltage criterion",
-                "s_v2": "Lead V2 S wave is a component measurement of the cross-lead voltage criterion",
-                "s_v3": "Lead V3 S wave is a component measurement of the cross-lead voltage criterion",
-                "s_v4": "Lead V4 S wave is a component measurement of the cross-lead voltage criterion",
-            }
-            evidence = [
-                self._compact_program_evidence(
-                    component_pointers[name], component_claims[name]
-                )
-                for name in used
-            ]
-            return ("pass" if cornell_pass or peguero_pass else "fail"), evidence
+            # Evaluate exactly the named components. A positive S value is
+            # not an S depth; absent demographics are not a male reference.
+            components = {"r_avl": ("aVL", "r_amp_mv"), "s_v3": ("V3", "s_amp_mv"),
+                          "s_v1": ("V1", "s_amp_mv"), "r_v5": ("V5", "r_amp_mv"),
+                          "r_v6": ("V6", "r_amp_mv")}
+            inputs, values = [], {}
+            for name, (lead, field) in components.items():
+                pointer = f"/representative_leads/{lead}/params/{field}"
+                quality = f"/representative_leads/{lead}/params/reliable_for_qrs"
+                inputs.extend((pointer, quality))
+                value = number(pointer)
+                if not visible(quality) or self.store.raw(quality, None) is not True:
+                    value = None
+                if value is not None and ((name.startswith("r_") and value < 0)
+                                          or (name.startswith("s_") and value > 0)):
+                    value = None
+                values[name] = value
+            sex_pointer = "/metadata/patient_meta/sex"
+            inputs.append(sex_pointer)
+            sex = str(self.store.raw(sex_pointer, "") or "").strip().lower()
+            threshold = 2.0 if sex in {"female", "f", "woman"} else (
+                2.8 if sex in {"male", "m", "man"} else None)
+            cornell = (values["r_avl"] - values["s_v3"]
+                       if values["r_avl"] is not None and values["s_v3"] is not None else None)
+            sokolow = (-values["s_v1"] + max(values["r_v5"], values["r_v6"])
+                       if all(values[key] is not None for key in ("s_v1", "r_v5", "r_v6")) else None)
+            checks = [(cornell > threshold) if cornell is not None and threshold is not None else None,
+                      (sokolow >= 3.5) if sokolow is not None else None]
+            status = "pass" if any(check is True for check in checks) else (
+                "fail" if all(check is False for check in checks) else "unknown")
+            evidence = [self._compact_program_evidence(pointer, "Named voltage criterion component or quality")
+                        for pointer in dict.fromkeys(inputs)
+                        if visible(pointer) and self.store.try_resolve(pointer) is not None]
+            return (status, evidence, "named_voltage_criteria_with_applicable_reference",
+                    {"cornell_mv": cornell, "cornell_threshold_mv": threshold,
+                     "sokolow_lyon_mv": sokolow, "sokolow_lyon_threshold_mv": 3.5}, inputs)
 
         fact = resolve_additional_deterministic_step(
             self.store,
@@ -1248,6 +1335,7 @@ class ECGDiagnosticAgent(ECGAgent):
         abstention_codes: list[str] = []
         decision_audit: list[dict[str, Any]] = []
         unresolved_pathways = False
+        applicability_limitations: list[str] = []
 
         for candidate_id, planned in plan_by_id.items():
             code = str(planned.get("code") or "")
@@ -1276,6 +1364,8 @@ class ECGDiagnosticAgent(ECGAgent):
             step_audit: list[dict[str, Any]] = []
             required_statuses: list[str] = []
             invalidator_statuses: list[str] = []
+            applicability_incomplete = False
+            pathway_not_applicable = False
             unknown_questions: list[str] = []
             support_tools: set[str] = set()
             for expected in expected_steps:
@@ -1302,6 +1392,7 @@ class ECGDiagnosticAgent(ECGAgent):
                     }
                     fresh = {
                         pointer for pointer in pointers if pointer in new_pointers
+                        and pointer in self._compact_candidate_visibility.get(candidate_id, new_pointers)
                     }
                     if any(
                         expected_tool in visible_pointer_tools.get(pointer, set())
@@ -1324,9 +1415,45 @@ class ECGDiagnosticAgent(ECGAgent):
                     if requested_status in {"pass", "fail"} and authorized
                     else "unknown"
                 )
+                # A null measurement is evidence of unavailability, never
+                # positive evidence for either confirmation or exclusion.
+                if authorized and not any(
+                    resolved is not None and not resolved.is_null
+                    for item in authorized
+                    for token in item.get("citations") or []
+                    for pointer in [self._compact_pointer(token)]
+                    for resolved in [self.store.try_resolve(pointer) if pointer else None]
+                ):
+                    effective_status = "unknown"
+                    authorization = "unavailable_measurements_only"
+                elif authorized and not any(
+                    resolved is not None and not resolved.is_null and resolved.reliable
+                    for item in authorized for token in item.get("citations") or []
+                    for pointer in [self._compact_pointer(token)]
+                    for resolved in [self.store.try_resolve(pointer) if pointer else None]
+                ):
+                    effective_status = "unknown"
+                    authorization = "limited_measurements_only"
+                if expected_tool == "get_waveform_review" and effective_status in {"pass", "fail"}:
+                    measurement_fields = {"raw_prominence_mv", "raw_max_mv", "raw_min_mv", "raw_st_80ms_mv"}
+                    if not any(
+                        pointer and "/observations/" in pointer and pointer.rsplit("/", 1)[-1] in measurement_fields
+                        and (value := self.store.try_resolve(pointer)) is not None
+                        and isinstance(value.value, (int, float)) and not isinstance(value.value, bool)
+                        and math.isfinite(value.value)
+                        for item in authorized for token in item.get("citations") or []
+                        for pointer in [self._compact_pointer(token)]
+                    ):
+                        effective_status = "unknown"
+                        authorization = "raw_status_without_measurement"
+                context_coverage = self._compact_evidence_coverage.get(f"{candidate_id}:{step_id}")
+                if context_coverage and context_coverage["status"] != "visible":
+                    effective_status = "unknown"
+                    authorization = "required_model_evidence_not_visible"
                 resolution_owner = "model_with_tool_bound_evidence"
                 deterministic_reason_code = None
                 deterministic_metrics: dict[str, Any] = {}
+                input_pointers: list[str] = []
                 # Shadow accounting: the model's own label is preserved even
                 # when the program answers the node, so every run keeps
                 # producing a model-vs-program agreement series for the nodes
@@ -1374,6 +1501,7 @@ class ECGDiagnosticAgent(ECGAgent):
                     self.registry.authorize_program_evidence(
                         tool=expected_tool,
                         citations=input_pointers,
+                        include_previous_batches=self._compact_executed_candidates is not None,
                         source=(
                             f"deterministic_pathway:{candidate_id}:{step_id}:"
                             f"{deterministic_reason_code}"
@@ -1384,7 +1512,15 @@ class ECGDiagnosticAgent(ECGAgent):
                 if gate == "required":
                     required_statuses.append(effective_status)
                 elif gate == "invalidator":
-                    invalidator_statuses.append(effective_status)
+                    if effective_status == "fail" and expected.get("failure_means_not_applicable"):
+                        pathway_not_applicable = True
+                    else:
+                        invalidator_statuses.append(effective_status)
+                    if effective_status == "unknown":
+                        applicability_incomplete |= bool(expected.get("unknown_blocks_confirmation"))
+                        applicability_limitations.append(
+                            f"{pathway.get('display_name') or code}: applicability remains uncertain ({step_id.replace('_', ' ')})"
+                        )
                 if effective_status == "pass":
                     support.extend(authorized)
                     support_tools.add(expected_tool)
@@ -1413,6 +1549,10 @@ class ECGDiagnosticAgent(ECGAgent):
                         "authorized_evidence_count": len(authorized),
                         "deterministic_reason_code": deterministic_reason_code,
                         "deterministic_metrics": deterministic_metrics,
+                        "program_input_pointers": input_pointers,
+                        "model_evidence_coverage": context_coverage,
+                        "unknown_blocks_confirmation": bool(expected.get("unknown_blocks_confirmation")),
+                        "failure_means_not_applicable": bool(expected.get("failure_means_not_applicable")),
                     }
                 )
 
@@ -1424,11 +1564,21 @@ class ECGDiagnosticAgent(ECGAgent):
             quality_allowed = self._compact_gate_allows_category(
                 diagnostic_prompts.DIAGNOSIS_CATALOG[code][1]
             )
-            # An invalidator reports that the criterion itself does not apply to
-            # this record, so it rejects on `fail` alone. `unknown` deliberately
-            # does not stall the candidate: an unmeasurable precondition must
-            # not cost a true positive.
-            if any(status == "fail" for status in invalidator_statuses):
+            # Applicability failures cannot exclude the underlying condition.
+            # Explicitly required preconditions must be resolved to confirm.
+            if self._compact_executed_candidates is not None and candidate_id not in self._compact_executed_candidates:
+                placement = "unresolved"
+                unresolved_pathways = True
+                unknown_questions.append("The bounded execution budget did not assess this candidate")
+            elif pathway_not_applicable or applicability_incomplete:
+                placement = "unresolved"
+                unresolved_pathways = True
+                if pathway_not_applicable:
+                    unknown_questions.append("This measurement criterion is not applicable; use an alternative pathway and review the waveforms")
+                    applicability_limitations.append(
+                        f"{pathway.get('display_name') or code}: this criterion is not applicable and does not exclude the underlying condition"
+                    )
+            elif any(status == "fail" for status in invalidator_statuses):
                 placement = "rejected"
             elif required_statuses and any(status == "fail" for status in required_statuses):
                 placement = "rejected"
@@ -1454,8 +1604,9 @@ class ECGDiagnosticAgent(ECGAgent):
 
             display_name = str(pathway.get("display_name") or code)
             promotion_gate_problems: list[str] = []
+            evidence_assessment = assess_evidence_strength(self.store, support, step_audit)
             if placement == "confirmed":
-                confidence = "HIGH" if len(support_tools) >= 2 else "MEDIUM"
+                confidence = evidence_assessment["confidence"]
                 proposed_positive = {
                     "code": code,
                     "statement": display_name,
@@ -1543,6 +1694,8 @@ class ECGDiagnosticAgent(ECGAgent):
                     "final_placement": placement,
                     "quality_scope_allowed": quality_allowed,
                     "supporting_tool_count": len(support_tools),
+                    "evidence_assessment": evidence_assessment,
+                    "criterion_not_applicable": pathway_not_applicable,
                     "uncertain_context_evidence_count": len(uncertain_context),
                     "promotion_gate_problems": promotion_gate_problems,
                     "duplicate_step_ids": duplicate_step_ids,
@@ -1555,7 +1708,7 @@ class ECGDiagnosticAgent(ECGAgent):
             )
 
         limitations = [
-            self._compact_clean_text(self._compact_humanize_limitation(value))
+            self._compact_report_limitation(value)
             for value in (
                 *list(self._quality_gate.get("partial_reasons") or []),
                 *list(self._quality_gate.get("stop_reasons") or []),
@@ -1567,12 +1720,22 @@ class ECGDiagnosticAgent(ECGAgent):
             limitations.append("Required nodes remain incomplete in some diagnosis-specific pathways")
         if abstention_codes:
             limitations.append("Some rule-based second-opinion candidates lack support from an independent measurement pathway")
+        limitations.extend(applicability_limitations)
+        if self._compact_deferred:
+            limitations.append("Some candidates remain incompletely assessed because the bounded review capacity was reached")
         limitations = list(dict.fromkeys(value for value in limitations if value))[:6]
         interval_contexts = self._expand_compact_interval_contexts(
             compact.get("interval_contexts"),
             new_pointers=new_pointers,
         )
 
+        # Preserve a measured rate phenotype when mechanism is uncertain, but
+        # avoid repeating it when the more specific sinus pathway is supported.
+        positive_codes_now = {row["code"] for row in positives}
+        redundant = {plain for plain, specific in (("bradycardia", "sinus_bradycardia"),
+                                                   ("tachycardia", "sinus_tachycardia"))
+                     if specific in positive_codes_now}
+        positives = [row for row in positives if row["code"] not in redundant]
         positive_statements = [str(row.get("statement") or "") for row in positives]
         differential_statements = [str(row.get("statement") or "") for row in differentials]
         summary = (
@@ -1643,6 +1806,16 @@ class ECGDiagnosticAgent(ECGAgent):
             for code in dict.fromkeys(abstention_codes)
             if code in diagnostic_prompts.DIAGNOSIS_CATALOG
         ]
+        for row in self._compact_deferred:
+            code = str(row.get("code") or "")
+            if code in diagnostic_prompts.DIAGNOSIS_CATALOG and not any(
+                item["topic"] == diagnostic_prompts.DIAGNOSIS_CATALOG[code][0] for item in abstentions
+            ):
+                abstentions.append({
+                    "topic": diagnostic_prompts.DIAGNOSIS_CATALOG[code][0],
+                    "reason": "This candidate was not fully assessed within the bounded evidence review; it is not excluded",
+                    "what_would_resolve_it": "Complete the dedicated pathway in a further review of the original waveforms",
+                })
         if not positives and not differentials and not abstentions:
             abstentions.append(
                 {
@@ -1675,7 +1848,8 @@ class ECGDiagnosticAgent(ECGAgent):
         )
         self._compact_decision_audit = {
             "workflow": "compact_pathway",
-            "model_overall_status": compact.get("overall_status"),
+            "model_overall_status": None if self._compact_batch_audit else compact.get("overall_status"),
+            "model_batch_overall_statuses": [row.get("model_overall_status") for row in self._compact_batch_audit],
             "program_overall_status": program_status,
             "rejected_model_rows": rejected_model_rows,
             "repaired_model_rows": repaired_model_rows,
@@ -2318,6 +2492,8 @@ class ECGDiagnosticAgent(ECGAgent):
         """Build a validated, bounded argument set for one planned view."""
 
         codes, domains = self._compact_candidate_domains(candidates)
+        if tool == "get_waveform_review":
+            return {"profile": "all"}
         if tool == "get_global_table":
             fields: list[str] = []
             if "axis" in domains or any("axis" in code for code in codes):
@@ -2572,6 +2748,20 @@ class ECGDiagnosticAgent(ECGAgent):
         return {}
 
     def _compact_candidate_semantic_conflict(self, code: str) -> str | None:
+        if code in {"left_axis_deviation", "right_axis_deviation", "extreme_axis_deviation"}:
+            pointer = "/global_features/qrs_axis_deg"
+            axis = self.store.try_resolve(pointer)
+            patient = self.store.raw("/metadata/patient_meta", {})
+            if (resolve_patient_age(patient).adult is True and pointer in self.registry.whitelist
+                    and axis is not None and axis.reliable
+                    and isinstance(axis.value, (int, float)) and not isinstance(axis.value, bool)):
+                compatible = {
+                    "left_axis_deviation": -90 < axis.value < -30,
+                    "right_axis_deviation": 90 < axis.value <= 180,
+                    "extreme_axis_deviation": -180 <= axis.value <= -90,
+                }[code]
+                if not compatible:
+                    return "[diagnosis_measurement_conflict] the authorized reliable QRS axis contradicts this candidate's definition range"
         if code == "wide_complex_tachycardia":
             patient = self.store.raw("/metadata/patient_meta", {})
             adult = resolve_patient_age(
@@ -2758,29 +2948,52 @@ class ECGDiagnosticAgent(ECGAgent):
                 )
             )
 
+        # Reserve actual requested cross-domain views before selecting paths.
+        signatures.update(self.registry.call_signature(tool, args)
+                          for tool, args in self._compact_review_calls)
+        pool = [copy.deepcopy(dict(raw)) for raw in candidates]
+        views = {str(row.get("id")): {
+            self.registry.call_signature(tool, args)
+            for tool, args, _ in self._compact_candidate_pathway_calls(row)
+        } for row in pool}
         kept: list[dict[str, Any]] = []
-        dropped: list[dict[str, Any]] = []
-        for raw in candidates:
-            candidate = copy.deepcopy(dict(raw))
-            calls = self._compact_candidate_pathway_calls(candidate)
-            candidate_signatures = {
-                self.registry.call_signature(tool, arguments)
-                for tool, arguments, _ in calls
-            }
-            projected = signatures | candidate_signatures
-            if len(projected) > ceiling:
-                dropped.append(
-                    {
-                        "id": str(candidate.get("id") or ""),
-                        "code": str(candidate.get("code") or ""),
-                        "sources": list(candidate.get("sources") or []),
-                        "required_new_views": len(projected - signatures),
-                        "projected_view_count": len(projected),
-                    }
-                )
-                continue
-            signatures = projected
-            kept.append(candidate)
+        domains: set[str] = set()
+        while pool and len(kept) < compact_diagnostic_prompts.MERGED_CANDIDATE_MAX:
+            feasible = [row for row in pool
+                        if len(signatures | views[str(row.get("id"))]) <= ceiling]
+            if not feasible:
+                break
+
+            def rank(row: Mapping[str, Any]) -> tuple[float, str]:
+                new_views = len(views[str(row.get("id"))] - signatures)
+                new_domains = len(set(row.get("domains") or []) - domains)
+                urgent = self._compact_program_urgency(str(row.get("code"))) in {"URGENT", "EMERGENT"}
+                # Count only real, usable measurement support, never rule
+                # confidence/status. This score routes work; it is not a diagnosis.
+                usable = 0
+                for token in row.get("support") or []:
+                    pointer = self._compact_pointer(token)
+                    evidence = self.store.try_resolve(pointer) if pointer else None
+                    usable += int(evidence is not None and evidence.reliable and not evidence.is_null)
+                utility = (100 if urgent else 0) + 6 * new_domains + min(usable, 4) + 1
+                return (-utility / (1 + new_views), str(row.get("code") or ""))
+
+            selected = min(feasible, key=rank)
+            signatures.update(views[str(selected.get("id"))])
+            domains.update(selected.get("domains") or [])
+            kept.append(selected)
+            pool.remove(selected)
+        dropped = [{
+            "id": str(row.get("id") or ""), "code": str(row.get("code") or ""),
+            "sources": list(row.get("sources") or []),
+            "required_new_views": len(views[str(row.get("id"))] - signatures),
+            "projected_view_count": len(signatures | views[str(row.get("id"))]),
+            "reason": "candidate_cap" if len(kept) >= compact_diagnostic_prompts.MERGED_CANDIDATE_MAX else "view_budget",
+        } for row in pool]
+        # Selection is utility-driven; retain stable presentation/identity
+        # order for callers and positional structured-output schemas.
+        positions = {str(row.get("id")): index for index, row in enumerate(candidates)}
+        kept.sort(key=lambda row: positions[str(row.get("id"))])
         return kept, dropped
 
     def _merge_compact_rule_candidates(
@@ -2861,9 +3074,6 @@ class ECGDiagnosticAgent(ECGAgent):
                 else:
                     annotated_family.append(code)
                 continue
-            if len(merged) >= compact_diagnostic_prompts.MERGED_CANDIDATE_MAX:
-                deferred.append(code)
-                continue
             conflict = self._compact_candidate_semantic_conflict(code)
             if conflict:
                 excluded.append({"code": code, "reason": conflict})
@@ -2897,6 +3107,23 @@ class ECGDiagnosticAgent(ECGAgent):
             seen_families[family] = candidate
             seen_ids.add(candidate_id)
             added.append(code)
+        # Rate is an independently reportable measured phenotype even when a
+        # more specific rhythm candidate has an unresolved mechanism. This is
+        # a transparent program screen after the blind plan, not a rule label.
+        if self._compact_adult():
+            rate = self.store.try_resolve("/global_features/heart_rate_bpm")
+            value = rate.value if rate is not None and rate.reliable else None
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+                phenotype = "bradycardia" if value < 60 else "tachycardia" if value > 100 else None
+                if phenotype and phenotype not in seen_codes:
+                    candidate = {"id": "m_" + phenotype, "code": phenotype,
+                                 "domains": ["rhythm_rate"],
+                                 "support": ["ev:/global_features/heart_rate_bpm"],
+                                 "counter": [], "checks": [],
+                                 "sources": ["measurement_phenotype"],
+                                 "uncertainty": "Rate alone does not determine rhythm mechanism."}
+                    merged.append(candidate)
+                    seen_codes[phenotype] = candidate
         patient_meta = self.store.raw("/metadata/patient_meta", {})
         adult_program_pathways = resolve_patient_age(
             patient_meta if isinstance(patient_meta, Mapping) else {}
@@ -2911,6 +3138,32 @@ class ECGDiagnosticAgent(ECGAgent):
                 ],
                 program_owned=adult_program_pathways,
             )
+            candidate["diagnostic_pathway"] = self._pathway_with_raw_review(candidate["diagnostic_pathway"])
+            # Keep a planned falsification view when no fixed-path view covers
+            # that modality. Compile it BEFORE budgeting so it cannot silently
+            # disappear or leave an incomplete candidate in the model plan.
+            steps = candidate["diagnostic_pathway"]["steps"]
+            if "independent_measurement_plan" not in candidate.get("sources", []):
+                continue  # rule blueprint checks already define its fixed path
+            for check in candidate.get("checks") or []:
+                tool = str(check.get("tool") or "")
+                if (check.get("purpose") != "falsify"
+                        or tool not in compact_diagnostic_prompts.COMPACT_DIRECT_TOOLS):
+                    continue
+                matching_step = next((step for step in steps if step["tool"] == tool), None)
+                arguments = (copy.deepcopy(matching_step["arguments"])
+                             if matching_step and isinstance(matching_step.get("arguments"), Mapping)
+                             else self._compact_prefetch_arguments(tool, [candidate]))
+                if tool == "get_lead_table" and "axis" in str(candidate.get("code")):
+                    arguments = {"leads": ["I", "II", "III", "aVL", "aVF"],
+                                 "fields": ["qrs_signed_area", "r_amp_mv", "s_amp_mv"]}
+                phenotype_only = candidate.get("code") in {"bradycardia", "tachycardia", "rate_abnormality"}
+                steps.append({"id": "planned_falsification", "gate": "supporting" if phenotype_only else "required",
+                    "tool": tool, "arguments": arguments, "owner": "model",
+                    "question": "Do these direct measurements corroborate the candidate after checking alternatives? "
+                        "Pass requires positive corroboration, fail requires direct contradiction, otherwise use unknown. "
+                        "Investigation requested: " + str(check.get("question") or "")})
+                break  # one bounded independent falsification view per candidate
         independent_rows = [
             row
             for row in merged
@@ -2936,9 +3189,10 @@ class ECGDiagnosticAgent(ECGAgent):
             *independent_rows[2:],
             *other_rows,
         ]
-        bounded, dropped_by_views = self._compact_bound_candidates_by_view_budget(
+        bounded, dropped_by_views = self._schedule_compact_candidates(
             budget_order
         )
+        self._compact_deferred.extend(dropped_by_views)
         retained_codes = {str(row.get("code") or "") for row in bounded}
         added = [code for code in added if code in retained_codes]
         deferred.extend(
@@ -2949,9 +3203,12 @@ class ECGDiagnosticAgent(ECGAgent):
         for row in dropped_by_views:
             sanitizations.append(
                 f"candidate `{row.get('code')}` dropped before adjudication: its "
-                "complete pathway exceeds the compact exact-view budget"
+                "complete pathway exceeds the bounded multi-batch review capacity"
             )
         self._compact_rule_merge_audit = {
+            "selection_policy": "urgency_domain_coverage_usable_support_per_new_view.v1",
+            "proposed_candidate_codes": [str(row.get("code") or "") for row in merged],
+            "independent_candidate_codes": [str(row.get("code") or "") for row in candidates],
             "independent_candidate_count": len(candidates),
             "merged_candidate_count": len(bounded),
             "rule_added_codes": added,
@@ -2962,6 +3219,10 @@ class ECGDiagnosticAgent(ECGAgent):
             "candidates_dropped_by_view_budget": dropped_by_views,
             "merged_candidate_cap": compact_diagnostic_prompts.MERGED_CANDIDATE_MAX,
             "exact_view_cap": DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_tool_ceiling,
+            "adjudication_batches": copy.deepcopy(self._compact_batches),
+            "reserved_review_views": [
+                {"tool": tool, "arguments": args} for tool, args in self._compact_review_calls
+            ],
         }
         return bounded
 
@@ -3143,6 +3404,10 @@ class ECGDiagnosticAgent(ECGAgent):
             if str(tool) in compact_diagnostic_prompts.COMPACT_DIRECT_TOOLS
         ]
         independent_candidate_count = len(candidates)
+        self._compact_review_calls = [
+            (name, self._compact_prefetch_arguments(name, []))
+            for name in dict.fromkeys(review_tools)
+        ][:DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_review_view_reserve]
         merged_candidates = self._merge_compact_rule_candidates(candidates, notes)
         self._compact_plan = {
             "candidates": merged_candidates,
@@ -3191,10 +3456,11 @@ class ECGDiagnosticAgent(ECGAgent):
 
         compact_ceiling = DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_tool_ceiling
         routing_audit: list[dict[str, Any]] = []
-        required_intervals = sorted(self._required_component_intervals())
+        required_intervals = sorted(self._required_component_intervals()) if not self._compact_batch_index else []
         prefetches: list[tuple[str, dict[str, Any]]] = []
         signatures: set[str] = set()
         model_visible_signatures: set[str] = set()
+        evidence_requirements: list[tuple[str, str, tuple[tuple[str, Any], ...]]] = []
 
         def add_view(
             tool: str,
@@ -3249,6 +3515,10 @@ class ECGDiagnosticAgent(ECGAgent):
 
         # Limited interval context is an independent reporting requirement.
         for interval in required_intervals:
+            evidence_requirements.append((
+                f"interval:{interval}", "get_interval_waveform_context",
+                (("interval", "qt" if interval == "QT_QTc" else "pr"), ("include_beat_flags", False)),
+            ))
             add_view(
                 "get_interval_waveform_context",
                 {
@@ -3286,6 +3556,10 @@ class ECGDiagnosticAgent(ECGAgent):
                     ),
                     "model",
                 )
+                if step_owner != "program":
+                    evidence_requirements.append((
+                        f"{candidate_id}:{step_id}", tool, tuple(arguments.items()),
+                    ))
                 if not add_view(
                     tool,
                     arguments,
@@ -3295,9 +3569,8 @@ class ECGDiagnosticAgent(ECGAgent):
                 ):
                     missing_required_views.append(f"{candidate_id}:{step_id}")
 
-        # Free-form planning checks are used only to construct a fallback path
-        # for an uncatalogued family. Once a fixed path exists, replaying those
-        # checks would duplicate evidence and dilute the 8K model packet.
+        # Falsification checks not covered by fixed modalities were compiled
+        # into required nodes before budgeting. Record how each check is covered.
         for candidate in candidates:
             candidate_id = str(candidate.get("id") or "candidate")
             for index, check in enumerate(candidate.get("checks") or []):
@@ -3314,18 +3587,25 @@ class ECGDiagnosticAgent(ECGAgent):
                         ),
                         "tool": tool,
                         "required": False,
-                        "superseded_by_fixed_pathway": True,
+                        "covered_by_pathway_tool": any(
+                            step.get("tool") == tool
+                            for step in candidate.get("diagnostic_pathway", {}).get("steps", [])
+                        ),
+                        "compiled_as_falsification": any(
+                            step.get("tool") == tool and step.get("id") == "planned_falsification"
+                            for step in candidate.get("diagnostic_pathway", {}).get("steps", [])
+                        ),
                     }
                 )
         for index, tool in enumerate(
-            (self._compact_plan.get("review_tools") or []) if not candidates else []
+            self._compact_plan.get("review_tools") or []
         ):
             name = str(tool)
             if name not in compact_diagnostic_prompts.COMPACT_DIRECT_TOOLS:
                 continue
             add_view(
                 name,
-                self._compact_prefetch_arguments(name, candidates),
+                self._compact_prefetch_arguments(name, []),
                 coverage_id=f"domain_review:{index + 1}",
                 required=False,
                 model_required=True,
@@ -3371,6 +3651,7 @@ class ECGDiagnosticAgent(ECGAgent):
             required_tool_calls=required_tool_calls,
             prefetch_tool_calls=prefetch_tool_calls,
             program_only_prefetch_tool_calls=program_only_prefetch_tool_calls,
+            model_evidence_requirements=tuple(evidence_requirements),
             response_schema=self._compact_runtime_verdict_schema(candidates),
         )
         self._runtime_phase_specs[spec.key] = runtime
@@ -3442,251 +3723,18 @@ class ECGDiagnosticAgent(ECGAgent):
             for item in suppressed_map.get(domain, set())
         }
 
-    def _expand_compact_verdict_v2(self, compact: Mapping[str, Any]) -> dict[str, Any]:
-        """Expand Qwen's bounded decision into the full audited report contract."""
-
-        plan_by_id = {
-            str(row.get("id") or ""): row
-            for row in (self._compact_plan.get("candidates") or [])
-            if isinstance(row, Mapping) and row.get("id")
-        }
-        new_pointers = {
-            pointer
-            for call in self.registry.calls
-            if call.ok and call.phase == "adjudicate"
-            for pointer in call.visible_citations
-        }
-        diagnoses: list[dict[str, Any]] = []
-        differentials: list[dict[str, Any]] = []
-        seen_ids: set[str] = set()
-        audit_rows: list[dict[str, Any]] = []
-        for index, raw in enumerate(compact.get("decisions") or []):
-            if not isinstance(raw, Mapping):
-                continue
-            candidate_id = str(raw.get("id") or "")
-            code = str(raw.get("code") or "")
-            planned = plan_by_id.get(candidate_id)
-            if (
-                planned is None
-                or str(planned.get("code") or "") != code
-                or candidate_id in seen_ids
-                or code not in diagnostic_prompts.DIAGNOSIS_CATALOG
-            ):
-                audit_rows.append(
-                    {"index": index, "accepted": False, "reason": "not_in_validated_plan"}
-                )
-                continue
-            seen_ids.add(candidate_id)
-            support = self._compact_evidence_items(raw.get("support"))
-            counter = self._compact_evidence_items(raw.get("counter"))
-            falsification = raw.get("falsification")
-            falsification = falsification if isinstance(falsification, Mapping) else {}
-            falsification_evidence = self._compact_evidence_items(
-                falsification.get("evidence")
-            )
-            falsification_pointers = {
-                str(citation).removeprefix("ev:")
-                for item in falsification_evidence
-                for citation in item.get("citations") or []
-            }
-            category = diagnostic_prompts.DIAGNOSIS_CATALOG[code][1]
-            requested_placement = str(raw.get("placement") or "unresolved")
-            challenge_passed = bool(
-                falsification.get("outcome") == "not_refuted"
-                and falsification.get("direction") == "supports"
-                and falsification_pointers.intersection(new_pointers)
-            )
-            confirmed = bool(
-                requested_placement == "confirmed"
-                and raw.get("confidence") in {"HIGH", "MEDIUM"}
-                and support
-                and challenge_passed
-                and self._compact_gate_allows_category(category)
-            )
-            audit_rows.append(
-                {
-                    "id": candidate_id,
-                    "code": code,
-                    "requested_placement": requested_placement,
-                    "final_placement": (
-                        "confirmed"
-                        if confirmed
-                        else "rejected"
-                        if requested_placement == "rejected"
-                        else "differential"
-                    ),
-                    "challenge_passed": challenge_passed,
-                    "quality_scope_allowed": self._compact_gate_allows_category(category),
-                }
-            )
-            statement = str(raw.get("statement") or "This ECG candidate requires waveform review.")
-            reasoning = str(raw.get("reasoning") or "The available evidence still requires human synthesis.")
-            if confirmed:
-                diagnoses.append(
-                    {
-                        "code": code,
-                        "statement": statement,
-                        "category": category,
-                        "confidence": str(raw.get("confidence")),
-                        "urgency": str(raw.get("urgency") or "NONE"),
-                        "evidence": support,
-                        "counterevidence": counter,
-                        "reasoning": reasoning,
-                    }
-                )
-            elif requested_placement != "rejected":
-                differentials.append(
-                    {
-                        "code": code,
-                        "statement": statement,
-                        "confidence": (
-                            "MEDIUM" if raw.get("confidence") == "MEDIUM" else "LOW"
-                        ),
-                        "supporting_evidence": support,
-                        "counterevidence": [*counter, *falsification_evidence],
-                        "what_would_resolve_it": str(
-                            raw.get("what_would_resolve_it")
-                            or "Independent discriminative waveform evidence is required."
-                        ),
-                    }
-                )
-
-        # A planned candidate cannot disappear silently from adjudication.
-        for candidate_id, planned in plan_by_id.items():
-            if candidate_id in seen_ids:
-                continue
-            support = [
-                {
-                    "claim": "Overview evidence raises this candidate, but targeted adjudication is incomplete.",
-                    "value": None,
-                    "unit": None,
-                    "citations": [f"ev:{pointer}"],
-                }
-                for token in (planned.get("support") or [])
-                if (pointer := self._compact_pointer(token)) is not None
-            ]
-            differentials.append(
-                {
-                    "code": str(planned.get("code") or ""),
-                    "statement": "This candidate did not complete targeted falsification and cannot be a positive conclusion.",
-                    "confidence": "LOW",
-                    "supporting_evidence": support,
-                    "counterevidence": [],
-                    "what_would_resolve_it": "Complete the planned independent support and falsification views and review the original waveforms.",
-                }
-            )
-            audit_rows.append(
-                {
-                    "id": candidate_id,
-                    "code": planned.get("code"),
-                    "requested_placement": "omitted",
-                    "final_placement": "differential",
-                    "challenge_passed": False,
-                }
-            )
-
-        interval_contexts: list[dict[str, Any]] = []
-        for raw in compact.get("interval_contexts") or []:
-            if not isinstance(raw, Mapping):
-                continue
-            interval_contexts.append(
-                {
-                    "interval": str(raw.get("interval") or ""),
-                    "status": str(raw.get("status") or "limited"),
-                    "interval_conclusion": str(
-                        raw.get("assessment") or "This interval cannot be interpreted reliably as a quantitative measurement."
-                    ),
-                    "component_waveform_assessment": str(
-                        raw.get("assessment") or "The component waveform still requires independent review."
-                    ),
-                    "residual_evidence": self._compact_evidence_items(
-                        raw.get("evidence")
-                    ),
-                    "interpretive_impact": str(
-                        raw.get("impact") or "A missing value cannot establish normality or abnormality."
-                    ),
-                    "what_would_resolve_it": str(
-                        raw.get("what_would_resolve_it") or "Review the component waveform and its boundaries."
-                    ),
-                }
-            )
-
-        limitations = list(
-            dict.fromkeys(
-                str(value)
-                for value in (
-                    *(self._compact_plan.get("quality_limitations") or []),
-                    *(compact.get("limitations") or []),
-                    *(self._quality_gate.get("partial_reasons") or []),
-                )
-                if str(value).strip()
-            )
-        )
-        review_reasons = [
-            str(value)
-            for value in (compact.get("human_review_reasons") or [])
-            if str(value).strip()
-        ] or ["A clinician must review the original 12-lead waveforms."]
-        if self.urgent_review_assessment.get("do_not_delay_human_review"):
-            review_reasons.insert(0, "A deterministic screening flag requires immediate urgent human waveform review.")
-
-        positive_codes = [row["code"] for row in diagnoses]
-        if diagnoses:
-            statements = "; ".join(str(row["statement"]) for row in diagnoses)
-            summary = "Confirmed positive ECG interpretations: " + statements
-            primary = statements
-            primary_confidence = (
-                "MEDIUM"
-                if any(row["confidence"] == "MEDIUM" for row in diagnoses)
-                else "HIGH"
-            )
-        else:
-            summary = "No positive diagnosis was confirmed; current candidates remain unconfirmed or insufficiently supported."
-            primary = "No positive diagnosis was confirmed; this ECG interpretation remains unconfirmed or limited."
-            primary_confidence = "LOW"
-        self._compact_decision_audit = {
-            "model_overall_status": compact.get("overall_status"),
-            "program_overall_status": (
-                "confirmed_diagnosis" if diagnoses else "no_confirmed_positive_diagnosis"
-            ),
-            "decisions": audit_rows,
-        }
-        return {
-            "summary": summary,
-            "ranked_complete_interpretations": [
-                {
-                    "rank": 1,
-                    "interpretation_type": "PRIMARY",
-                    "complete_diagnosis": primary,
-                    "confidence": primary_confidence,
-                    "basis_codes": positive_codes,
-                    "key_uncertainty": (
-                        limitations[0]
-                        if limitations
-                        else "Human confirmation against the original waveforms and clinical data remains required."
-                    ),
-                }
-            ],
-            "diagnoses": diagnoses,
-            "differential_diagnoses": differentials,
-            "interval_measurement_contexts": interval_contexts,
-            "abstentions": [],
-            "quality_assessment": {
-                "interpretability": (
-                    "limited"
-                    if limitations
-                    or str(self._quality_gate.get("state") or "pass") == "partial"
-                    else "adequate"
-                ),
-                "limitations": limitations,
-            },
-            "human_review": {"required": True, "reasons": review_reasons},
-        }
-
-    def _normalize_verdict_v2(self, verdict: dict[str, Any]) -> dict[str, Any]:
-        if self._compact_workflow and "overall_status" in verdict:
-            verdict = self._expand_compact_verdict(verdict)
-        return super()._normalize_verdict(verdict)
+    def _program_phase_response(self, spec: PhaseSpec) -> str | None:
+        if (not self._compact_workflow or spec.key != "adjudicate"
+                or spec.model_evidence_requirements
+                or self._compact_plan.get("review_tools")
+                or not self._compact_plan.get("candidates")
+                or self._phase_completion_feedback(spec, len(self.registry.calls) - len(spec.prefetch_tool_calls))):
+            return None
+        # Even optional model-visible/fallback work must not be bypassed.
+        if len(spec.program_only_prefetch_tool_calls) != len(spec.prefetch_tool_calls):
+            return None
+        return json.dumps({"overall_status": "no_confirmed_positive_diagnosis",
+                           "decisions": [], "interval_contexts": []})
 
     def _postprocess_phase(
         self,
@@ -3843,7 +3891,9 @@ class ECGDiagnosticAgent(ECGAgent):
         phase_calls: list[Any] = []
         seen: set[str] = set()
         for call in self.registry.phase_calls:
-            if not call.ok:
+            if not call.ok and not (
+                self._compact_workflow and call.error_note == "measurement_unavailable"
+            ):
                 continue
             signature = self.registry.call_signature(call.tool, call.args)
             if signature in seen:
@@ -3893,6 +3943,10 @@ class ECGDiagnosticAgent(ECGAgent):
         """Expose only tools justified by the preceding hypothesis state."""
 
         if self._compact_workflow:
+            if spec.key == "adjudicate":
+                # Batch execution compiles each exact active plan immediately
+                # before its own prefetch, including any one-time update.
+                return spec
             return self._compact_runtime_phase_spec(spec)
 
         if spec.key not in {"investigate", "challenge"}:
@@ -4544,9 +4598,21 @@ class ECGDiagnosticAgent(ECGAgent):
         finished.audit["diagnostic_workflow"] = self.workflow
         if self._compact_workflow:
             finished.audit["compact_plan"] = copy.deepcopy(self._compact_plan)
+            finished.audit["measurement_limitation_sources"] = copy.deepcopy(
+                getattr(self, "_compact_limitation_sources", []))
+            finished.audit["model_evidence_coverage"] = copy.deepcopy(self._compact_evidence_coverage)
             finished.audit["compact_decision"] = copy.deepcopy(
                 self._compact_decision_audit
             )
+            finished.audit["adjudication_batches"] = copy.deepcopy(self._compact_batch_audit)
+            finished.audit["candidate_updates"] = copy.deepcopy(self._compact_update_audit)
+            finished.audit["deferred_candidates"] = copy.deepcopy(self._compact_deferred)
+            finished.audit["confidence_policy"] = {
+                "version": "uncalibrated_evidence_strength_v1",
+                "labels_are_probabilities": False,
+                "high_confidence_requires_external_calibration": True,
+                "tool_count_is_not_independent_evidence_count": True,
+            }
             finished.audit["rule_second_opinion"] = {
                 **copy.deepcopy(self._compact_rule_second_opinion),
                 "merge": copy.deepcopy(self._compact_rule_merge_audit),

@@ -26,8 +26,9 @@ _HYPOTHESIS_CODES = sorted(set(DIAGNOSIS_CATALOG) - set(NON_HYPOTHESIS_CODES))
 # program when the plan is captured.
 INDEPENDENT_PLAN_MIN_CANDIDATES = 3
 INDEPENDENT_PLAN_MAX_CANDIDATES = 6
-# The blind plan is always retained, and rule-generated second-opinion
-# candidates are appended after it in clinical-priority order.
+# Blind and rule-generated candidates enter a shared budget selector. Required
+# review views are reserved; urgency, uncovered domains and marginal view cost
+# decide which complete paths fit. Presentation order remains stable.
 #
 # This was 5, leaving only two slots for the rule engine. Measured on the
 # diverse50 cohort that is far too tight: on 09545_hr the rule engine offered
@@ -50,6 +51,7 @@ MERGED_CANDIDATE_MAX = 10
 # the legacy exploratory workflow, but are a common source of guessed fields
 # and repeated calls for a small local model.
 COMPACT_DIRECT_TOOLS = (
+    "get_diagnostic_overview",
     "get_global_table",
     "get_rhythm_profile",
     "get_atrial_event_table",
@@ -62,6 +64,7 @@ COMPACT_DIRECT_TOOLS = (
     "get_native_beat_profile",
     "get_lead_table",
     "get_beat_table",
+    "get_waveform_review",
 )
 
 
@@ -75,6 +78,8 @@ COMPACT_DIRECT_TOOLS = (
 # corroborates the step just as well; requiring the exact view starved steps
 # whose named tool never won a prefetch slot.
 COMPACT_TOOL_EVIDENCE_NAMESPACES: dict[str, frozenset[str]] = {
+    "get_diagnostic_overview": frozenset({"metadata", "global_features", "rhythm_inputs", "representative_leads"}),
+    "get_waveform_review": frozenset({"waveform_review"}),
     "get_global_table": frozenset({"global_features"}),
     "get_rhythm_profile": frozenset({"rhythm_inputs"}),
     "get_atrial_event_table": frozenset({"rhythm_inputs"}),
@@ -132,7 +137,7 @@ PLAN_INSTRUCTION = """COMPACT PLAN — the diagnosis-neutral overview, including
 
 Return one plan JSON object. Raise at most {candidate_limit} material candidates; normal domain findings are not candidates. The limit is sized to this record, so it is a ceiling and not a target: raise only what the overview actually supports. Every candidate needs at least one exact supporting Qn citation from the overview and one or two discriminating checks. Mark each check as `support` or `falsify`; at least one check per candidate should try to falsify it. Choose a direct modality/table tool rather than `search_measurements` when the field is already known. Write `question` and `uncertainty` in English; do not copy patient numbers into them.
 
-`review_tools` may name up to two additional cross-domain views needed for an important abnormal or technically limited domain. The program deduplicates requests and computes a per-record hard ceiling from named candidate/domain coverage; the ceiling is not a target. Return JSON only."""
+`review_tools` may name up to two additional cross-domain views needed for an important abnormal or technically limited domain. The program deduplicates requests and computes a per-record hard ceiling from named candidate/domain coverage; the ceiling is not a target. Return minified JSON without indentation or padding. Keep each question and uncertainty to one complete sentence under 100 characters; finish the sentence rather than cutting a word at the schema limit. For quality_limitations, name the affected measurement and limitation in words; a Qn reference may accompany the explanation. Avoid exaggerated severity words for borderline measurements."""
 
 
 _CHECK_SCHEMA: dict[str, Any] = {
@@ -228,7 +233,7 @@ ADJUDICATE_INSTRUCTION = """COMPACT EVIDENCE REVIEW AND ACTIVE FALSIFICATION.
 The preceding PROGRAM-VALIDATED plan is the complete merged candidate set. Each candidate contains a fixed `diagnostic_pathway`. Rows marked `independent_measurement_plan` came from your blind measurement plan. Rows marked `ecgfeat_rule_second_opinion` were injected only after that plan to reduce omissions. The orchestrator has already executed the pathway's bounded views with validated arguments. Review the returned Qn evidence packets and return one compact pathway verdict JSON object. Do not request or assume any view that is not present.
 
 Rules:
-- Never invent a candidate code that was not in the plan.
+- Fill decisions only for the active batch's candidate codes. If newly shown measurements reveal a material omitted alternative, optionally propose up to two `candidate_updates` with its registered code, exact new supporting Qn citations and a concise reason. These are requests for a separate pathway, never diagnoses. The program permits at most one update round; when that array has a zero-item limit, return it empty or omit it.
 - Rule status, confidence, priority and publication channel are provenance only: they cannot support or refute a pathway node and must never be cited. `not_matched` is not supplied and absence from the shortlist is not counterevidence.
 - Return every `owner=model` pathway step exactly once using its exact `id`. Omit every `owner=program` step; do not calculate, cite, or restate it. Do not add or rename steps.
 - `pass` means the stated requirement is positively established; `fail` means directly contradicted; `unknown` means the named tool did not establish either direction.
@@ -313,6 +318,19 @@ COMPACT_VERDICT_SCHEMA: dict[str, Any] = {
                     "pathway_steps",
                 ],
                 "additionalProperties": False,
+            },
+        },
+        "candidate_updates": {
+            "type": "array", "maxItems": 2,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "code": {"type": "string", "enum": _HYPOTHESIS_CODES},
+                    "support": {"type": "array", "minItems": 1, "maxItems": 4,
+                                "items": {"type": "string", "maxLength": 24}},
+                    "reason": {"type": "string", "maxLength": 120},
+                },
+                "required": ["code", "support", "reason"], "additionalProperties": False,
             },
         },
         "interval_contexts": {

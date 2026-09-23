@@ -126,6 +126,7 @@ def test_quality_stop_bypasses_the_model_with_non_diagnostic_output():
         "suppressed_domains": [],
     }
     result = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(payload, record_id="QUALITY-STOP"),
         backend=ScriptedBackend(script=[]),
         knowledge_guidance=False,
@@ -149,6 +150,7 @@ def test_missing_or_incomplete_quality_gate_fails_closed_without_model_calls():
         backend = ScriptedBackend(script=[])
 
         result = ECGDiagnosticAgent(
+            workflow="legacy",
             store=EvidenceStore.from_dict(payload, record_id="INVALID-GATE"),
             backend=backend,
             knowledge_guidance=False,
@@ -355,16 +357,14 @@ def test_compact_workflow_has_two_model_decisions_and_program_prefetch():
         )
     runtime = agent._compact_runtime_phase_spec(phases[1])
 
-    # The two sinus scalar nodes share one global view. Clean P-boundary and
-    # AV-association safety views remain separate deterministic inputs.
-    assert runtime.tool_budget == 6
-    assert len(runtime.prefetch_tool_calls) == 6
-    assert len(runtime.program_only_prefetch_tool_calls) == 5
-    assert (
-        len(runtime.prefetch_tool_calls)
-        - len(runtime.program_only_prefetch_tool_calls)
-        == 1
-    )
+    # Every distinct pathway view is budgeted, including model P-morphology.
+    assert runtime.tool_budget == len(runtime.prefetch_tool_calls)
+    assert runtime.tool_budget <= DEFAULT_DIAGNOSTIC_PROTOCOL.phases.compact_tool_ceiling
+    program_calls = set((name, json.dumps(dict(args), sort_keys=True))
+                        for name, args in runtime.program_only_prefetch_tool_calls)
+    assert program_calls
+    assert len(program_calls) < runtime.tool_budget
+    assert any(row[0].endswith(":sinus_p_morphology") for row in runtime.model_evidence_requirements)
     assert runtime.coverage_requirements == ()
     assert runtime.allowed_tools == tuple(
         dict.fromkeys(name for name, _arguments in runtime.prefetch_tool_calls)
@@ -411,6 +411,7 @@ def test_compact_conduction_and_voltage_views_are_focused_for_small_model():
 def test_investigation_tools_follow_targeted_hypotheses():
     store = EvidenceStore.from_dict(_payload(), record_id="SELECTIVE-INVESTIGATE")
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=store,
         backend=ScriptedBackend(script=[]),
         knowledge_guidance=False,
@@ -469,6 +470,7 @@ def test_investigation_tools_follow_targeted_hypotheses():
 def test_challenge_tools_are_available_and_mandatory():
     store = EvidenceStore.from_dict(_payload(), record_id="SELECTIVE-CHALLENGE")
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=store,
         backend=ScriptedBackend(script=[]),
         knowledge_guidance=False,
@@ -553,6 +555,7 @@ def test_challenge_gate_does_not_treat_nondiscriminative_evidence_as_support():
 
 def test_investigation_guard_materializes_visible_component_wave_evidence():
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="COMPONENT-GUARD"),
         backend=ScriptedBackend(),
         knowledge_guidance=False,
@@ -583,6 +586,7 @@ def test_investigation_guard_materializes_visible_component_wave_evidence():
 
 def test_investigation_runtime_requires_missing_interval_component_view():
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="INTERVAL-PLAN"),
         backend=ScriptedBackend(),
         knowledge_guidance=False,
@@ -605,6 +609,7 @@ def test_new_hypothesis_guard_rejects_ivcd_label_for_p_av_observation():
     payload["global_features"]["qrs_ms"] = 80.0
     payload["global_features"]["qrs_wide_ms"] = 80.0
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(payload, record_id="CODE-GUARD"),
         backend=ScriptedBackend(),
         knowledge_guidance=False,
@@ -1255,7 +1260,7 @@ def test_diagnostic_agent_uses_measurement_tools_and_outputs_independent_diagnos
         ]
     )
 
-    result = ECGDiagnosticAgent(store=store, backend=backend).run()
+    result = ECGDiagnosticAgent(workflow="legacy", store=store, backend=backend).run()
 
     assert result.ok and result.verified, result.summary()
     assert result.verdict["diagnoses"][0]["code"] == "sinus_rhythm"

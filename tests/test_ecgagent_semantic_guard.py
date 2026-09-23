@@ -486,6 +486,7 @@ def test_semantic_failure_forces_ecgfeat_reread_before_revision() -> None:
     )
 
     result = ECGDiagnosticAgent(
+        workflow="legacy",
         store=store,
         backend=backend,
         max_revisions=2,

@@ -49,6 +49,7 @@ def _align_beat(
     ref_vm: np.ndarray,
     max_lag_ms: int,
     fs: int,
+    bounded_search: bool = False,
 ) -> np.ndarray:
     """Cross-correlation alignment, lag capped at max_lag_ms.
 
@@ -57,7 +58,12 @@ def _align_beat(
     """
     vm = _vm_1d(beat)
     c = correlate(vm - np.mean(vm), ref_vm - np.mean(ref_vm), mode="full")
-    lag = int(np.argmax(c) - (len(vm) - 1))
+    if bounded_search:
+        radius = int(max_lag_ms * fs / 1000)
+        center = len(vm) - 1
+        lag = int(np.argmax(c[max(0, center - radius):center + radius + 1]) - min(radius, center))
+    else:
+        lag = int(np.argmax(c) - (len(vm) - 1))
     lag = int(np.clip(lag, -int(max_lag_ms * fs / 1000), int(max_lag_ms * fs / 1000)))
     if lag == 0:
         return beat.copy()
@@ -128,11 +134,15 @@ def build_representative_beats_with_meta(
     outlier_corr_threshold: float = 0.70,
     max_lag_ms: int = 30,
     paced_beat_ids: List[int] | set[int] | None = None,
+    robust_alignment: bool = False,
 ) -> Tuple[Dict[int, np.ndarray], Dict[int, RepBeatMeta]]:
     """
     Same as build_representative_beats but also returns per-group metadata (T009).
     """
     left  = int(left_ms  * fs / 1000)
+    if robust_alignment and len(r_locs) > 1:
+        # Extend slow-rhythm templates without crossing the typical next beat.
+        right_ms = max(right_ms, min(800, int(.70 * np.median(np.diff(r_locs)) * 1000 / fs)))
     right = int(right_ms * fs / 1000)
     reps:  Dict[int, np.ndarray]  = {}
     metas: Dict[int, RepBeatMeta] = {}
@@ -176,12 +186,19 @@ def build_representative_beats_with_meta(
                         active_members = filtered
 
         beats  = [_extract_window(ecg, int(r_locs[m]), left, right) for m in active_members]
-        ref    = beats[0]
+        eligible = [i for i, member in enumerate(active_members)
+                    if int(r_locs[member]) >= left and int(r_locs[member]) + right <= ecg.shape[1]]
+        reference_index = (select_family_medoid(beats, eligible or list(range(len(beats))))
+                           if robust_alignment else 0)
+        ref    = beats[int(reference_index or 0)]
         ref_vm = _vm_1d(ref)
 
-        aligned = [ref]
-        for b in beats[1:]:
-            aligned.append(_align_beat(b, ref_vm, max_lag_ms, fs))
+        if robust_alignment:
+            aligned = [_align_beat(b, ref_vm, max_lag_ms, fs, bounded_search=True) for b in beats]
+        else:
+            aligned = [ref]
+            for b in beats[1:]:
+                aligned.append(_align_beat(b, ref_vm, max_lag_ms, fs))
 
         rr_prev_ms = [
             None if member <= 0 else (

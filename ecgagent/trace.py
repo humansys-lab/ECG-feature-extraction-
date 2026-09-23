@@ -184,6 +184,16 @@ def _phase_outputs(lines: list[str], phases: Sequence[Mapping[str, Any]]) -> Non
                 "",
             ]
         )
+        for attempt in _items(phase.get("response_history")):
+            lines.append(f"#### Public response · turn {attempt.get('turn')} · {attempt.get('stop_reason')}")
+            lines.append("")
+            _fenced(lines, attempt.get("text"), "text")
+            if attempt.get("guard_problems"):
+                lines.append("Guard problems: " + _json(attempt["guard_problems"]))
+            if attempt.get("repair_feedback"):
+                _fenced(lines, attempt["repair_feedback"], "text")
+            lines.append("")
+        lines.extend(["Final committed phase output:", ""])
         _fenced(lines, phase.get("text"), "text")
         lines.append("")
 
@@ -213,7 +223,9 @@ def _tool_calls(
         full_result = call.get("result_text")
         model_context_result = call.get("model_context_text")
         result_kind = (
-            "Model excerpt plus complete raw audit result"
+            "Program-only result; not sent to model"
+            if call.get("program_only")
+            else "Model excerpt plus complete raw audit result"
             if model_context_result is not None
             else "Complete model-visible result"
             if full_result is not None
@@ -375,7 +387,9 @@ def _runtime(lines: list[str], payload: Mapping[str, Any]) -> None:
             f"- Model: `{_compact(batch.get('model') or _mapping(model.get('config')).get('model'))}`",
             f"- Token/call usage: `{_json(model.get('usage') or {})}`",
             f"- Whole-record runtime circuit breaker: `{_json(audit.get('runtime_controls') or {})}`",
-            f"- Total batch runtime: {float(batch.get('runtime_seconds') or 0):.2f} s",
+            (f"- Total batch runtime: {float(batch['runtime_seconds']):.2f} s"
+             if isinstance(batch.get("runtime_seconds"), (int, float))
+             else "- Total batch runtime: N/A (not recorded for this run)"),
         ]
     )
     dynamic_tools = audit.get("dynamic_tool_selection")

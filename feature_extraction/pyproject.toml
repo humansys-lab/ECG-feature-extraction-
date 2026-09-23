@@ -1,18 +1,39 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=75,<82", "wheel>=0.44,<1"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ecgfeat-dxl-inspired"
+name = "ecg-records"
 version = "0.1.0"
-description = "DXL-inspired 12-lead ECG feature extraction scaffold"
+description = "Research and engineering ECG measurements; not a medical device"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
-    "numpy>=1.24",
-    "scipy>=1.10",
+    "numpy>=1.26,<3",
+    "scipy>=1.11,<2",
+]
+
+[project.scripts]
+ecg-record = "ecgfeat.cli:main"
+
+[project.optional-dependencies]
+viz = ["matplotlib>=3.7,<4"]
+performance = ["numba>=0.59,<0.67"]
+wfdb = ["wfdb>=4.1,<5"]
+dev = [
+    "hypothesis>=6.100,<7",
+    "jsonschema>=4.22,<5",
+    "pytest>=8,<9",
+    "ruff>=0.6,<1",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ecgfeat*"]
+
+[tool.setuptools.package-data]
+ecgfeat = ["py.typed", "schemas/**/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+addopts = "-ra"

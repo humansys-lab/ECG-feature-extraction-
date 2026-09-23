@@ -47,7 +47,7 @@ DEFAULT_DATASET_DIR = PROJECT_ROOT / "data" / "ptb-xl" / "05000"
 DEFAULT_METADATA_DIR = PROJECT_ROOT / "data" / "ptb-xl-metadata"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "ptbxl_05000_ecgagent"
 DEFAULT_LOCAL_MAX_CONCURRENCY = 6
-EXTRACTION_ARTIFACT_SCHEMA_VERSION = "ecgagent.feature-artifact.v1"
+EXTRACTION_ARTIFACT_SCHEMA_VERSION = "ecgagent.feature-artifact.v2"
 _EXTRACTION_PROVENANCE_KEY = "_ecgagent_extraction"
 PSEUDONYM_KEY_FILENAME = ".ecgagent_pseudonym_key"
 PSEUDONYM_STRATEGY = "hmac-sha256-output-key-v1"
@@ -498,6 +498,7 @@ def _load_wfdb_record(record_path: Path) -> tuple[Any, float]:
     import numpy as np
     import wfdb
     from ecgfeat.models import STANDARD_12_LEADS
+    from .evidence.waveform_review import calibrate_to_mv
 
     record = wfdb.rdrecord(str(record_path))
     by_name = {
@@ -509,10 +510,15 @@ def _load_wfdb_record(record_path: Path) -> tuple[Any, float]:
     ]
     if missing:
         raise ValueError(f"missing standard leads: {', '.join(missing)}")
+    indices = [by_name[lead.lower()] for lead in STANDARD_12_LEADS]
     ecg = np.asarray(record.p_signal, dtype=float)[
         :,
-        [by_name[lead.lower()] for lead in STANDARD_12_LEADS],
+        indices,
     ].T
+    units = getattr(record, "units", None)
+    if not isinstance(units, (list, tuple)) or len(units) != len(record.sig_name):
+        raise ValueError("WFDB physical amplitude units are missing")
+    ecg = calibrate_to_mv(ecg, [units[index] for index in indices])
     return ecg, float(record.fs)
 
 
@@ -534,6 +540,8 @@ def _feature_code_fingerprint() -> str:
         digest.update(str(path.relative_to(source_root)).encode("utf-8"))
         digest.update(b"\0")
         _hash_file(path, digest)
+    # Review changes must invalidate resumable extraction artifacts as well.
+    _hash_file(Path(__file__).parent / "evidence" / "waveform_review.py", digest)
     return "sha256:" + digest.hexdigest()
 
 
@@ -593,6 +601,7 @@ def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
         from ecgfeat.api import ECGFeatureExtractor
         from ecgfeat.export import prepare_json_export, to_dict
         from ecgfeat.models import PatientMeta
+        from .evidence.waveform_review import STANDARD_LEADS, build_waveform_review
 
         ecg, fs = _load_wfdb_record(Path(record["record_path"]))
         extractor = ECGFeatureExtractor(
@@ -611,6 +620,9 @@ def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
         payload = prepare_json_export(
             to_dict(features),
             include_beat_features=True,
+        )
+        payload["waveform_review"] = build_waveform_review(
+            ecg, fs, payload, lead_names=STANDARD_LEADS, amplitude_unit="mV",
         )
         provenance = _extraction_provenance(record, fs_internal)
         if provenance is None:
@@ -1050,6 +1062,7 @@ def _diagnose_one(
     final_payload: dict[str, Any] | None = None
     final_result: Any = None
     started = time.perf_counter()
+    record_deadline: float | None = None
 
     for attempt in range(record_retries + 1):
         attempt_started = time.perf_counter()
@@ -1081,7 +1094,7 @@ def _diagnose_one(
                 )
             else:
                 backend = build_backend(backend_name, model=model)
-            result = ECGDiagnosticAgent(
+            agent = ECGDiagnosticAgent(
                 store=store,
                 backend=backend,
                 max_revisions=max_revisions,
@@ -1112,7 +1125,13 @@ def _diagnose_one(
                         },
                     )
                 ),
-            ).run()
+            )
+            if record_deadline is None:
+                record_deadline = started + agent.max_wall_seconds
+            agent.max_wall_seconds = min(agent.max_wall_seconds, record_deadline - time.perf_counter())
+            if agent.max_wall_seconds <= 0:
+                raise TimeoutError("record deadline exhausted before another attempt")
+            result = agent.run()
             final_result = result
             final_payload = result.to_dict()
             final_payload["record_id"] = record["record"]
@@ -1137,6 +1156,7 @@ def _diagnose_one(
                 "ok": result.ok,
                 "verified": result.verified,
                 "error": result.error,
+                "model_requests": (result.audit.get("runtime_controls") or {}).get("model_requests", []),
             }
             attempts.append(attempt_row)
             attempt_payload = dict(final_payload)
@@ -1167,7 +1187,7 @@ def _diagnose_one(
                     "traceback": traceback.format_exc(),
                 }
             )
-            if _fatal_external_error(error):
+            if _fatal_external_error(error) or (record_deadline is not None and time.perf_counter() >= record_deadline):
                 break
 
     if final_payload is None:
@@ -1702,6 +1722,7 @@ def run_diagnosis(
     fatal_error: str | None = None
     deferred_tasks: list[tuple[Any, ...]] = []
     shared_backend: Any = None
+    execution_started = time.perf_counter()
     if backend in {"qwen-local", "medgemma-local"} and tasks:
         from .backends import build_backend
 
@@ -1799,6 +1820,9 @@ def run_diagnosis(
     results.sort(key=lambda row: str(row["record"]))
     manifest = {
         "backend": backend,
+        "execution_wall_seconds": time.perf_counter() - execution_started,
+        "executed_record_count": completed_tasks,
+        "records_per_second": completed_tasks / max(time.perf_counter() - execution_started, 1e-9),
         "model": model,
         "model_provenance_fingerprint": model_provenance_fingerprint,
         "model_provenance_status": model_provenance_status,
@@ -2519,8 +2543,38 @@ def analyze_results(
     baseline_micro = _micro(baseline_metrics, direct_only=True)
     agent_micro = _micro(agent_metrics, direct_only=True)
 
+    from .performance import label_metrics, summarize_performance
+    row_index = {str(row["record"]): row for row in record_rows}
+    direct_categories = {spec.key for spec in _category_specs() if spec.semantic_scope == "direct"}
+    full_cohort = []
+    proposal_rows = []
+    observed_proposal_records = 0
+    payload_index = {str(payload.get("record_id")): payload for payload in payloads}
+    for record in records:
+        record_id = str(record["record"])
+        row = row_index.get(record_id, {})
+        if not row.get("reference_available", record.get("reference_available")):
+            continue
+        expected = set(str(row.get("reference_categories") or "").split("|")) if row else _category_set(set(record.get("reference_codes_active") or []), reference=True)
+        predicted = set(str(row.get("agent_categories") or "").split("|")) if row.get("verified") else set()
+        full_cohort.append({"reference_categories": expected & direct_categories,
+                            "agent_categories": predicted & direct_categories})
+        audit = (payload_index.get(record_id, {}).get("audit") or {})
+        merge = (audit.get("rule_second_opinion") or {}).get("merge") or {}
+        observed_proposal_records += int("proposed_candidate_codes" in merge)
+        proposed = _category_set(set(merge.get("proposed_candidate_codes") or []), reference=False)
+        proposal_rows.append({"reference_categories": expected & direct_categories,
+                              "agent_categories": proposed & direct_categories})
+
     summary = {
         "schema_version": "ecgagent_batch_analysis.v2",
+        "full_cohort_direct_label_agreement": label_metrics(full_cohort),
+        "candidate_proposal_direct_label_agreement": {
+            **label_metrics(proposal_rows),
+            "observed_proposal_records": observed_proposal_records,
+            "failure_policy": "missing proposal telemetry counts as an empty proposal; proposals are not diagnoses",
+        },
+        "performance": summarize_performance(payloads),
         "analysis_status": (
             "complete"
             if execution.get("verified", 0) == len(records)
@@ -2621,6 +2675,10 @@ def analyze_results(
     preserved_audit = {
         key: prior_diagnosis_manifest[key]
         for key in (
+            "workers",
+            "execution_wall_seconds",
+            "executed_record_count",
+            "records_per_second",
             "backend",
             "model",
             "model_provenance_fingerprint",
@@ -2690,6 +2748,7 @@ def _write_analysis_markdown(
     runtimes = summary.get("runtime_seconds_by_outcome") or {}
     verified_runtime = runtimes.get("verified") or {}
     usage = summary.get("model_usage") or {}
+    full_cohort = summary.get("full_cohort_direct_label_agreement") or {}
     lines = [
         "# PTB-XL ECGAgent Diagnostic Analysis",
         "",
@@ -2705,6 +2764,15 @@ def _write_analysis_markdown(
         ),
         "",
     ]
+    if full_cohort:
+        full_metrics = full_cohort.get("agent") or {}
+        lines.extend([
+            "## Full Cohort (Including Abstentions)", "",
+            f"- Labelled records: {full_cohort.get('record_count', 0)}",
+            f"- Direct micro precision / recall / F1: {_fmt_metric(full_metrics.get('precision'))} / {_fmt_metric(full_metrics.get('recall'))} / {_fmt_metric(full_metrics.get('f1'))}",
+            "- Failed, missing, stale and unverified outputs count as empty predictions. Verified-only comparisons remain a separate conditional analysis.",
+            "- `analysis.json.performance` contains phase latency, token usage, local repair outcomes and model-node evidence visibility.", "",
+        ])
     if errors.get("deepseek_insufficient_balance"):
         lines.extend(
             [

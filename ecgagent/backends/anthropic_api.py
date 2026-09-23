@@ -50,6 +50,7 @@ class AnthropicBackend:
     hard_phase_guards: bool = True
     capabilities: BackendCapabilities = field(
         default=BackendCapabilities(
+            request_context=True,
             native_tool_calls=True,
             structured_output_level="schema",
             enforce_phase_coverage=True,
@@ -66,6 +67,7 @@ class AnthropicBackend:
             or DEFAULT_BASE_URL
         ).strip()
         self.capabilities = BackendCapabilities(
+            request_context=True,
             native_tool_calls=True,
             structured_output_level=("schema" if self.hard_phase_guards else "json"),
             enforce_phase_coverage=True,
@@ -102,7 +104,16 @@ class AnthropicBackend:
         max_tokens: int | None = None,
         response_schema: dict[str, Any] | None = None,
         require_tool_call: bool = False,
+        phase: str | None = None,
+        deadline: float | None = None,
     ) -> LLMResponse:
+        from .request_budget import remaining_seconds
+        client = self.client
+        if deadline is not None:
+            remaining = remaining_seconds(deadline)
+            options = getattr(client, "with_options", None)
+            if callable(options):
+                client = options(timeout=remaining, max_retries=0)
         output_config: dict[str, Any] = {"effort": self.effort}
         if response_schema is not None and not require_tool_call:
             output_config["format"] = {"type": "json_schema", "schema": response_schema}
@@ -118,6 +129,8 @@ class AnthropicBackend:
             # those are rejected on Opus 5 and Fable 5.
             "thinking": {"type": "adaptive"},
         }
+        if deadline is not None:
+            kwargs["timeout"] = remaining_seconds(deadline)
         if tools:
             kwargs["tools"] = list(tools)
             if require_tool_call:
@@ -129,7 +142,7 @@ class AnthropicBackend:
             kwargs["extra_body"] = {"fallbacks": "default"}
 
         try:
-            with self.client.beta.messages.stream(**kwargs) as stream:
+            with client.beta.messages.stream(**kwargs) as stream:
                 message = stream.get_final_message()
         except TypeError as exc:
             # The SDK resolves credentials lazily, so a missing key surfaces
@@ -142,6 +155,8 @@ class AnthropicBackend:
                 "`ant auth login` to store a profile the SDK picks up automatically."
             ) from exc
 
+        if deadline is not None:
+            remaining_seconds(deadline)
         self.turns.append(
             {
                 "model": getattr(message, "model", self.model),

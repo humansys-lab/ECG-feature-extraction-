@@ -378,7 +378,18 @@ def process_job(
                 metadata=metadata,
             )
             result = extractor.extract(ecg, fs=sampling_rate, meta=patient_meta)
-            feature_payload = to_dict_fn(result)
+            # Keep the full payload when writing PT. JSON-only runs can skip
+            # copying data the selected export profile will discard. Inspect
+            # the injected serializer so existing one-argument callers work.
+            import inspect
+            serializer_options = {}
+            if not save_pt_output and export_profile is not None and prepare_json_export_fn is not None:
+                try:
+                    if "profile" in inspect.signature(to_dict_fn).parameters:
+                        serializer_options["profile"] = export_profile
+                except (TypeError, ValueError):
+                    pass
+            feature_payload = to_dict_fn(result, **serializer_options)
             clinical = feature_payload.get("clinical_interpretation", {})
             if isinstance(clinical, dict) and clinical.get("ruleset_version"):
                 manifest["clinical_ruleset_version"] = clinical["ruleset_version"]

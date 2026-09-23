@@ -72,10 +72,10 @@ def test_human_report_explains_diagnosis_evidence_uncertainty_and_next_steps():
 
     assert "# ECG Agent Diagnostic Interpretation Report" in report
     assert "passed measurement-citation, reliability-qualification, numeric-logic" in report
-    assert "## Top 3 Most Likely Complete ECG Interpretations" in report
-    assert report.index("## Top 3 Most Likely Complete ECG Interpretations") < report.index("## Overall Conclusion")
+    assert "## Ranked ECG Findings and Interpretations" in report
+    assert report.index("## Ranked ECG Findings and Interpretations") < report.index("## Overall Conclusion")
     assert "1. **Sinus rhythm with limited QT/QTc measurement requiring T/U-wave review.**" in report
-    assert "Primary complete interpretation; overall confidence: Medium" in report
+    assert "Primary interpretation; overall evidence strength: Medium" in report
     assert "## Reporting Levels" in report
     assert "## Major ECG Findings" in report
     assert "Rationale" in report

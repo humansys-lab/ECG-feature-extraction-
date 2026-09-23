@@ -310,6 +310,7 @@ def render_brief_report(
             "## Conclusion",
             "",
             _text(verdict.get("summary"), "No overall conclusion provided."),
+            "Evidence-strength labels are qualitative and uncalibrated; they are not disease probabilities.",
             "",
             (
                 "## Confirmed Diagnoses"
@@ -331,7 +332,7 @@ def render_brief_report(
         attributes: list[str] = []
         confidence = _text(diagnosis.get("confidence"))
         if confidence:
-            attributes.append(f"Confidence: {_CONFIDENCE.get(confidence, confidence)}")
+            attributes.append(f"Evidence strength: {_CONFIDENCE.get(confidence, confidence)}")
         urgency = _text(diagnosis.get("urgency"))
         if urgency:
             attributes.append(f"Urgency: {_URGENCY.get(urgency, urgency)}")
@@ -358,7 +359,7 @@ def render_brief_report(
         )
         confidence = _text(differential.get("confidence"))
         confidence_text = _CONFIDENCE.get(confidence, confidence)
-        suffix = f" (Likelihood: {confidence_text})" if confidence_text else ""
+        suffix = f" (Evidence strength: {confidence_text})" if confidence_text else ""
         lines.append(f"- **{statement}**{suffix}")
         evidence = _brief_evidence(differential.get("supporting_evidence"))
         if evidence:
@@ -496,11 +497,12 @@ def render_human_report(
     diagnoses_raw = _items(verdict.get("diagnoses"))
     complete_interpretations = _complete_interpretations(verdict)
     top_heading = (
-        "## Top 3 Most Likely Complete ECG Interpretations"
+        "## Ranked ECG Findings and Interpretations"
         if verified is True
         else "## Top 3 ECG Interpretation Candidates (Unconfirmed)"
     )
-    lines.extend(["", top_heading, ""])
+    lines.extend(["", top_heading, "",
+                  "Evidence-strength labels are qualitative and uncalibrated; they are not disease probabilities.", ""])
     if verified is not True:
         lines.append(
             "> Caution: evidence and semantic validation failed or has unknown status. This ranking is for troubleshooting only, not a confirmed diagnosis."
@@ -515,9 +517,9 @@ def render_human_report(
         )
         confidence = _text(interpretation.get("confidence"))
         interpretation_type = _text(interpretation.get("interpretation_type"))
-        type_text = "Primary complete interpretation" if interpretation_type == "PRIMARY" else "Complete alternative interpretation"
+        type_text = "Primary interpretation" if interpretation_type == "PRIMARY" else "Alternative interpretation"
         confidence_text = _CONFIDENCE.get(confidence, confidence)
-        suffix = f" ({type_text}; overall confidence: {confidence_text})"
+        suffix = f" ({type_text}; overall evidence strength: {confidence_text})"
         lines.append(f"{index}. **{diagnosis}**{suffix}")
         uncertainty = _text(interpretation.get("key_uncertainty"))
         if uncertainty:
@@ -618,7 +620,7 @@ def render_human_report(
         confidence = _text(diagnosis.get("confidence"))
         if confidence:
             attributes.append(
-                f"Confidence: {_CONFIDENCE.get(confidence, confidence)}"
+                f"Evidence strength: {_CONFIDENCE.get(confidence, confidence)}"
             )
         urgency = _text(diagnosis.get("urgency"))
         if urgency:
@@ -662,7 +664,7 @@ def render_human_report(
         confidence_text = _CONFIDENCE.get(confidence, confidence)
         lines.append(f"### {index}. {statement}")
         if confidence_text:
-            lines.append(f"- Current likelihood: {confidence_text}")
+            lines.append(f"- Current evidence strength: {confidence_text}")
         _append_evidence_section(
             lines,
             "Evidence supporting this possibility",

@@ -235,6 +235,7 @@ def test_local_unchanged_intermediate_state_does_not_spend_repair_turn():
         hard_phase_guards=True,
     )
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="HARD-GUARD"),
         backend=backend,
         max_revisions=0,
@@ -639,6 +640,7 @@ def test_local_agent_fuses_duplicate_only_tool_batch():
     )
     backend = _backend(fake)
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="DUP-FUSE"),
         backend=backend,
         max_revisions=0,
@@ -762,6 +764,7 @@ def test_local_backend_runs_the_existing_ecg_diagnostic_agent_protocol():
     store = EvidenceStore.from_dict(_payload(), record_id="LOCAL")
 
     result = ECGDiagnosticAgent(
+        workflow="legacy",
         store=store,
         backend=backend,
         max_revisions=0,
@@ -814,6 +817,7 @@ def test_local_agent_requires_minimum_evidence_coverage_before_finishing():
         enforce_phase_coverage=True,
     )
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="COVERAGE"),
         backend=backend,
         max_revisions=0,
@@ -854,6 +858,7 @@ def test_local_survey_prefetches_fixed_packet_and_uses_one_model_turn():
         structured_output_level="grammar",
     )
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(_payload(), record_id="PREFETCH"),
         backend=backend,
         max_revisions=0,
@@ -889,6 +894,7 @@ def test_survey_coverage_requires_only_the_compact_overview():
         enforce_phase_coverage=True,
     )
     agent = ECGDiagnosticAgent(
+        workflow="legacy",
         store=EvidenceStore.from_dict(payload, record_id="BOTH-LIMITED"),
         backend=backend,
         max_revisions=0,

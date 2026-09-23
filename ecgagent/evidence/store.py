@@ -345,11 +345,7 @@ class EvidenceStore:
         return self._lead_params(lead).get(field_name)
 
     def lead_param_fields(self) -> list[str]:
-        for lead in self.leads:
-            params = self._lead_params(lead)
-            if params:
-                return sorted(params.keys())
-        return []
+        return sorted({field for lead in self.leads for field in self._lead_params(lead)})
 
     def global_fields(self) -> list[str]:
         return sorted((self.document.get("global_features") or {}).keys())

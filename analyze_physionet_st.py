@@ -373,6 +373,11 @@ def _assess_sparse_hybrid(
         return result(False, "qrs_unreliable")
     if core_reason == "lead_qrs_quality":
         return result(False, "lead_qrs_quality")
+    if core_reason in {
+        "insufficient_calibrated_pr_anchors", "baseline_anchor_support_insufficient",
+        "representative_donor_baseline_uncertain",
+    }:
+        return result(False, core_reason)
     if support < required_support:
         return result(False, "insufficient_real_lead_support")
 

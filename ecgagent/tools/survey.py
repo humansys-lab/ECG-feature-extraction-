@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+import math
 
 from ..evidence.store import EvidenceStore
 from ._render import markdown_table
@@ -12,6 +13,9 @@ _OVERVIEW_POINTERS: tuple[tuple[str, str], ...] = (
     ("patient age (years)", "/metadata/patient_meta/age"),
     ("patient age (days)", "/metadata/patient_meta/age_days"),
     ("patient sex", "/metadata/patient_meta/sex"),
+    ("amplitude calibration", "/metadata/input_contract/amplitude_calibration"),
+    ("amplitude output unit", "/metadata/input_contract/amplitude_output_unit"),
+    ("sampling rate", "/metadata/input_fs"),
     ("record quality", "/metadata/record_quality/record_grade"),
     ("measurement gate", "/metadata/diagnostic_gate/state"),
     ("detected beats", "/metadata/n_beats"),
@@ -65,7 +69,22 @@ def get_diagnostic_overview(store: EvidenceStore) -> ToolResult:
 
     rows: list[list[str]] = []
     citations: list[str] = []
-    for label, pointer in _OVERVIEW_POINTERS:
+    screening: list[tuple[str, str]] = []
+    # Select existing extremes, without applying thresholds or creating
+    # diagnostic flags. They raise questions; full cross-lead views must still
+    # establish distribution, reliability and competing explanations.
+    for field in ("st_hybrid_j_mv", "t_amp_mv", "q_duration_ms", "r_amp_mv", "s_amp_mv"):
+        values = []
+        for lead in store.leads:
+            pointer = f"/representative_leads/{lead}/params/{field}"
+            evidence = store.try_resolve(pointer)
+            value = evidence.value if evidence else None
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+                values.append((float(value), lead, pointer))
+        if values:
+            for value, lead, pointer in dict.fromkeys((min(values), max(values))):
+                screening.append((f"screening extreme {lead}.{field}", pointer))
+    for label, pointer in (*_OVERVIEW_POINTERS, *screening):
         evidence = store.try_resolve(pointer)
         if evidence is None:
             continue
@@ -84,9 +103,9 @@ def get_diagnostic_overview(store: EvidenceStore) -> ToolResult:
         citations.extend((evidence.pointer, *evidence.companions))
 
     if not rows:
-        return ToolResult.error("diagnostic overview measurements are unavailable")
+        return ToolResult.unavailable("diagnostic overview measurements are unavailable")
     inventory = (
-        "Detailed cross-lead/beat evidence is intentionally not pushed here. "
+        "Screening extremes are individual measurements, not cross-lead patterns or diagnoses. "
         "Available pull views: rhythm/P-AV, interval component context, QRS and "
         "T/U morphology maps, morphology families, native-beat panels, pacing, "
         "focused per-lead/per-beat tables. Mark those domains not_assessed until "
@@ -105,7 +124,7 @@ def get_diagnostic_overview(store: EvidenceStore) -> ToolResult:
         citations=tuple(dict.fromkeys(citations)),
         note=(
             "This overview contains measurements and availability only. It does "
-            "not contain morphology detail or diagnostic conclusions."
+            "not establish morphology patterns or diagnostic conclusions."
         ),
     )
 
@@ -116,7 +135,7 @@ SPECS = (
         description=(
             "Return one compact diagnosis-neutral overview of quality, rate, "
             "rhythm-screening observations, intervals, axes and modality "
-            "availability. Detailed morphology is not included and must be "
+            "availability and bounded measured morphology extremes. Full morphology must be "
             "queried after hypotheses are formed."
         ),
         parameters={},

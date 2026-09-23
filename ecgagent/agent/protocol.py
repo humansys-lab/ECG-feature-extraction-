@@ -15,7 +15,7 @@ from .runtime import (
 )
 from .safety_policy import CLINICAL_SAFETY_POLICY_VERSION
 
-DIAGNOSTIC_AGENT_PROTOCOL_VERSION = "ecgagent.diagnostic.v41"
+DIAGNOSTIC_AGENT_PROTOCOL_VERSION = "ecgagent.diagnostic.v44"
 
 DIAGNOSTIC_DOMAINS: tuple[str, ...] = (
     "quality",
@@ -46,6 +46,7 @@ DIAGNOSTIC_TOOLS: tuple[str, ...] = (
     "get_interval_waveform_context",
     "get_pacing_profile",
     "get_native_beat_profile",
+    "get_waveform_review",
 )
 
 DOMAIN_TOOL_MAP: dict[str, tuple[str, ...]] = {
@@ -126,11 +127,18 @@ class PhasePolicy:
     # pathways required fourteen or fifteen.  Local evidence reads are cheap,
     # and the model still sees the existing bounded evidence packet.
     compact_tool_ceiling: int = 15
+    compact_adjudication_batches: int = 4
+    compact_model_nodes_per_batch: int = 5
+    compact_candidate_updates: int = 2
     # Only views feeding owner=model nodes enter this shared round-robin packet;
     # deterministic-only views stay in the program ledger. Eight thousand
     # characters therefore leaves enough cross-lead depth for morphology while
     # avoiding a 12K packet merely because fewer model views share the budget.
     compact_model_evidence_chars: int = 8000
+    compact_model_required_evidence_chars: int = 24000
+    compact_required_evidence_headroom_chars: int = 1024
+    compact_phase_state_retries: int = 1
+    compact_review_view_reserve: int = 2
     survey_budget: int = 1
     # Budgets are hard ceilings, not completion targets.  Simple records can
     # finish after the named coverage contract is satisfied; complex records

@@ -121,6 +121,11 @@ def _demo(store: EvidenceStore, registry, *, mode: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--features", type=Path, required=True, help="path to a *_features.json payload")
+    parser.add_argument(
+        "--waveform-record", type=Path, default=None,
+        help=("explicit matching original WFDB record (base path or .hea) for bounded "
+              "raw measurement review; requires physical units and matching timebase"),
+    )
     parser.add_argument("--record-id", type=str, default=None)
     parser.add_argument(
         "--mode",
@@ -327,6 +332,27 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"features file not found: {args.features}")
 
     source_store = EvidenceStore.from_path(args.features, record_id=args.record_id)
+    from .evidence.waveform_review import (
+        STANDARD_LEADS, build_waveform_review, unavailable_waveform_review,
+    )
+
+    document = dict(source_store.document)
+    if args.waveform_record is not None:
+        from .batch import _load_wfdb_record
+
+        record_path = args.waveform_record
+        if record_path.suffix == ".hea":
+            record_path = record_path.with_suffix("")
+        try:
+            ecg, fs = _load_wfdb_record(record_path)
+        except (OSError, ValueError, ImportError) as exc:
+            parser.error(f"could not load --waveform-record: {exc}")
+        document["waveform_review"] = build_waveform_review(
+            ecg, fs, document, lead_names=STANDARD_LEADS, amplitude_unit="mV",
+        )
+    elif "waveform_review" not in document:
+        document["waveform_review"] = unavailable_waveform_review()
+    source_store = EvidenceStore.from_dict(document, record_id=source_store.record_id)
     store = source_store
     if args.mode == "diagnose":
         from .agent.diagnostic import DIAGNOSTIC_TOOLS

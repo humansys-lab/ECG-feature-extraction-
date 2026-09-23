@@ -69,6 +69,11 @@ class ToolResult:
     def error(cls, message: str, note: str | None = None) -> "ToolResult":
         return cls(ok=False, text=message, note=note)
 
+    @classmethod
+    def unavailable(cls, message: str) -> "ToolResult":
+        """A valid read with no measurement; not an execution/schema error."""
+        return cls.error(message, note="measurement_unavailable")
+
 
 @dataclass(frozen=True)
 class ToolSpec:
@@ -124,6 +129,7 @@ class CallRecord:
     result_text: str = ""
     result_sha256: str = ""
     error_note: str | None = None
+    program_only: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Compact call metadata for the primary result JSON.
@@ -136,6 +142,7 @@ class CallRecord:
 
         return {
             "call_id": self.call_id,
+            "program_only": self.program_only,
             "tool": self.tool,
             "args": self.args,
             "ok": self.ok,
@@ -268,18 +275,22 @@ class ToolRegistry:
         tool: str,
         citations: Any,
         source: str,
+        include_previous_batches: bool = False,
     ) -> tuple[str, ...]:
         """Authorize inputs consumed by a deterministic pathway resolver.
 
         A program resolver may use the complete bounded tool result even when
         backend context compression hid some rows from the model.  Only
         pointers actually touched by a successful call of ``tool`` in the
-        current phase are accepted.
+        current batch are accepted by default. Compact finalization may include
+        earlier batches with the same phase name; other phases remain excluded.
         """
 
+        phase_calls = ([record for record in self.calls if record.phase == self.phase]
+                       if include_previous_batches else self.phase_calls)
         touched_by_tool = {
             pointer
-            for record in self.phase_calls
+            for record in phase_calls
             if record.ok and record.tool == str(tool)
             for pointer in record.citations
         }
@@ -528,6 +539,7 @@ class ToolRegistry:
         *,
         tool: str,
         arguments: dict[str, Any] | None = None,
+        required_by: tuple[str, ...] = (),
     ) -> ModelEvidenceView | None:
         """Return the canonical model/audit view for a successful result.
 
@@ -544,6 +556,7 @@ class ToolRegistry:
             arguments=dict(arguments or {}),
             rendered_text=result.render(),
             citations=result.citations,
+            required_by=required_by,
         )
 
     # -- introspection ------------------------------------------------------
@@ -635,10 +648,10 @@ def build_default_registry(
     include: tuple[str, ...] | None = None,
 ) -> ToolRegistry:
     """Registry with the MVP tool set bound to `store`."""
-    from . import modalities, orient, query, survey
+    from . import modalities, orient, query, survey, waveform_review
 
     registry = ToolRegistry(store=store, budget=budget)
-    for spec in (*orient.SPECS, *survey.SPECS, *query.SPECS, *modalities.SPECS):
+    for spec in (*orient.SPECS, *survey.SPECS, *query.SPECS, *modalities.SPECS, *waveform_review.SPECS):
         if include is None or spec.name in include:
             registry.register(spec)
     return registry

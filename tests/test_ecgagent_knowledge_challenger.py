@@ -141,6 +141,7 @@ def test_diagnostic_agent_challenges_only_after_verified_first_pass_and_rereads_
     )
 
     result = ECGDiagnosticAgent(
+        workflow="legacy",
         store=store,
         backend=backend,
         knowledge_challenge=True,
@@ -183,6 +184,7 @@ def test_knowledge_revision_without_ecgfeat_reread_is_rejected_safely():
     )
 
     result = ECGDiagnosticAgent(
+        workflow="legacy",
         store=store,
         backend=backend,
         knowledge_challenge=True,

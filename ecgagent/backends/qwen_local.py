@@ -21,23 +21,23 @@ from typing import Any, Mapping, Sequence
 
 from ..evidence.ledger import visible_citations
 from ..evidence.model_view import MODEL_EVIDENCE_VIEW_VERSION
+from ..evidence.packing import (
+    DEFAULT_MAX_RETAINED_EVIDENCE_CHARS,
+    DEFAULT_MAX_REQUIRED_EVIDENCE_CHARS,
+    DEFAULT_REQUIRED_EVIDENCE_HEADROOM_CHARS,
+    EvidencePackingPolicy,
+    evidence_citation_label,
+    pack_evidence_rows,
+)
 from ..privacy import endpoint_is_literal_loopback, resolve_backend_privacy
 from .base import BackendCapabilities, LLMResponse, ToolCall, ToolOutcome
+from .request_budget import openai_completion
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
 DEFAULT_MODEL = "qwen3.8-27b"
 DEFAULT_MAX_TOKENS = 8192
 DEFAULT_TIMEOUT_S = 600.0
-# Qwen 27B can address a much larger physical context window, but exact
-# state-machine work degrades well before that limit.  The canonical diagnostic
-# ledger already carries every evidence atom that a committed phase selected,
-# so the in-phase packet only needs enough room for the *current* decision.
-# Citation aliasing below recovers much of the space previously spent copying
-# long JSON pointers, allowing this smaller cap without proportionally dropping
-# patient facts.
-DEFAULT_MAX_RETAINED_EVIDENCE_CHARS = 12000
-
 _INFLIGHT_LEDGER_PREFIX = "QWEN IN-PHASE EVIDENCE LEDGER."
 _PHASE_MEMORY_PREFIX = "QWEN CUMULATIVE EVIDENCE MEMORY."
 _REVISION_CANDIDATE_PREFIX = "QWEN CURRENT DIAGNOSIS CANDIDATE."
@@ -77,10 +77,16 @@ class QwenLocalBackend:
     timeout: float = DEFAULT_TIMEOUT_S
     max_retries: int = 2
     thinking: bool = True
+    thinking_token_budget: int | None = 768
     preserve_thinking: bool = True
     temperature: float = 0.1
     top_p: float = 0.95
     max_retained_evidence_chars: int = DEFAULT_MAX_RETAINED_EVIDENCE_CHARS
+    # Required cross-lead bundles may exceed the optional packet target.
+    # None disables growth; set equal to max_retained_evidence_chars for a hard
+    # fixed packet. Complex cases should use a >=24K-token server context.
+    max_required_evidence_chars: int | None = DEFAULT_MAX_REQUIRED_EVIDENCE_CHARS
+    required_evidence_headroom_chars: int = DEFAULT_REQUIRED_EVIDENCE_HEADROOM_CHARS
     # Once a phase is committed, its selected evidence is materialised in the
     # program-owned ledger snapshot.  Retaining the raw tool packet beside that
     # snapshot duplicated the same facts and was the largest avoidable source
@@ -97,6 +103,7 @@ class QwenLocalBackend:
     # json_schema repair if needed. Tool-free turns are constrained directly.
     capabilities: BackendCapabilities = field(
         default=BackendCapabilities(
+            request_context=True,
             native_tool_calls=True,
             structured_output_level="schema",
             context_compaction=True,
@@ -133,14 +140,24 @@ class QwenLocalBackend:
         default_factory=list,
         repr=False,
     )
+    _effective_evidence_chars: int | None = field(default=None, init=False, repr=False)
+    _evidence_batch_trace_starts: dict[str, int] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self.evidence_packing_policy()  # Validate before creating a client.
+        if self.thinking_token_budget is not None and (
+            isinstance(self.thinking_token_budget, bool)
+            or not isinstance(self.thinking_token_budget, int)
+            or self.thinking_token_budget < 0
+        ):
+            raise ValueError("thinking_token_budget must be a non-negative integer or None")
         self.base_url = str(
             self.base_url
             or os.getenv("QWEN_BASE_URL", "").strip()
             or DEFAULT_BASE_URL
         ).strip()
         self.capabilities = BackendCapabilities(
+            request_context=True,
             native_tool_calls=True,
             structured_output_level="schema",
             context_compaction=True,
@@ -193,6 +210,8 @@ class QwenLocalBackend:
         max_tokens: int | None = None,
         response_schema: dict[str, Any] | None = None,
         require_tool_call: bool = False,
+        phase: str | None = None,
+        deadline: float | None = None,
     ) -> LLMResponse:
         request_messages: list[dict[str, Any]] = [
             {"role": "system", "content": system + _CITATION_SYSTEM_NOTE},
@@ -203,11 +222,7 @@ class QwenLocalBackend:
         # before emitting the first JSON token (observed on v6). Preserve
         # thinking for the evidence adjudication where clinical synthesis
         # benefits from it.
-        compact_plan_turn = any(
-            "COMPACT PLAN" in str(message.get("content") or "")
-            for message in messages
-            if isinstance(message, dict)
-        )
+        compact_plan_turn = phase == "plan"
         request_thinking = bool(self.thinking and not compact_plan_turn)
         if response_schema is not None and not require_tool_call and tools:
             # With tools open, vLLM cannot apply the terminal JSON grammar
@@ -243,11 +258,20 @@ class QwenLocalBackend:
                 }
             },
         }
+        if request_thinking and self.thinking_token_budget is not None:
+            kwargs["extra_body"]["thinking_token_budget"] = min(
+                int(self.thinking_token_budget), max(0, int(kwargs["max_tokens"]) // 3),
+            )
         if tools:
             kwargs["tools"] = [_to_openai_tool(tool) for tool in tools]
             if require_tool_call:
                 kwargs["tool_choice"] = "required"
         elif response_schema is not None and not require_tool_call:
+            # Bound grammar whitespace to avoid spending the generation budget
+            # on padding between otherwise short JSON fields (vLLM extension).
+            kwargs["extra_body"]["structured_outputs"] = {
+                "json": response_schema, "disable_any_whitespace": True,
+            }
             # vLLM's OpenAI server supports strict json_schema decoding. Do not
             # apply it while tools remain open: constraining generated content
             # to terminal JSON would make Qwen's native <tool_call> branch
@@ -261,7 +285,10 @@ class QwenLocalBackend:
                 },
             }
 
-        completion = self.client.chat.completions.create(**kwargs)
+        completion = openai_completion(
+            self.client, kwargs, deadline=deadline, timeout=self.timeout,
+            max_retries=self.max_retries,
+        )
         choice = completion.choices[0]
         message = choice.message
         usage = _usage_dict(completion)
@@ -314,6 +341,7 @@ class QwenLocalBackend:
                 "usage": usage,
                 "tool_calls": len(tool_calls),
                 "thinking_enabled": request_thinking,
+                "thinking_token_budget": kwargs["extra_body"].get("thinking_token_budget"),
             }
         )
         return LLMResponse(
@@ -399,7 +427,7 @@ class QwenLocalBackend:
                     "truncated_for_model": bool(outcome.model_omitted_count),
                     "raw_touched_citations": list(outcome.citations),
                     "candidate_citations": list(
-                        outcome.model_candidate_citations
+                        outcome.model_candidate_citations or candidates
                         if outcome.model_text is not None
                         else outcome.citations
                     ),
@@ -417,6 +445,12 @@ class QwenLocalBackend:
     def user_turn(self, text: str) -> dict[str, Any]:
         return {"role": "user", "content": text}
 
+    def begin_evidence_batch(self, phase: str) -> None:
+        """Start a fresh packet in this phase, keeping aliases and prior audit."""
+
+        self._inflight_evidence.pop(str(phase), None)
+        self._evidence_batch_trace_starts[str(phase)] = len(self._tool_context_trace)
+
     def reset_session(self) -> None:
         self.turns.clear()
         self.reasoning.clear()
@@ -430,6 +464,8 @@ class QwenLocalBackend:
         self._phase_history.clear()
         self._current_phase_state = None
         self._tool_context_trace.clear()
+        self._effective_evidence_chars = None
+        self._evidence_batch_trace_starts.clear()
 
     def close(self) -> None:
         if not self._owns_client:
@@ -450,12 +486,16 @@ class QwenLocalBackend:
             timeout=self.timeout,
             max_retries=self.max_retries,
             thinking=self.thinking,
+            thinking_token_budget=self.thinking_token_budget,
             preserve_thinking=self.preserve_thinking,
             temperature=self.temperature,
             top_p=self.top_p,
             max_retained_evidence_chars=self.max_retained_evidence_chars,
+            max_required_evidence_chars=self.max_required_evidence_chars,
+            required_evidence_headroom_chars=self.required_evidence_headroom_chars,
             retain_committed_tool_views=self.retain_committed_tool_views,
             client=self.client,
+            name=self.name,
             max_tool_calls_per_turn=self.max_tool_calls_per_turn,
         )
 
@@ -775,118 +815,26 @@ class QwenLocalBackend:
                     trace_row["phase"] = str(phase)
                     break
 
+    def evidence_packing_policy(self) -> EvidencePackingPolicy:
+        """Return the current shared policy, including orchestrator overrides."""
+
+        return EvidencePackingPolicy(
+            max_retained_evidence_chars=self.max_retained_evidence_chars,
+            max_required_evidence_chars=self.max_required_evidence_chars,
+            required_evidence_headroom_chars=self.required_evidence_headroom_chars,
+        )
+
     def _bounded_evidence_rows(
         self,
         rows: Sequence[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        """Pack complete atoms fairly across all retained evidence views.
+        limit = self.evidence_packing_policy().effective_limit(rows)
+        self._effective_evidence_chars = limit
 
-        Context budgeting must not decide which clinical domain disappears.
-        Every atomic tool view therefore gets a small shell first, after which
-        complete citation/value/unit atoms are admitted round-robin.  No atom
-        is ever split and one wide table cannot evict every other tool view.
-        """
-
-        def rendered_size(items: Sequence[dict[str, Any]]) -> int:
-            return len(
-                json.dumps(
-                    items,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    default=str,
-                )
-            )
-
-        ordered = sorted(rows, key=lambda item: int(item.get("sequence") or 0))
-        packed: list[dict[str, Any]] = []
-        atom_sources: list[tuple[dict[str, Any], list[dict[str, Any]], int]] = []
-        raw_rows: list[dict[str, Any]] = []
-
-        for row in ordered:
-            public = {
-                "tool": row.get("tool"),
-                "arguments": row.get("arguments") or {},
-                "result": row.get("result") or "",
-            }
-            result = public["result"]
-            is_atomic = (
-                isinstance(result, dict)
-                and str(result.get("contract") or "").startswith(
-                    "ecgagent.model-evidence."
-                )
-                and isinstance(result.get("evidence"), list)
-            )
-            if not is_atomic:
-                raw_rows.append(public)
-                continue
-
-            atoms = [
-                dict(atom)
-                for atom in result.get("evidence") or []
-                if isinstance(atom, dict)
-            ]
-            source_omitted = max(0, int(result.get("omitted_atom_count") or 0))
-            shell_result = {
-                key: value
-                for key, value in result.items()
-                if key not in {"evidence", "omitted_atom_count", "omission_policy"}
-            }
-            shell_result["evidence"] = []
-            shell_result["omitted_atom_count"] = len(atoms) + source_omitted
-            shell_result["omission_policy"] = (
-                "Only listed atoms are model-visible and citable; use a narrower "
-                "tool view for omitted evidence."
-            )
-            packed_row = {
-                "tool": public["tool"],
-                "arguments": public["arguments"],
-                "result": shell_result,
-            }
-            packed.append(packed_row)
-            atom_sources.append((packed_row, atoms, source_omitted))
-
-        # Ordinary ECG tool arguments are schema-bounded and all shells fit.
-        # For pathological third-party rows, retain the newest shells rather
-        # than violating the hard context budget.
-        while (
-            len(packed) > 1
-            and rendered_size(packed) > self.max_retained_evidence_chars
-        ):
-            removed = packed.pop(0)
-            atom_sources = [
-                source for source in atom_sources if source[0] is not removed
-            ]
-
-        max_atoms = max((len(atoms) for _, atoms, _ in atom_sources), default=0)
-        for atom_index in range(max_atoms):
-            # Recent views win only the tie inside a fair round-robin pass.
-            for packed_row, atoms, source_omitted in reversed(atom_sources):
-                if atom_index >= len(atoms):
-                    continue
-                result = packed_row["result"]
-                selected_atoms = result["evidence"]
-                selected_atoms.append(atoms[atom_index])
-                result["omitted_atom_count"] = (
-                    len(atoms) - len(selected_atoms) + source_omitted
-                )
-                if rendered_size(packed) > self.max_retained_evidence_chars:
-                    selected_atoms.pop()
-                    result["omitted_atom_count"] = (
-                        len(atoms) - len(selected_atoms) + source_omitted
-                    )
-
-        # Raw compatibility/error rows are non-evidence notes. They consume
-        # only space left after atomic patient data has been packed.
-        for public in reversed(raw_rows):
-            candidate = [*packed, public]
-            if rendered_size(candidate) <= self.max_retained_evidence_chars:
-                packed.append(public)
-
-        for packed_row, _atoms, _source_omitted in atom_sources:
-            result = packed_row["result"]
-            if int(result.get("omitted_atom_count") or 0) == 0:
-                result.pop("omission_policy", None)
-        return packed
+        return pack_evidence_rows(
+            sorted(rows, key=lambda row: int(row.get("sequence") or 0)),
+            limit,
+        )
 
     def _record_packed_context(
         self,
@@ -904,7 +852,8 @@ class QwenLocalBackend:
                 row.get("arguments") or {},
             )
             by_signature[signature] = row
-        for trace_row in self._tool_context_trace:
+        start = self._evidence_batch_trace_starts.get(str(phase), 0)
+        for trace_row in self._tool_context_trace[start:]:
             if str(trace_row.get("phase") or "") != str(phase):
                 continue
             signature = self._call_signature(
@@ -913,6 +862,10 @@ class QwenLocalBackend:
             )
             packed = by_signature.get(signature)
             if packed is None:
+                trace_row["omitted_atom_count"] = (
+                    int(trace_row.get("omitted_atom_count") or 0)
+                    + len(trace_row.get("visible_citations") or [])
+                )
                 trace_row["model_context_text"] = ""
                 trace_row["model_context_chars"] = 0
                 trace_row["visible_citations"] = []
@@ -967,8 +920,7 @@ class QwenLocalBackend:
             kept.append(dict(message))
         rows = list(self._inflight_evidence.get(str(phase), {}).values())
         packed_rows = self._bounded_evidence_rows(rows)
-        if packed_rows:
-            self._record_packed_context(str(phase), packed_rows)
+        self._record_packed_context(str(phase), packed_rows)
         if packed_rows:
             kept.append(
                 {
@@ -1123,12 +1075,13 @@ class QwenLocalBackend:
             "timeout_seconds": self.timeout,
             "max_retries": self.max_retries,
             "thinking": self.thinking,
+            "thinking_token_budget": self.thinking_token_budget,
             "preserve_thinking": self.preserve_thinking,
             "temperature": self.temperature,
             "top_p": self.top_p,
             "context_compaction": {
                 "tool_result_contract": MODEL_EVIDENCE_VIEW_VERSION,
-                "max_retained_evidence_chars": self.max_retained_evidence_chars,
+                **self.evidence_packing_policy().audit_config(self._effective_evidence_chars),
                 "retain_committed_tool_views": self.retain_committed_tool_views,
                 "citation_format": "Q{sequence}",
                 "citation_alias_count": len(self._alias_pointers),
@@ -1196,27 +1149,7 @@ class QwenLocalBackend:
 
 def _citation_label(pointer: str) -> str:
     """Return a compact semantic identity for an aliased evidence pointer."""
-
-    parts = [part for part in str(pointer).removeprefix("ev:").split("/") if part]
-    if not parts:
-        return "evidence"
-    if len(parts) >= 4 and parts[0] == "representative_leads":
-        return f"{parts[1]}.{parts[-1]}"
-    if len(parts) >= 3 and parts[0] == "p_wave_assessments":
-        return f"p_assessment[{parts[1]}].{parts[-1]}"
-    if len(parts) >= 4 and parts[:2] == ["rhythm_inputs", "p_events"]:
-        return f"p_event[{parts[2]}].{parts[-1]}"
-    if len(parts) >= 3 and parts[0] == "beat_features":
-        return f"beat[{parts[1]}].{parts[-1]}"
-    if parts[0] == "global_features":
-        return f"global.{parts[-1]}"
-    if len(parts) >= 2 and parts[0] == "quality":
-        return ".".join(("quality", *parts[-2:]))
-    if parts[0] == "rhythm_inputs":
-        return ".".join(("rhythm", *parts[1:]))[-72:]
-    if parts[0] == "metadata":
-        return ".".join(parts)[-72:]
-    return ".".join(parts[-3:])[-72:]
+    return evidence_citation_label(pointer)
 
 
 _SCHEMA_ANNOTATION_KEYS = {

@@ -704,6 +704,13 @@ class GlobalFeatures:
     # number (see api._apply_qt_reject_gate).
     qt_rejected: bool = False
     qt_reject_reason: Optional[str] = None
+    # Explicit estimands: qt_dispersion_ms retains the historical estimator;
+    # independent_ms is the full quality-approved lead range without clipping.
+    qt_dispersion_independent_ms: Optional[float] = None
+    qt_dispersion_p90_p10_ms: Optional[float] = None
+    qt_dispersion_source: Optional[str] = None
+    qt_dispersion_used_leads: List[str] = field(default_factory=list)
+    qt_dispersion_legacy_excluded_leads: List[str] = field(default_factory=list)
 
 
 @dataclass

@@ -6,6 +6,7 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 from .models import LeadBeatFeatures, STANDARD_12_LEADS
+from .numeric import trapezoid
 
 
 @dataclass(frozen=True)
@@ -605,7 +606,7 @@ def localize_st_robust(
         finite_segment = segment[np.isfinite(segment)]
         if finite_segment.size:
             mean_mv = _median_1d(finite_segment)
-            area_mv_ms = float(np.trapezoid(segment, dx=1000.0 / float(fs)))
+            area_mv_ms = float(trapezoid(segment, dx=1000.0 / float(fs)))
 
     st_noise_segment = values[
         max(0, int(j_index + round(0.012 * fs))) :
