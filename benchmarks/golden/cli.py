@@ -193,6 +193,8 @@ def cmd_check(args: argparse.Namespace) -> int:
         "mode": args.mode, "tier": args.tier, "baseline_id": args.baseline_id, "label": label,
         "environment": _environment(args.code_root), "seconds": round(time.perf_counter() - started, 1),
         "cases": len(cases), "summary": summary, "config_drift": config_drift,
+        "surfaces": list(surfaces),
+        "case_seconds": {r["case_id"]: r["seconds"] for r in results if "seconds" in r},
         "failures": [r for r in reports if r["status"] != "pass"],
     }
     out = Path(args.report) if args.report else REPORT_ROOT / f"{label}.{args.tier}.{args.mode}.json"

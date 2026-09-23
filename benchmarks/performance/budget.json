@@ -1,0 +1,23 @@
+{
+  "budget_version": 1,
+  "reference_case": "tests/fixtures/golden/reference_10s_12lead (10 s, 500 Hz, 12 leads, 10 beats)",
+  "measured_on": {
+    "date": "2026-09-23",
+    "machine": "16-core Linux x86_64 under full load (load average ~16), Python 3.12.13, NumPy 2.2.6, SciPy 1.18.0, Numba 0.65.0",
+    "import_s": 0.16, "first_extraction_s": 3.85, "warm_extraction_median_s": 2.26, "peak_rss_mb": 242
+  },
+  "absolute": {
+    "comment": "About 2.5x the loaded development measurement so slower hosted CI runners pass; a breach means a real regression, not noise.",
+    "import_record_api_s": 1.0,
+    "first_extraction_s": 12.0,
+    "warm_extraction_median_s": 6.0,
+    "peak_rss_mb": 600,
+    "summary_bytes": 24000
+  },
+  "relative_to_phase0_golden": {
+    "comment": "Per-case wall time of a golden check versus the frozen Phase 0 baseline case_seconds; only meaningful on the controlled runner that produced the baseline, at comparable load.",
+    "baseline_id": "phase0-52a339c",
+    "median_ratio_max": 1.15,
+    "p95_ratio_max": 1.35
+  }
+}
