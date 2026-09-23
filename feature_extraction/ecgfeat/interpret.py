@@ -21,7 +21,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .features import estimate_initial_qrs_axis_deg
+from ._engine.measurement.features import estimate_initial_qrs_axis_deg
 from .glasgow_rules.models import GlasgowConfig
 from .glasgow_rules.rate import bradycardia_limit, tachycardia_limit
 from .mi import build_mi_evidence, build_mi_statement_candidates

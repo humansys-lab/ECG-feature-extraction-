@@ -1,0 +1,67 @@
+# Layer contracts from docs/library_design/01_architecture.md ("Layer diagram and
+# enforced dependency rules").  Run: lint-imports --config feature_extraction/.importlinter
+[importlinter]
+root_package = ecgfeat
+
+[importlinter:contract:record-independence]
+name = L4 ecgfeat.record imports no engine, pipeline, legacy, plotting or interpretation code
+type = forbidden
+source_modules =
+    ecgfeat.record
+forbidden_modules =
+    ecgfeat._engine
+    ecgfeat.pipeline
+    ecgfeat.api
+    ecgfeat.models
+    ecgfeat.export
+    ecgfeat.compat
+    ecgfeat.visualize
+    ecgfeat.interpret
+    ecgfeat.statement_engine
+    ecgfeat.rhythm_rules
+    ecgfeat.rhythm_statements
+    ecgfeat.mi
+    ecgfeat.pediatric_rules
+    ecgfeat.glasgow
+    ecgfeat.clinical_rules
+    ecgfeat.glasgow_rules
+
+[importlinter:contract:engine-no-upward]
+name = L1/L2 ecgfeat._engine never imports record, pipeline, compatibility, plotting or interpretation
+type = forbidden
+source_modules =
+    ecgfeat._engine
+forbidden_modules =
+    ecgfeat.record
+    ecgfeat.pipeline
+    ecgfeat.compat
+    ecgfeat.api
+    ecgfeat.export
+    ecgfeat.visualize
+    ecgfeat.interpret
+    ecgfeat.statement_engine
+    ecgfeat.rhythm_rules
+    ecgfeat.rhythm_statements
+    ecgfeat.mi
+    ecgfeat.pediatric_rules
+    ecgfeat.glasgow
+    ecgfeat.clinical_rules
+    ecgfeat.glasgow_rules
+# Known Phase 5 debt: signal quality reads thresholds from the diagnostic rule
+# configuration.  Removed when interpretation moves to its own distribution.
+ignore_imports =
+    ecgfeat._engine.quality.signal -> ecgfeat.clinical_rules.config
+
+[importlinter:contract:foundation-bottom]
+name = L1 foundation imports no measurement-engine siblings
+type = forbidden
+source_modules =
+    ecgfeat._engine.foundation
+forbidden_modules =
+    ecgfeat._engine.preprocess
+    ecgfeat._engine.quality
+    ecgfeat._engine.detection
+    ecgfeat._engine.beats
+    ecgfeat._engine.delineation
+    ecgfeat._engine.atrial
+    ecgfeat._engine.measurement

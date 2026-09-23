@@ -1,13 +1,10 @@
-from __future__ import annotations
+"""Moved: the implementation now lives in ``ecgfeat._engine.foundation.numeric``.
 
-from typing import Any
+This private engine module was relocated during the ``_engine`` migration
+(docs/library_design/05_migration_plan.md, Phase 1).  The old import path is a
+temporary alias to the same module object and emits ``DeprecationWarning``.
+"""
 
-import numpy as np
+from ._moved import alias_module
 
-
-def trapezoid(y: Any, x: Any = None, dx: float = 1.0, axis: int = -1) -> Any:
-    """NumPy 1.x/2.x compatible trapezoidal integration without warnings."""
-    implementation = getattr(np, "trapezoid", None)
-    if implementation is None:  # pragma: no cover - NumPy < 2 compatibility
-        implementation = np.trapz
-    return implementation(y, x=x, dx=dx, axis=axis)
+alias_module(__name__, "._engine.foundation.numeric")

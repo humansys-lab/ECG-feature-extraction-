@@ -26,7 +26,7 @@ _EXPORTS = {
     "RepresentativeLeadFeatures": (".models", "RepresentativeLeadFeatures"),
     "STANDARD_12_LEADS": (".models", "STANDARD_12_LEADS"),
     "WaveBounds": (".models", "WaveBounds"),
-    "PWaveConfig": (".p_wave_engine", "PWaveConfig"),
+    "PWaveConfig": ("._engine.atrial.p_wave", "PWaveConfig"),
     "ECGInputError": (".errors", "ECGInputError"),
     "RefinementConfig": (".refinement", "RefinementConfig"),
     "ECGConfig": (".config", "ECGConfig"),

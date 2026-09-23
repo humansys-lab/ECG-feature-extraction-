@@ -5,22 +5,22 @@ from dataclasses import asdict
 
 import numpy as np
 
-from .atrial import (
+from ._engine.atrial.core import (
     _classify_af_afl,
     build_qrst_subtracted_residual,
     compute_organized_p_ratio,
     compute_pr_dispersion_ms,
     extract_atrial_events,
 )
-from .acquisition_qc import (
+from ._engine.quality.acquisition import (
     apply_channel_delay_compensation,
     assess_acquisition_chain,
 )
-from .delineate import (
+from ._engine.delineation.core import (
     apply_systematic_qrs_tail_settling_rescue,
     delineate_beats,
 )
-from .features import (
+from ._engine.measurement.features import (
     _axis_from_amplitudes,
     _low_support_limb_t_axis_coverage_values,
     _st_supported_limb_t_axis_coverage_values,
@@ -34,7 +34,7 @@ from .features import (
     _select_reliable_qt_leads,
     _stable_limb_signed_t_axis_deg,
 )
-from .grouping import build_beat_annotations, cluster_beats
+from ._engine.beats.grouping import build_beat_annotations, cluster_beats
 from .clinical_rules.engine import analyze_clinical
 from .interpret import interpret
 from .models import (
@@ -43,16 +43,16 @@ from .models import (
     STANDARD_12_LEADS,
     resolve_patient_age,
 )
-from .preprocess import analysis_signal, lowpass_filter, resample_ecg
-from .p_wave_engine import (
+from ._engine.preprocess import analysis_signal, lowpass_filter, resample_ecg
+from ._engine.atrial.p_wave import (
     PWaveConfig,
     backfill_missing_p_from_robust_engine,
     build_p_wave_assessments,
     finalize_p_wave_states,
     summarize_p_wave_assessments,
 )
-from .qrs import DEFAULT_QRS_LEADS, detect_qrs_multilead_with_meta
-from .quality import (
+from ._engine.detection.qrs import DEFAULT_QRS_LEADS, detect_qrs_multilead_with_meta
+from ._engine.quality.signal import (
     build_diagnostic_gate,
     compute_adjacent_precordial_correlations,
     compute_qrs_detector_agreement,
@@ -64,14 +64,14 @@ from .quality import (
     summarize_record_quality,
     validate_pacing_spikes_against_qrs,
 )
-from .r_localization import apply_hybrid_r_localization
-from .wave_localization import apply_hybrid_wave_localization
-from .st_localization import apply_hybrid_st_measurement
-from .st_baseline import calibrated_st_signal, adaptive_st_signal
+from ._engine.delineation.r_localization import apply_hybrid_r_localization
+from ._engine.delineation.wave_localization import apply_hybrid_wave_localization
+from ._engine.measurement.st_localization import apply_hybrid_st_measurement
+from ._engine.measurement.st_baseline import calibrated_st_signal, adaptive_st_signal
 from .refinement import RefinementConfig
-from .boundary_refinement import correct_p_boundaries
-from .t_wave_refinement import refine_t_wave_boundaries
-from .representative import build_representative_beats_with_meta
+from ._engine.delineation.refinement import correct_p_boundaries
+from ._engine.delineation.t_refinement import refine_t_wave_boundaries
+from ._engine.beats.representative import build_representative_beats_with_meta
 from .rhythm_rules import (
     assess_pacing_evidence_quality,
     build_measurement_availability,
@@ -84,7 +84,7 @@ from .rhythm_rules import (
     select_measurement_beat_ids,
 )
 from .rhythm_statements import build_rhythm_statement_candidates
-from .twelve_sl import apply_twelve_sl_measurement_profile
+from ._engine.measurement.profiles.twelve_sl import apply_twelve_sl_measurement_profile
 from .validation import validate_ecg_input
 
 
@@ -2250,7 +2250,7 @@ class ECGFeatureExtractor:
         atrial_events = extract_atrial_events(beat_features, quality, r_locs, fs_run, ecg=ecg_measure)
         atrial_validation_audit: Dict[str, Any] = {}
         if self.refinement.atrial_event_validation:
-            from .atrial_validation import validate_atrial_events
+            from ._engine.atrial.validation import validate_atrial_events
             atrial_events = validate_atrial_events(atrial_events, ecg_measure, fs_run, beat_features,
                                                   quality, audit=atrial_validation_audit)
         atrial_residual = build_qrst_subtracted_residual(
