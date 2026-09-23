@@ -77,6 +77,34 @@ def _import_runtime_components():
     return ECGFeatureExtractor, to_dict, PatientMeta, generate_report, generate_ecg_annotated_plot, prepare_json_export
 
 
+RECORD_LEADS = ("I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6")
+OUTPUT_FORMATS = ("legacy", "record", "both")
+
+
+def build_record_writer(profile: str) -> Callable[..., bytes]:
+    """Serialize the ECG Record for an already-extracted legacy result.
+
+    The record is built from the same engine result as the legacy JSON, so
+    ``--output-format both`` leaves the legacy file byte-identical.  The
+    configuration equals ``ECGFeatureExtractor(mains_freq=50)``.
+    """
+    _ensure_feature_extraction_path()
+    import numpy as np
+    from ecgfeat import ECGConfig, ECGMeasurements, config_provenance, dumps_record, ecg_emit, ecg_prepare
+
+    config = ECGConfig(mains_frequency_hz=50)
+    provenance = config_provenance(config)
+
+    def write(ecg: Any, sampling_rate: float, result: Any, patient_meta: Any = None) -> bytes:
+        patient = {key: getattr(patient_meta, key) for key in ("age", "age_days", "sex")
+                   if getattr(patient_meta, key, None) is not None}
+        prepared = ecg_prepare(np.asarray(ecg, dtype=np.float64), sampling_rate=sampling_rate,
+                               lead_names=RECORD_LEADS, amplitude_unit="mV", patient=patient or None)
+        return dumps_record(ecg_emit(ECGMeasurements(prepared, result, config, provenance), profile=profile))
+
+    return write
+
+
 def load_pt(path: Path) -> Any:
     try:
         import torch
@@ -305,7 +333,15 @@ def process_job(
     export_profile: str | None = None,
     save_pt_output: bool = True,
     gzip_json: bool = False,
+    output_format: str = "legacy",
+    record_writer: Callable[..., bytes] | None = None,
+    record_profile: str = "summary",
 ) -> dict[str, Any]:
+    if output_format not in OUTPUT_FORMATS:
+        raise ValueError(f"output_format must be one of {OUTPUT_FORMATS}")
+    if output_format != "legacy" and record_writer is None:
+        raise ValueError("record output requires a record writer")
+    write_legacy = output_format in {"legacy", "both"}
     raw_batch = load_pt_fn(job.input_path)
     batch = normalize_batch_ecg(raw_batch, job.input_path)
     metadata = {}
@@ -332,8 +368,11 @@ def process_job(
         "export_profile": export_profile,
         "pt_output_enabled": bool(save_pt_output),
         "json_gzip_enabled": bool(gzip_json),
+        "output_format": output_format,
         "errors": [],
     }
+    if output_format != "legacy":
+        manifest["record_profile"] = record_profile
 
     for sample_index, ecg in enumerate(batch):
         if limit is not None and sample_index >= limit:
@@ -346,8 +385,13 @@ def process_job(
         report_path = job.output_dir / f"{sample_id}_report.txt"
         annotated_plot_path = job.output_dir / f"{sample_id}_ecg_annotated.png"
 
-        expected_paths = [feature_json_path, report_path]
-        if save_pt_output:
+        record_json_path = job.output_dir / f"{sample_id}_record.json"
+        expected_paths = [report_path]
+        if write_legacy:
+            expected_paths.append(feature_json_path)
+        if output_format != "legacy":
+            expected_paths.append(record_json_path)
+        if save_pt_output and write_legacy:
             expected_paths.append(feature_pt_path)
         if annotated_plot_writer is not None:
             expected_paths.append(annotated_plot_path)
@@ -378,6 +422,21 @@ def process_job(
                 metadata=metadata,
             )
             result = extractor.extract(ecg, fs=sampling_rate, meta=patient_meta)
+            if output_format != "legacy":
+                record_bytes = record_writer(ecg, sampling_rate, result, patient_meta)
+                record_json_path.write_bytes(record_bytes + b"\n")
+                if "record_schema_version" not in manifest:
+                    stamp = json.loads(record_bytes)
+                    manifest["record_schema_version"] = stamp["schema_version"]
+                    manifest["record_library_version"] = stamp["provenance"]["library_version"]
+                    manifest["record_config_sha256"] = stamp["provenance"]["config_hash"]
+            if not write_legacy:
+                report_writer(record_id, header, ecg, result, report_path)
+                if annotated_plot_writer is not None:
+                    annotated_plot_writer(record_id, header, ecg, result, annotated_plot_path)
+                    manifest["annotated_plots"] += 1
+                manifest["processed"] += 1
+                continue
             # Keep the full payload when writing PT. JSON-only runs can skip
             # copying data the selected export profile will discard. Inspect
             # the injected serializer so existing one-argument callers work.
@@ -498,6 +557,22 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--output-format",
+        choices=OUTPUT_FORMATS,
+        default="legacy",
+        help=(
+            "legacy: historical feature JSON (default during the compatibility window); "
+            "record: versioned ECG Record JSON (<id>_record.json) only; both: write both "
+            "from the same extraction (the legacy file is unchanged)."
+        ),
+    )
+    parser.add_argument(
+        "--record-profile",
+        choices=("summary", "all", "debug"),
+        default="summary",
+        help="ECG Record profile for --output-format record/both (default: summary).",
+    )
+    parser.add_argument(
         "--no-pt",
         action="store_true",
         help="Do not write the duplicate full-detail .pt feature artifact.",
@@ -565,6 +640,10 @@ def _process_job_runtime(job: BatchJob, config: dict[str, Any]) -> dict[str, Any
         export_profile=str(config["export_profile"]),
         save_pt_output=bool(config["save_pt_output"]),
         gzip_json=bool(config["gzip_json"]),
+        output_format=config.get("output_format", "legacy"),
+        record_writer=(build_record_writer(config.get("record_profile", "summary"))
+                       if config.get("output_format", "legacy") != "legacy" else None),
+        record_profile=config.get("record_profile", "summary"),
     )
 
 
@@ -604,6 +683,8 @@ def run_batch(args: argparse.Namespace) -> int:
         "export_profile": export_profile,
         "save_pt_output": not bool(getattr(args, "no_pt", False)),
         "gzip_json": bool(getattr(args, "gzip_json", False)),
+        "output_format": str(getattr(args, "output_format", "legacy")),
+        "record_profile": str(getattr(args, "record_profile", "summary")),
     }
 
     def record_summary(job: BatchJob, summary: dict[str, Any]) -> None:
@@ -627,6 +708,8 @@ def run_batch(args: argparse.Namespace) -> int:
             prepare_json_export_fn,
         ) = serial_runtime
         extractor = ECGFeatureExtractor(mains_freq=50)
+        record_writer = (build_record_writer(config["record_profile"])
+                         if config["output_format"] != "legacy" else None)
         for job in jobs:
             print(f"[process] {job.disease_label}/{job.source_name} -> {job.output_dir}")
             summary = process_job(
@@ -648,6 +731,9 @@ def run_batch(args: argparse.Namespace) -> int:
                 export_profile=config["export_profile"],
                 save_pt_output=config["save_pt_output"],
                 gzip_json=config["gzip_json"],
+                output_format=config["output_format"],
+                record_writer=record_writer,
+                record_profile=config["record_profile"],
             )
             record_summary(job, summary)
     else:
