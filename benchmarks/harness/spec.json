@@ -1,0 +1,344 @@
+{
+  "spec_version": 1,
+  "description": "Pinned invocations of the ten root-level ecgfeat evaluation tools (doc 06 'Benchmark harness as a release gate'). Every CLI flag below was read from the tool's argparse at baseline revision 52a339c; none is invented. Placeholders: {repo}=tree under test, {data}={repo}/data, {run_dir}=per-run raw output dir, {records}=resolved record list of the first dataset (one argv item per record), {corpus:<id>}=harness-owned corpus root.",
+  "max_workers": 8,
+  "thread_env": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "NUMBA_NUM_THREADS": "1",
+    "MPLBACKEND": "Agg",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONHASHSEED": "0"
+  },
+  "corpora": {
+    "batch_pt": {
+      "builder": "batch_pt",
+      "source_shard": "ptb-xl/12000",
+      "metadata_dir": "ptb-xl-metadata-1.0.1",
+      "classes": ["NORM", "MI", "STTC", "CD", "HYP"],
+      "per_class": 20,
+      "variants": [
+        {"name": "ptbxl500", "sampling_rate": 500},
+        {"name": "ptbxl100", "sampling_rate": 100}
+      ]
+    },
+    "smv": {
+      "builder": "smv",
+      "metadata_dir": "ptb-xl-metadata",
+      "frozen_verdicts": [
+        {
+          "record": "01000_hr",
+          "wfdb_record": "ptb-xl/01000/01000_hr",
+          "diagnosis_json": "ecgagent_sample_review_20260908/diagnoses/01000_hr.json"
+        },
+        {
+          "record": "01006_hr",
+          "wfdb_record": "ptb-xl/01000/01006_hr",
+          "diagnosis_json": "ecgagent_complex_review_20260908/diagnoses/01006_hr.json"
+        }
+      ]
+    }
+  },
+  "tools": [
+    {
+      "id": "snapshot_regression",
+      "script": "snapshot_regression.py",
+      "status": "delegated",
+      "delegated_reason": "Owned by the golden snapshot harness (benchmarks/golden/, separate engineer). This evaluator harness does not run or pin it.",
+      "gate_role": "Primary old-vs-new parity harness over the golden manifest (doc 05 B: Phase 0 onward, every phase).",
+      "cadence": "Every PR (doc 06)."
+    },
+    {
+      "id": "evaluate_ludb",
+      "script": "evaluate_ludb.py",
+      "status": "pinned",
+      "gate_role": "Detect delineation onset/offset regressions after internal moves and pipeline decomposition (doc 05 B: Phases 1 and 3; full set before Phase 3 completion).",
+      "cadence": "Every release; optional on PRs touching delineation (doc 06).",
+      "estimated_minutes": 12,
+      "workers": 1,
+      "ok_exit_codes": [0, 1],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": ["--out", "{run_dir}/out"]}
+      ],
+      "datasets": [
+        {
+          "name": "LUDB",
+          "release": "1.0.1",
+          "root": "{data}/lobachevsky-university-electrocardiography-database-1.0.1",
+          "subset_rule": "All 200 records in RECORDS. The tool only exposes --n (first N of RECORDS) and reads LUDB from the fixed path <tool dir>/data/lobachevsky-...-1.0.1, so no record flag is passed.",
+          "records": {"from_file": "RECORDS", "basename": true},
+          "files": ["RECORDS", "data/{record}.hea", "data/{record}.dat", "data/{record}.i", "data/{record}.ii", "data/{record}.iii", "data/{record}.avr", "data/{record}.avl", "data/{record}.avf", "data/{record}.v1", "data/{record}.v2", "data/{record}.v3", "data/{record}.v4", "data/{record}.v5", "data/{record}.v6"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"fs_internal": 500, "mains_freq": 50}, "source": "hard-coded in evaluate_ludb.main()", "match_tolerance_ms": 75},
+      "normalizer": "evaluate_ludb"
+    },
+    {
+      "id": "evaluate_qtdb",
+      "script": "evaluate_qtdb.py",
+      "status": "pinned",
+      "gate_role": "Guard QT/QRS/T measurements and boundary behaviour on a non-LUDB database (doc 05 B: Phases 1 and 3).",
+      "cadence": "Every release; optional on PRs touching delineation/intervals (doc 06).",
+      "estimated_minutes": 15,
+      "workers": 4,
+      "ok_exit_codes": [0, 1],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": [
+          "--qtdb-root", "{data}/qtdb", "--out", "{run_dir}/out", "--annotator", "q1c",
+          "--records", "{records}", "--methods", "all",
+          "--r-tolerance-ms", "75", "--wave-tolerance-ms", "150", "--window-pad-sec", "5",
+          "--ecgfeat-r-source", "global", "--ecgfeat-wave-source", "native",
+          "--neurokit-peak-method", "neurokit", "--neurokit-delineate-method", "dwt",
+          "--mains-freq", "60", "--annotation-cluster-gap-sec", "3", "--workers", "4"]}
+      ],
+      "datasets": [
+        {
+          "name": "QTDB",
+          "release": "PhysioNet qtdb (version not stated in the local copy; identity = manifest hash)",
+          "root": "{data}/qtdb",
+          "subset_rule": "All 105 records in RECORDS that have a .q1c annotation (the tool's own discovery rule), passed explicitly via --records.",
+          "records": {"from_file": "RECORDS", "require_suffix": ".q1c"},
+          "files": ["RECORDS", "{record}.hea", "{record}.dat", "{record}.q1c"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"mains_freq": 60, "note": "fs_internal chosen inside compare_ludb_detectors.detect_ecgfeat"}, "sparse_adapter": "channels in slots II/V2, rest zero; scored slot II", "restrict_to_annotated_span": true},
+      "normalizer": "evaluate_qtdb"
+    },
+    {
+      "id": "evaluate_ludb_cse",
+      "script": "evaluate_ludb_cse.py",
+      "status": "pinned",
+      "gate_role": "Guard CSE-style interval measurement behaviour while modules move (doc 05 B: Phases 1 and 3).",
+      "cadence": "Every release (doc 06).",
+      "estimated_minutes": 5,
+      "workers": 4,
+      "ok_exit_codes": [0, 1],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": ["--out-dir", "{run_dir}/out", "--records", "{records}", "--workers", "4", "--outlier-count", "8"]}
+      ],
+      "datasets": [
+        {
+          "name": "LUDB",
+          "release": "1.0.1",
+          "root": "{data}/lobachevsky-university-electrocardiography-database-1.0.1",
+          "subset_rule": "All 200 LUDB records (numeric order), passed explicitly via --records. The tool reads LUDB from the fixed path <tool dir>/data/lobachevsky-...-1.0.1/data.",
+          "records": {"glob": "data/*.hea", "sort": "numeric"},
+          "files": ["data/{record}.hea", "data/{record}.dat", "data/{record}.i", "data/{record}.ii", "data/{record}.iii", "data/{record}.avr", "data/{record}.avl", "data/{record}.avf", "data/{record}.v1", "data/{record}.v2", "data/{record}.v3", "data/{record}.v4", "data/{record}.v5", "data/{record}.v6"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"fs_internal": 500, "mains_freq": 50}, "source": "compare_annotations.REPORT_INTERNAL_FS / REPORT_MAINS_FREQ", "patient_meta": "age/sex from LUDB header"},
+      "normalizer": "evaluate_ludb_cse"
+    },
+    {
+      "id": "compare_annotations",
+      "script": "compare_annotations.py",
+      "status": "pinned",
+      "gate_role": "Compare record-level measurements between the algorithm and the LUDB annotation-derived reference (doc 05 B: Phases 1 and 3).",
+      "cadence": "Every release when annotation or fiducial code changed; otherwise manual quarterly audit (doc 06).",
+      "estimated_minutes": 7,
+      "workers": 4,
+      "ok_exit_codes": [0],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": ["--batch-reports", "--out-dir", "{run_dir}/out", "--records", "{records}", "--workers", "4", "--no-visuals", "--measurement-profile", "native"]}
+      ],
+      "datasets": [
+        {
+          "name": "LUDB",
+          "release": "1.0.1",
+          "root": "{data}/lobachevsky-university-electrocardiography-database-1.0.1",
+          "subset_rule": "All 200 LUDB records (numeric order), passed explicitly via --records. Only the machine-readable --batch-reports mode is used; the plotting modes are interactive/visual and not gateable. LUDB is read from the fixed path <tool dir>/data/lobachevsky-...-1.0.1/data.",
+          "records": {"glob": "data/*.hea", "sort": "numeric"},
+          "files": ["data/{record}.hea", "data/{record}.dat", "data/{record}.i", "data/{record}.ii", "data/{record}.iii", "data/{record}.avr", "data/{record}.avl", "data/{record}.avf", "data/{record}.v1", "data/{record}.v2", "data/{record}.v3", "data/{record}.v4", "data/{record}.v5", "data/{record}.v6"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"fs_internal": 500, "mains_freq": 50}, "measurement_profile": "native", "patient_meta": "age/sex from LUDB header"},
+      "normalizer": "compare_annotations"
+    },
+    {
+      "id": "compare_ludb_detectors",
+      "script": "compare_ludb_detectors.py",
+      "status": "pinned",
+      "gate_role": "Guard QRS detector / delineation equivalence while detection code moves under _engine (doc 05 B: Phases 1 and 3).",
+      "cadence": "Manual before any detector-selection/policy change; required for a release containing such a change (doc 06).",
+      "estimated_minutes": 10,
+      "workers": 4,
+      "ok_exit_codes": [0, 2],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": [
+          "--dataset-dir", "{data}/lobachevsky-university-electrocardiography-database-1.0.1",
+          "--out-dir", "{run_dir}/out", "--records", "{records}", "--leads", "all", "--methods", "all",
+          "--r-tolerance-ms", "75", "--wave-tolerance-ms", "150",
+          "--ecgfeat-r-source", "global", "--ecgfeat-wave-source", "native",
+          "--neurokit-peak-method", "neurokit", "--neurokit-delineate-method", "dwt",
+          "--restrict-to-annotated-span", "--mains-freq", "50", "--workers", "4", "--no-plot"]}
+      ],
+      "datasets": [
+        {
+          "name": "LUDB",
+          "release": "1.0.1",
+          "root": "{data}/lobachevsky-university-electrocardiography-database-1.0.1",
+          "subset_rule": "All 200 LUDB records x 12 leads, passed explicitly via --records. --restrict-to-annotated-span is ON (LUDB annotates only the middle of each 10 s record; without it PPV measures annotation coverage, not detector precision).",
+          "records": {"glob": "data/*.hea", "sort": "numeric"},
+          "files": ["data/{record}.hea", "data/{record}.dat", "data/{record}.i", "data/{record}.ii", "data/{record}.iii", "data/{record}.avr", "data/{record}.avl", "data/{record}.avf", "data/{record}.v1", "data/{record}.v2", "data/{record}.v3", "data/{record}.v4", "data/{record}.v5", "data/{record}.v6"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"mains_freq": 50}, "methods": ["ecgfeat", "neurokit2", "biosppy"], "comparators_note": "neurokit2/biosppy rows do not depend on ecgfeat; they are environment/corpus sentinels"},
+      "normalizer": "compare_ludb_detectors"
+    },
+    {
+      "id": "analyze_physionet_st",
+      "script": "analyze_physionet_st.py",
+      "status": "pinned",
+      "gate_role": "Guard ST localisation/amplitude paths on EDB/LTSTDB (doc 05 B: Phases 1, 3 and 4).",
+      "cadence": "Every release that changes ST measurement; otherwise manual before a schema release exposing new ST fields (doc 06).",
+      "estimated_minutes": 20,
+      "workers": 1,
+      "ok_exit_codes": [0, 1],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": [
+          "--dataset", "both", "--edb-dir", "{data}/edb", "--ltstdb-dir", "{data}/ltstdb",
+          "--out-dir", "{run_dir}/out", "--max-records", "0", "--max-events-per-record", "3",
+          "--controls-per-record", "1", "--window-sec", "12", "--edb-reference-sec", "30",
+          "--ltst-annotation", "stb", "--mains-freq", "50", "--no-plots"]}
+      ],
+      "datasets": [
+        {
+          "name": "EDB",
+          "release": "PhysioNet European ST-T Database (version not stated in the local copy; identity = manifest hash)",
+          "root": "{data}/edb",
+          "subset_rule": "All 90 records in RECORDS; tool defaults of 3 evenly sampled events + 1 control per record.",
+          "records": {"from_file": "RECORDS"},
+          "files": ["RECORDS", "{record}.hea", "{record}.dat", "{record}.atr"]
+        },
+        {
+          "name": "LTSTDB",
+          "release": "PhysioNet Long-Term ST Database (doi:10.13026/C2G01T; version not stated locally)",
+          "root": "{data}/ltstdb",
+          "subset_rule": "All 86 records in RECORDS; .stb event protocol; 3 events + 1 control per record, 12 s windows.",
+          "records": {"from_file": "RECORDS"},
+          "files": ["RECORDS", "{record}.hea", "{record}.dat", "{record}.stb", "{record}.stf"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"mains_freq": 50, "note": "constructed inside extract_sparse_window"}, "sparse_adapter": "real_2_or_3_channels_in_II_V2_V3_zero_padded", "st_amplitude_source": "tool default (the tool has no st_amplitude_source flag; doc 05's pinned variants cannot be exercised through this CLI)"},
+      "normalizer": "analyze_physionet_st"
+    },
+    {
+      "id": "batch_extract_ecgfeat",
+      "script": "batch_extract_ecgfeat.py",
+      "status": "pinned",
+      "gate_role": "End-to-end batch serialization/compatibility gate for the legacy export (doc 05 B: Phases 2 and 4).",
+      "cadence": "Release candidate on the pinned batch corpus; manual for very large full-dataset runs (doc 06).",
+      "estimated_minutes": 5,
+      "workers": 5,
+      "ok_exit_codes": [0, 2],
+      "steps": [
+        {"name": "fs500", "kind": "tool", "argv": ["--input-dir", "{corpus:batch_pt}/ptbxl500", "--output-dir", "{run_dir}/out500", "--sampling-rate", "500", "--sources", "real", "--export-profile", "summary", "--no-pt", "--workers", "5", "--blas-threads", "1"]},
+        {"name": "fs100", "kind": "tool", "argv": ["--input-dir", "{corpus:batch_pt}/ptbxl100", "--output-dir", "{run_dir}/out100", "--sampling-rate", "100", "--sources", "real", "--export-profile", "summary", "--no-pt", "--workers", "5", "--blas-threads", "1"]}
+      ],
+      "datasets": [
+        {
+          "name": "PTB-XL-derived .pt batch corpus",
+          "release": "built by benchmarks.harness.corpora.build_batch_pt_corpus from PTB-XL shard 12000 + ptb-xl-metadata-1.0.1",
+          "root": "{corpus:batch_pt}",
+          "subset_rule": "The tool's production corpus (all_diseases_pt100 generated/real tensors) is NOT present on this machine. Stand-in: for each PTB-XL diagnostic superclass NORM/MI/STTC/CD/HYP, the first 20 records (ascending ecg_id) of local shard 12000 whose active diagnostic statements map to exactly one superclass; saved as <variant>/<class>/real.pt float32 [20,12,T] at 500 Hz and resample_poly(1,5) 100 Hz.",
+          "records": {"glob": "*/*/real.pt", "sort": "lexical"},
+          "files": ["{record}", "corpus_build.json"],
+          "extra_glob": ["*/*/metadata.pt"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"mains_freq": 50, "fs_internal": null}, "export_profile": "summary", "pt_output": false, "source": "hard-coded in batch_extract_ecgfeat.run_batch"},
+      "normalizer": "batch_extract_ecgfeat"
+    },
+    {
+      "id": "score_measurement_verifiable",
+      "script": "score_measurement_verifiable.py",
+      "status": "pinned",
+      "gate_role": "Verify that measurement values remain traceable to frozen agent calls after provenance and record-layer changes (doc 05 B: Phases 2 and 4).",
+      "cadence": "Every PR on the pinned small corpus; full corpus per release (doc 06). Only the small corpus exists locally.",
+      "estimated_minutes": 1,
+      "workers": 2,
+      "ok_exit_codes": [0],
+      "steps": [
+        {"name": "features", "kind": "module", "module": "ecgagent.batch", "ok_exit_codes": [0, 2], "argv": ["extract", "--dataset-dir", "{corpus:smv}/wfdb", "--metadata-dir", "{data}/ptb-xl-metadata", "--output-dir", "{run_dir}/runs/smv_run", "--extract-workers", "2", "--fs-internal", "500", "--no-reuse-existing"]},
+        {"name": "stage_verdicts", "kind": "copy", "from": "{corpus:smv}/diagnoses", "to": "{run_dir}/runs/smv_run/diagnoses"},
+        {"name": "stage_reference", "kind": "copy", "from": "{corpus:smv}/record_results.csv", "to": "{run_dir}/runs/smv_run/record_results.csv"},
+        {"name": "score", "kind": "tool", "argv": ["{run_dir}/runs/smv_run"]}
+      ],
+      "datasets": [
+        {
+          "name": "Frozen ecgagent verdicts + staged PTB-XL records",
+          "release": "harness corpus 'smv' (verdicts copied from ecgagent_sample_review_20260908 and ecgagent_complex_review_20260908)",
+          "root": "{corpus:smv}",
+          "subset_rule": "The two agent verdicts that exist on this machine (01000_hr, 01006_hr). The tool scores LLM agent output; producing new verdicts needs a live LLM run, so the 'full corpus per release' tier is blocked here. features/ is regenerated by the tree under test via 'python -m ecgagent.batch extract' (the producer the agent runs used).",
+          "records": {"glob": "diagnoses/*.json", "sort": "lexical", "stem": true},
+          "files": ["diagnoses/{record}.json", "wfdb/{record}.hea", "wfdb/{record}.dat", "record_results.csv"]
+        },
+        {
+          "name": "PTB-XL metadata (demographics for extraction)",
+          "release": "data/ptb-xl-metadata (differs from ptb-xl-metadata-1.0.1 in ptbxl_database.csv; identity = manifest hash)",
+          "root": "{data}/ptb-xl-metadata",
+          "subset_rule": "Metadata files read by ecgagent.batch.load_reference_index.",
+          "records": {"list": []},
+          "files": ["ptbxl_database.csv", "scp_statements.csv"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"fs_internal": 500, "mains_freq": 50}, "export": "prepare_json_export(to_dict(...), include_beat_features=True) + waveform_review", "source": "ecgagent.batch._extract_one"},
+      "normalizer": "score_measurement_verifiable"
+    },
+    {
+      "id": "evaluate_target_ecgfeat_diagnosis",
+      "script": "evaluate_target_ecgfeat_diagnosis.py",
+      "status": "pinned",
+      "gate_role": "Guard the interpretation-distribution split and its compatibility adapter (doc 05 B: Phase 5).",
+      "cadence": "Every ecginterpret release and every core release that changes fields consumed by interpretation (doc 06).",
+      "estimated_minutes": 10,
+      "workers": 6,
+      "ok_exit_codes": [0, 1],
+      "steps": [
+        {"name": "main", "kind": "tool", "argv": [
+          "--ptbxl-dir", "{data}/ptb-xl/09000", "--ptbxl-metadata-dir", "{data}/ptb-xl-metadata-1.0.1",
+          "--local-dir", "{data}/010",
+          "--condition-csv", "{data}/a-large-scale-12-lead-electrocardiogram-database-for-arrhythmia-study-1.0.0/ConditionNames_SNOMED-CT.csv",
+          "--out-dir", "{run_dir}/out", "--workers", "6", "--fs-internal", "500", "--datasets", "both"]}
+      ],
+      "datasets": [
+        {
+          "name": "PTB-XL",
+          "release": "1.0.1 metadata (ptb-xl-metadata-1.0.1); 500 Hz records",
+          "root": "{data}/ptb-xl/09000",
+          "subset_rule": "Deterministic subset: every record of the local PTB-XL shard 09000 (1000 records, 09000_hr..09999_hr, the tool's own sorted *.hea discovery, no --limit). The full 10-shard local copy (10000 records) is not run per release for runtime.",
+          "records": {"glob": "*.hea", "sort": "lexical", "stem": true},
+          "files": ["{record}.hea", "{record}.dat"]
+        },
+        {
+          "name": "PTB-XL metadata",
+          "release": "1.0.1",
+          "root": "{data}/ptb-xl-metadata-1.0.1",
+          "subset_rule": "Metadata read by the tool.",
+          "records": {"list": []},
+          "files": ["ptbxl_database.csv", "scp_statements.csv"]
+        },
+        {
+          "name": "Chapman/Ningbo 12-lead arrhythmia database, local folder 010",
+          "release": "a-large-scale-12-lead-electrocardiogram-database-for-arrhythmia-study 1.0.0 (WFDBRecords/01/010)",
+          "root": "{data}/010",
+          "subset_rule": "All 100 records of data/010.",
+          "records": {"glob": "*.hea", "sort": "lexical", "stem": true},
+          "files": ["{record}.hea", "{record}.mat"]
+        },
+        {
+          "name": "SNOMED-CT condition names",
+          "release": "1.0.0",
+          "root": "{data}/a-large-scale-12-lead-electrocardiogram-database-for-arrhythmia-study-1.0.0",
+          "subset_rule": "Condition-name CSV read by the tool.",
+          "records": {"list": []},
+          "files": ["ConditionNames_SNOMED-CT.csv"]
+        }
+      ],
+      "extraction_config": {"ECGFeatureExtractor": {"fs_internal": 500, "mains_freq": 50, "enable_pacing": true}, "prediction_source": "clinical_interpretation.final_statements (matched only)"},
+      "normalizer": "evaluate_target_ecgfeat_diagnosis"
+    }
+  ]
+}

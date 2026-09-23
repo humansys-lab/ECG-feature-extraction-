@@ -1,0 +1,266 @@
+{
+  "schema_version": "ecgfeat-benchmark-baseline-index.v1",
+  "baseline_id": "phase0-52a339c",
+  "git_revision": "52a339c0be757c7263ba669c88514ad76acf9466",
+  "environment": {
+    "python": "3.12.13",
+    "python_implementation": "CPython",
+    "python_executable": "/workspace/ecg_gemma/.venv/bin/python",
+    "os": "Linux-6.8.0-78-generic-x86_64-with-glibc2.35",
+    "machine": "x86_64",
+    "cpu_count": 16,
+    "packages": {
+      "numpy": "2.2.6",
+      "scipy": "1.18.0",
+      "numba": "0.65.0",
+      "llvmlite": "0.47.0",
+      "wfdb": "4.3.1",
+      "neurokit2": "0.2.13",
+      "biosppy": "2.2.4",
+      "peakutils": "1.3.5",
+      "pandas": "2.3.3",
+      "matplotlib": "3.11.0",
+      "torch": "2.11.0",
+      "PyWavelets": "1.9.0"
+    },
+    "numpy_blas": {
+      "name": "scipy-openblas",
+      "version": "0.3.29"
+    },
+    "ecgfeat_file": "/workspace/ecg_gemma_baseline/feature_extraction/ecgfeat/__init__.py",
+    "ecgagent_file": "/workspace/ecg_gemma_baseline/ecgagent/__init__.py",
+    "accelerator": {
+      "torch_cuda_available": false,
+      "torch_cuda_device_count": 0,
+      "used_by_tools": false
+    },
+    "thread_env": {
+      "OPENBLAS_NUM_THREADS": "1",
+      "OMP_NUM_THREADS": "1",
+      "MKL_NUM_THREADS": "1",
+      "NUMEXPR_NUM_THREADS": "1",
+      "NUMBA_NUM_THREADS": "1"
+    },
+    "git": {
+      "commit": "52a339c0be757c7263ba669c88514ad76acf9466",
+      "tracked_changes": 0,
+      "tracked_changes_sample": [],
+      "clean": true
+    },
+    "repo_root": "/workspace/ecg_gemma_baseline",
+    "harness_python": "3.12.13"
+  },
+  "spec_sha256": "9979be7eabd60ce146ab4868cfdb244ce48784f0f53a49b28bb3a9064d8632e3",
+  "tolerance_policy": {
+    "source": "docs/library_design/06_testing_and_validation.md, 'Common regression tolerances'",
+    "bounded_accuracy": "aggregate <= 0.5 pp; predeclared subgroup/lead <= 1.0 pp (values are fractions: 0.005 / 0.010)",
+    "error": "<= max(2 % relative, one reporting quantum); signed biases compared on |value|",
+    "coverage": "fraction: <= 0.5 pp; yield count: candidate >= 99.5 % of baseline count",
+    "failure_count": "0 new failures",
+    "exact": "0 differences",
+    "frozen_before_any_migrated_result": true,
+    "never_widened_for_observed_spread": true
+  },
+  "tools": [
+    {
+      "id": "snapshot_regression",
+      "script": "snapshot_regression.py",
+      "status": "delegated",
+      "file": "snapshot_regression.json",
+      "tool_sha256": "3028771821360c38948d24637a806d5034a83a5fd69fb27941f1c29145ba3850",
+      "metric_count": 0,
+      "gated_metric_count": 0,
+      "reason": "Owned by the golden snapshot harness (benchmarks/golden/, separate engineer). This evaluator harness does not run or pin it."
+    },
+    {
+      "id": "evaluate_ludb",
+      "script": "evaluate_ludb.py",
+      "status": "pinned",
+      "file": "evaluate_ludb.json",
+      "tool_sha256": "2252132c52edd7cf924a7ea8f3b01e9789cc0586f0c857aa7aa6dce24529da8c",
+      "metric_count": 157,
+      "gated_metric_count": 156,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 0
+      },
+      "dataset_manifest_sha256": "84c8632186ab7b6d6977472dac94391a06f0ff4ef166a68f54203f7cc0b39944",
+      "wall_seconds_per_run": [
+        590.58,
+        598.36
+      ]
+    },
+    {
+      "id": "evaluate_qtdb",
+      "script": "evaluate_qtdb.py",
+      "status": "pinned",
+      "file": "evaluate_qtdb.json",
+      "tool_sha256": "57edbe0222b2464cf0ebea7bfbc796d2f5de652ddf16a68597d968f329c0d6e6",
+      "metric_count": 190,
+      "gated_metric_count": 153,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 1
+      },
+      "dataset_manifest_sha256": "e67dd3a9472c75a916a37d60d11617e6bb01498890f46ce5f755d2a690583a38",
+      "wall_seconds_per_run": [
+        270.86,
+        368.97
+      ]
+    },
+    {
+      "id": "evaluate_ludb_cse",
+      "script": "evaluate_ludb_cse.py",
+      "status": "pinned",
+      "file": "evaluate_ludb_cse.json",
+      "tool_sha256": "093dca2999b49077f8cd3cca0711230f4d1ea6301543a0ff13ae3c86c975d088",
+      "metric_count": 170,
+      "gated_metric_count": 115,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 0
+      },
+      "dataset_manifest_sha256": "fc60324b7bf91958d219aad1131d86ea8899c6126b2f0ada8f7122ba25930e10",
+      "wall_seconds_per_run": [
+        135.91,
+        137.0
+      ]
+    },
+    {
+      "id": "compare_annotations",
+      "script": "compare_annotations.py",
+      "status": "pinned",
+      "file": "compare_annotations.json",
+      "tool_sha256": "bd33b4a39288eafe74954c36c0930bc55ef606e5df5e4e7d1e93e147176f3eb2",
+      "metric_count": 89,
+      "gated_metric_count": 81,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 0
+      },
+      "dataset_manifest_sha256": "fc60324b7bf91958d219aad1131d86ea8899c6126b2f0ada8f7122ba25930e10",
+      "wall_seconds_per_run": [
+        142.33,
+        142.3
+      ]
+    },
+    {
+      "id": "compare_ludb_detectors",
+      "script": "compare_ludb_detectors.py",
+      "status": "pinned",
+      "file": "compare_ludb_detectors.json",
+      "tool_sha256": "618fcee8cd706c871256aeecb6a8db6c157b79044f582d72d80191d8e1606e9b",
+      "metric_count": 2656,
+      "gated_metric_count": 2283,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 9
+      },
+      "dataset_manifest_sha256": "fc60324b7bf91958d219aad1131d86ea8899c6126b2f0ada8f7122ba25930e10",
+      "wall_seconds_per_run": [
+        180.13,
+        200.25
+      ]
+    },
+    {
+      "id": "analyze_physionet_st",
+      "script": "analyze_physionet_st.py",
+      "status": "pinned",
+      "file": "analyze_physionet_st.json",
+      "tool_sha256": "5981b1569016e13bcba6711d11bb8b5728c4edb39bf7fbafea48e38a8d56c10b",
+      "metric_count": 93,
+      "gated_metric_count": 77,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 0
+      },
+      "dataset_manifest_sha256": "6fa69e8518896daa170615300c8a7b420d2e88f5e4284dcdd75918d4a8131582",
+      "wall_seconds_per_run": [
+        1195.83,
+        1224.2
+      ]
+    },
+    {
+      "id": "batch_extract_ecgfeat",
+      "script": "batch_extract_ecgfeat.py",
+      "status": "pinned",
+      "file": "batch_extract_ecgfeat.json",
+      "tool_sha256": "2a7d9d0aec43ea7c3d977561b990f304b1b272246a09f1b58d7bc58bfb67a230",
+      "metric_count": 28,
+      "gated_metric_count": 22,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 0
+      },
+      "dataset_manifest_sha256": "d939f56d3711323935c200424395610c4295862b408e6ad499f0266bb4b7e224",
+      "wall_seconds_per_run": [
+        102.93,
+        106.98
+      ]
+    },
+    {
+      "id": "score_measurement_verifiable",
+      "script": "score_measurement_verifiable.py",
+      "status": "pinned",
+      "file": "score_measurement_verifiable.json",
+      "tool_sha256": "c6a753dc92a75865821ee775ea93b148dacca2fbc0bd7d8c19f28a8c41313438",
+      "metric_count": 12,
+      "gated_metric_count": 11,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 0
+      },
+      "dataset_manifest_sha256": "366abb0cfd210da17f505d09d82a4671750c445cd51b23c9ada985fc8abe9fad",
+      "wall_seconds_per_run": [
+        5.0,
+        4.85
+      ]
+    },
+    {
+      "id": "evaluate_target_ecgfeat_diagnosis",
+      "script": "evaluate_target_ecgfeat_diagnosis.py",
+      "status": "pinned",
+      "file": "evaluate_target_ecgfeat_diagnosis.json",
+      "tool_sha256": "cf7815817f79dd7563f2a343324d74159fe4143265e6f7b9c8e4609270964a5b",
+      "metric_count": 432,
+      "gated_metric_count": 218,
+      "determinism": {
+        "runs_compared": 2,
+        "identical": true,
+        "identical_gated_metrics": true,
+        "identical_output_digests": true,
+        "ungated_runtime_values_differing": 2
+      },
+      "dataset_manifest_sha256": "74e27a33697ab5660f077646673a7e9bf3d248f108b552cec51e8795dde6d990",
+      "wall_seconds_per_run": [
+        507.99,
+        459.33
+      ]
+    }
+  ],
+  "generated_at": "2026-09-23T09:08:28+00:00"
+}

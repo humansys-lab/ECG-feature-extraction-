@@ -1,0 +1,3833 @@
+{
+  "record_id": "01006_hr",
+  "ok": true,
+  "verified": true,
+  "revisions": 0,
+  "refused": null,
+  "error": null,
+  "verdict": {
+    "summary": "ECG conclusion: First-degree AV block; Counterclockwise precordial rotation. Unconfirmed or limited: Bradycardia (unconfirmed); Poor R-wave progression (unconfirmed).",
+    "ranked_complete_interpretations": [
+      {
+        "rank": 1,
+        "interpretation_type": "PRIMARY",
+        "complete_diagnosis": "First-degree AV block; Counterclockwise precordial rotation",
+        "confidence": "MEDIUM",
+        "basis_codes": [
+          "first_degree_av_block",
+          "counterclockwise_rotation"
+        ],
+        "key_uncertainty": "Required nodes remain incomplete in some diagnosis-specific pathways"
+      },
+      {
+        "rank": 2,
+        "interpretation_type": "ALTERNATIVE",
+        "complete_diagnosis": "Bradycardia (unconfirmed)",
+        "confidence": "MEDIUM",
+        "basis_codes": [
+          "bradycardia"
+        ],
+        "key_uncertainty": "Complete the diagnosis-specific pathway and review the original waveforms"
+      },
+      {
+        "rank": 3,
+        "interpretation_type": "ALTERNATIVE",
+        "complete_diagnosis": "Poor R-wave progression (unconfirmed)",
+        "confidence": "LOW",
+        "basis_codes": [
+          "poor_r_wave_progression"
+        ],
+        "key_uncertainty": "Complete the following required nodes: Do R/S progression and transition from V1 through V6 support this candidate?"
+      }
+    ],
+    "diagnoses": [
+      {
+        "code": "first_degree_av_block",
+        "statement": "First-degree AV block",
+        "category": "conduction",
+        "confidence": "HIGH",
+        "urgency": "ROUTINE",
+        "evidence": [
+          {
+            "claim": "Programmatic definition-level assessment using the global reportable PR interval",
+            "value": 212,
+            "unit": "ms",
+            "citations": [
+              "ev:/global_features/pr_ms"
+            ]
+          },
+          {
+            "claim": "Programmatic count of P-QRS association types among reliable atrial events",
+            "value": null,
+            "unit": null,
+            "citations": [
+              "ev:/rhythm_inputs/p_events/0/association_type"
+            ]
+          },
+          {
+            "claim": "Programmatic count of P-QRS association types among reliable atrial events",
+            "value": null,
+            "unit": null,
+            "citations": [
+              "ev:/rhythm_inputs/p_events/1/association_type"
+            ]
+          },
+          {
+            "claim": "Programmatic count of P-QRS association types among reliable atrial events",
+            "value": null,
+            "unit": null,
+            "citations": [
+              "ev:/rhythm_inputs/p_events/3/association_type"
+            ]
+          }
+        ],
+        "counterevidence": [],
+        "reasoning": "Every required node in the diagnosis-specific pathway is supported by its corresponding measurement view."
+      },
+      {
+        "code": "counterclockwise_rotation",
+        "statement": "Counterclockwise precordial rotation",
+        "category": "other",
+        "confidence": "MEDIUM",
+        "urgency": "ROUTINE",
+        "evidence": [
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 0.153,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V1/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 0.129,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V3/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 0.413,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V4/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 2.272,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V6/params/r_amp_mv"
+            ]
+          }
+        ],
+        "counterevidence": [],
+        "reasoning": "Every required node in the diagnosis-specific pathway is supported by its corresponding measurement view."
+      }
+    ],
+    "differential_diagnoses": [
+      {
+        "code": "bradycardia",
+        "statement": "Bradycardia (unconfirmed)",
+        "confidence": "MEDIUM",
+        "supporting_evidence": [
+          {
+            "claim": "Global heart rate used for the definition-level rate assessment",
+            "value": 50,
+            "unit": "bpm",
+            "citations": [
+              "ev:/global_features/heart_rate_bpm"
+            ]
+          }
+        ],
+        "counterevidence": [],
+        "what_would_resolve_it": "Complete the diagnosis-specific pathway and review the original waveforms"
+      },
+      {
+        "code": "poor_r_wave_progression",
+        "statement": "Poor R-wave progression (unconfirmed)",
+        "confidence": "LOW",
+        "supporting_evidence": [
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 0.153,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V1/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 0.129,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V3/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 0.413,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V4/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6",
+            "value": 2.272,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/V6/params/r_amp_mv"
+            ]
+          },
+          {
+            "claim": "The sampled native beat is not paced.",
+            "value": null,
+            "unit": null,
+            "citations": [
+              "ev:/rhythm_inputs/native_beat_profiles/rows/0/paced"
+            ]
+          },
+          {
+            "claim": "The sampled native beat has a measurable QRS duration.",
+            "value": 158,
+            "unit": "ms",
+            "citations": [
+              "ev:/rhythm_inputs/native_beat_profiles/rows/0/qrs_ms"
+            ]
+          }
+        ],
+        "counterevidence": [],
+        "what_would_resolve_it": "Complete the following required nodes: Do R/S progression and transition from V1 through V6 support this candidate?"
+      }
+    ],
+    "interval_measurement_contexts": [
+      {
+        "interval": "QT_QTc",
+        "status": "unavailable",
+        "interval_conclusion": "This interval has reliability limitations and cannot serve as unconditional diagnostic evidence",
+        "component_waveform_assessment": "T/U-wave morphology remains informative, but QT/QTc endpoint reliability is limited",
+        "residual_evidence": [
+          {
+            "claim": "Lead I: Lead T amplitude is measurable.",
+            "value": -0.099,
+            "unit": "mV",
+            "citations": [
+              "ev:/representative_leads/I/params/t_amp_mv"
+            ]
+          }
+        ],
+        "interpretive_impact": "Limited QT/QTc measurement cannot confirm or exclude a QT abnormality",
+        "what_would_resolve_it": "Review T-wave endpoints across leads and repeat measurement under improved technical conditions if needed"
+      }
+    ],
+    "abstentions": [],
+    "quality_assessment": {
+      "interpretability": "limited",
+      "limitations": [
+        "Required nodes remain incomplete in some diagnosis-specific pathways"
+      ]
+    },
+    "human_review": {
+      "required": true,
+      "reasons": [
+        "Review the program-confirmed diagnostic pathways against the original 12-lead evidence",
+        "Incomplete diagnostic pathways require review with the original waveforms and clinical context",
+        "QT_QTc measurement is limited; component waves and interval endpoints require human review"
+      ]
+    }
+  },
+  "knowledge_navigation": {
+    "enabled": false,
+    "requested": true,
+    "status": "disabled",
+    "max_chunks": 4,
+    "patient_evidence": false,
+    "injected_after_phase": "survey",
+    "removed_after_phase": "hypothesize"
+  },
+  "pre_knowledge_verdict": null,
+  "knowledge_review": null,
+  "knowledge_revisions": 0,
+  "brief_report": "# Brief ECG Diagnostic Report\n\n- Record: 01006_hr\n- Result status: Passed deterministic evidence validation\n\n## Conclusion\n\nECG conclusion: First-degree AV block; Counterclockwise precordial rotation. Unconfirmed or limited: Bradycardia (unconfirmed); Poor R-wave progression (unconfirmed).\n\n## Confirmed Diagnoses\n\n- **First-degree AV block** (Confidence: High; Urgency: Routine)\n  - Key evidence: Programmatic definition-level assessment using the global reportable PR interval (212 ms); Programmatic count of P-QRS association types among reliable atrial events\n- **Counterclockwise precordial rotation** (Confidence: Medium; Urgency: Routine)\n  - Key evidence: Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (0.153 mV); Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (0.129 mV)\n\n## Important but Unconfirmed\n\n- **Bradycardia (unconfirmed)** (Likelihood: Medium)\n  - Supporting evidence: Global heart rate used for the definition-level rate assessment (50 bpm)\n  - How to resolve: Complete the diagnosis-specific pathway and review the original waveforms\n- **Poor R-wave progression (unconfirmed)** (Likelihood: Low)\n  - Supporting evidence: Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (0.153 mV); Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (0.129 mV)\n  - How to resolve: Complete the following required nodes: Do R/S progression and transition from V1 through V6 support this candidate?\n\n## Main Limitations\n\n- Overall interpretability: Limited\n- Required nodes remain incomplete in some diagnosis-specific pathways\n- QT/QTc interval and T/U waves: This interval has reliability limitations and cannot serve as unconditional diagnostic evidence\n\n## Human Review Recommendations\n\n- This result requires human review.\n- Review the program-confirmed diagnostic pathways against the original 12-lead evidence\n- Incomplete diagnostic pathways require review with the original waveforms and clinical context\n- QT_QTc measurement is limited; component waves and interval endpoints require human review\n- Complete the diagnosis-specific pathway and review the original waveforms\n- Complete the following required nodes: Do R/S progression and transition from V1 through V6 support this candidate?\n- See the full report for 1 additional recommendations.\n\n> Key values come from structured ecgfeat measurements. See the full report and JSON for complete evidence paths and audit details. This report is for research assistance only and does not replace clinician waveform review, clinical information or a formal medical diagnosis.",
+  "human_report": "# ECG Agent Diagnostic Interpretation Report\n\n- Record: 01006_hr\n- Evidence and semantic validation: passed measurement-citation, reliability-qualification, numeric-logic, definition-level diagnosis-to-measurement consistency, and candidate-promotion checks\n\n## Ranked ECG Findings and Interpretations\n\n1. **First-degree AV block; Counterclockwise precordial rotation** (Primary interpretation; overall confidence: Medium)\n   - Key uncertainty: Required nodes remain incomplete in some diagnosis-specific pathways\n2. **Bradycardia (unconfirmed)** (Alternative interpretation; overall confidence: Medium)\n   - Key uncertainty: Complete the diagnosis-specific pathway and review the original waveforms\n3. **Poor R-wave progression (unconfirmed)** (Alternative interpretation; overall confidence: Low)\n   - Key uncertainty: Complete the following required nodes: Do R/S progression and transition from V1 through V6 support this candidate?\n\n## Overall Conclusion\n\nECG conclusion: First-degree AV block; Counterclockwise precordial rotation. Unconfirmed or limited: Bradycardia (unconfirmed); Poor R-wave progression (unconfirmed).\n\n## Reporting Levels\n\n- Major ECG findings include only findings that reached the positive-interpretation evidence threshold.\n- Candidate-detector results and insufficiently supported mechanisms are listed under Differential Diagnoses and are not confirmed diagnoses.\n- Items that cannot be assessed reliably are listed as limited or abstained; missing values are never used to invent a diagnosis.\n\n## Data Quality and Interpretation Limitations\n\n- Overall interpretability: Limited\n- Required nodes remain incomplete in some diagnosis-specific pathways\n\n## Major ECG Findings (Positive-Interpretation Threshold Met)\n\n### 1. First-degree AV block\n- Code: first_degree_av_block; Category: Conduction; Confidence: High; Urgency: Routine\n- Rationale: Every required node in the diagnosis-specific pathway is supported by its corresponding measurement view.\n  Supporting evidence:\n  - Programmatic definition-level assessment using the global reportable PR interval (Structured measurement: 212 ms; Evidence location: ev:/global_features/pr_ms)\n  - Programmatic count of P-QRS association types among reliable atrial events (Evidence location: ev:/rhythm_inputs/p_events/0/association_type)\n  - Programmatic count of P-QRS association types among reliable atrial events (Evidence location: ev:/rhythm_inputs/p_events/1/association_type)\n  - Programmatic count of P-QRS association types among reliable atrial events (Evidence location: ev:/rhythm_inputs/p_events/3/association_type)\n  Counterevidence or inconsistencies:\n  - No explicit counterevidence was recorded among the evidence reviewed in this run\n\n### 2. Counterclockwise precordial rotation\n- Code: counterclockwise_rotation; Category: Other; Confidence: Medium; Urgency: Routine\n- Rationale: Every required node in the diagnosis-specific pathway is supported by its corresponding measurement view.\n  Supporting evidence:\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 0.153 mV; Evidence location: ev:/representative_leads/V1/params/r_amp_mv)\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 0.129 mV; Evidence location: ev:/representative_leads/V3/params/r_amp_mv)\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 0.413 mV; Evidence location: ev:/representative_leads/V4/params/r_amp_mv)\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 2.272 mV; Evidence location: ev:/representative_leads/V6/params/r_amp_mv)\n  Counterevidence or inconsistencies:\n  - No explicit counterevidence was recorded among the evidence reviewed in this run\n\n## Differential Diagnoses (Unconfirmed Candidates)\n\n### 1. Bradycardia (unconfirmed)\n- Current likelihood: Medium\n  Evidence supporting this possibility:\n  - Global heart rate used for the definition-level rate assessment (Structured measurement: 50 bpm; Evidence location: ev:/global_features/heart_rate_bpm)\n  Evidence against this possibility:\n  - No explicit counterevidence was recorded among the evidence reviewed in this run\n- How to resolve: Complete the diagnosis-specific pathway and review the original waveforms\n\n### 2. Poor R-wave progression (unconfirmed)\n- Current likelihood: Low\n  Evidence supporting this possibility:\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 0.153 mV; Evidence location: ev:/representative_leads/V1/params/r_amp_mv)\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 0.129 mV; Evidence location: ev:/representative_leads/V3/params/r_amp_mv)\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 0.413 mV; Evidence location: ev:/representative_leads/V4/params/r_amp_mv)\n  - Programmatic calculation of R-wave progression and R/S transition from V1 through V6 (Structured measurement: 2.272 mV; Evidence location: ev:/representative_leads/V6/params/r_amp_mv)\n  - The sampled native beat is not paced. (Evidence location: ev:/rhythm_inputs/native_beat_profiles/rows/0/paced)\n  - The sampled native beat has a measurable QRS duration. (Structured measurement: 158 ms; Evidence location: ev:/rhythm_inputs/native_beat_profiles/rows/0/qrs_ms)\n  Evidence against this possibility:\n  - No explicit counterevidence was recorded among the evidence reviewed in this run\n- How to resolve: Complete the following required nodes: Do R/S progression and transition from V1 through V6 support this candidate?\n\n## Waveform Information Retained When Intervals Are Limited\n\n### 1. QT/QTc interval and T/U waves\n- Measurement status: Cannot be measured reliably\n- Interval: This interval has reliability limitations and cannot serve as unconditional diagnostic evidence\n- Component waveform still shows: T/U-wave morphology remains informative, but QT/QTc endpoint reliability is limited\n  Retained waveform evidence:\n  - Lead I: Lead T amplitude is measurable. (Structured measurement: -0.099 mV; Evidence location: ev:/representative_leads/I/params/t_amp_mv)\n- Diagnostic impact: Limited QT/QTc measurement cannot confirm or exclude a QT abnormality\n- How to resolve: Review T-wave endpoints across leads and repeat measurement under improved technical conditions if needed\n\n## Indeterminate Items\n\nNo indeterminate item requires separate reporting.\n\n## Human Review Recommendations\n\n- Human review is required.\n- Review the program-confirmed diagnostic pathways against the original 12-lead evidence\n- Incomplete diagnostic pathways require review with the original waveforms and clinical context\n- QT_QTc measurement is limited; component waves and interval endpoints require human review\n\n> Note: deterministic validation confirms that measurements, citations and reliability qualifications in the report match ecgfeat output, and applies numeric-logic, definition-level diagnosis and candidate-promotion gates. It does not cover all clinical diagnostic knowledge and does not mean that the clinical diagnosis has been validated. This report is a research aid and does not replace clinician waveform review, history, symptoms, prior testing or a formal medical diagnosis.",
+  "verification": {
+    "passed": true,
+    "n_claims": 16,
+    "n_citations": 16,
+    "n_quantities": 12,
+    "n_supported_quantities": 12,
+    "n_thresholds": 0,
+    "support_rate": 1.0,
+    "counts": {},
+    "findings": []
+  },
+  "phases": [
+    {
+      "phase": "plan",
+      "tool_budget": 1,
+      "exposed_tools": [],
+      "prefetched_tool_calls": 1,
+      "turns": 1,
+      "tool_calls": 1,
+      "rejected_calls": 0,
+      "elapsed_s": 44.03,
+      "stop_reason": "end_turn",
+      "duplicate_batches": 0,
+      "tool_loop_fused": false,
+      "phase_guard_attempts": 0,
+      "phase_guard_passed": true,
+      "phase_guard_problems": [],
+      "phase_sanitizations": [
+        "candidate[2] `left_axis_deviation` dropped: [diagnosis_measurement_conflict] the authorized reliable QRS axis contradicts this candidate's definition range",
+        "candidate `rbbb_pattern` dropped before adjudication: its complete pathway exceeds the compact exact-view budget",
+        "candidate `rvh_pattern` dropped before adjudication: its complete pathway exceeds the compact exact-view budget"
+      ],
+      "text": "{\"candidates\": [{\"id\": \"c1\", \"code\": \"bradycardia\", \"domains\": [\"rhythm_rate\"], \"support\": [\"Q5\", \"Q27\"], \"counter\": [\"Q21\", \"Q29\"], \"checks\": [{\"tool\": \"get_rhythm_profile\", \"purpose\": \"support\", \"question\": \"Is the bradycardia sinus in origin with regular RR intervals?\"}, {\"tool\": \"get_atrial_event_table\", \"purpose\": \"falsify\", \"question\": \"Are there ectopic atrial events or pauses suggesting non-sinus bradycardia?\"}], \"uncertainty\": \"Rate is low but mechanism and regularity need confirmation.\"}, {\"id\": \"c2\", \"code\": \"first_degree_av_block\", \"domains\": [\"conduction_preexcitation\"], \"support\": [\"Q6\"], \"counter\": [\"Q38\"], \"checks\": [{\"tool\": \"get_interval_waveform_context\", \"purpose\": \"support\", \"question\": \"Is the PR interval consistently prolonged across beats?\"}, {\"tool\": \"get_atrial_event_table\", \"purpose\": \"falsify\", \"question\": \"Are P waves consistently preceding QRS complexes without dropped beats?\"}], \"uncertainty\": \"PR is prolonged but consistency and P-wave morphology need verification.\"}, {\"id\": \"c3\", \"code\": \"left_axis_deviation\", \"domains\": [\"axis\"], \"support\": [\"Q10\"], \"counter\": [\"Q22\"], \"checks\": [{\"tool\": \"get_lead_table\", \"purpose\": \"support\", \"question\": \"Do limb leads confirm leftward QRS axis?\"}, {\"tool\": \"get_morphology_groups\", \"purpose\": \"falsify\", \"question\": \"Is there left anterior fascicular block morphology?\"}], \"uncertainty\": \"Axis is leftward but fascicular block morphology is unconfirmed.\"}, {\"id\": \"c4\", \"code\": \"left_ventricular_hypertrophy\", \"domains\": [\"voltage_chamber_r_progression\"], \"support\": [\"Q18\", \"Q19\"], \"counter\": [\"Q7\"], \"checks\": [{\"tool\": \"get_morphology_groups\", \"purpose\": \"support\", \"question\": \"Are there strain pattern or repolarization abnormalities?\"}, {\"tool\": \"get_lead_table\", \"purpose\": \"falsify\", \"question\": \"Do voltage criteria meet LVH thresholds in multiple leads?\"}], \"uncertainty\": \"High voltage is present but strain pattern and multi-lead criteria need assessment.\"}, {\"id\": \"c5\", \"code\": \"st_elevation\", \"domains\": [\"voltage_chamber_r_progression\"], \"support\": [\"Q11\", \"Q12\"], \"counter\": [\"Q13\", \"Q14\"], \"checks\": [{\"tool\": \"get_morphology_groups\", \"purpose\": \"support\", \"question\": \"Is ST elevation present in contiguous leads?\"}, {\"tool\": \"get_lead_table\", \"purpose\": \"falsify\", \"question\": \"Is ST elevation reciprocal in other leads?\"}], \"uncertainty\": \"ST deviations are present but contiguity and reciprocity need confirmation.\"}], \"review_tools\": [\"get_morphology_groups\", \"get_lead_table\"], \"quality_limitations\": []}",
+      "response_history": [
+        {
+          "turn": 1,
+          "text": "{\"candidates\": [{\"id\": \"c1\", \"code\": \"bradycardia\", \"domains\": [\"rhythm_rate\"], \"support\": [\"Q5\", \"Q27\"], \"counter\": [\"Q21\", \"Q29\"], \"checks\": [{\"tool\": \"get_rhythm_profile\", \"purpose\": \"support\", \"question\": \"Is the bradycardia sinus in origin with regular RR intervals?\"}, {\"tool\": \"get_atrial_event_table\", \"purpose\": \"falsify\", \"question\": \"Are there ectopic atrial events or pauses suggesting non-sinus bradycardia?\"}], \"uncertainty\": \"Rate is low but mechanism and regularity need confirmation.\"}, {\"id\": \"c2\", \"code\": \"first_degree_av_block\", \"domains\": [\"conduction_preexcitation\"], \"support\": [\"Q6\"], \"counter\": [\"Q38\"], \"checks\": [{\"tool\": \"get_interval_waveform_context\", \"purpose\": \"support\", \"question\": \"Is the PR interval consistently prolonged across beats?\"}, {\"tool\": \"get_atrial_event_table\", \"purpose\": \"falsify\", \"question\": \"Are P waves consistently preceding QRS complexes without dropped beats?\"}], \"uncertainty\": \"PR is prolonged but consistency and P-wave morphology need verification.\"}, {\"id\": \"c3\", \"code\": \"left_axis_deviation\", \"domains\": [\"axis\"], \"support\": [\"Q10\"], \"counter\": [\"Q22\"], \"checks\": [{\"tool\": \"get_lead_table\", \"purpose\": \"support\", \"question\": \"Do limb leads confirm leftward QRS axis?\"}, {\"tool\": \"get_morphology_groups\", \"purpose\": \"falsify\", \"question\": \"Is there left anterior fascicular block morphology?\"}], \"uncertainty\": \"Axis is leftward but fascicular block morphology is unconfirmed.\"}, {\"id\": \"c4\", \"code\": \"left_ventricular_hypertrophy\", \"domains\": [\"voltage_chamber_r_progression\"], \"support\": [\"Q18\", \"Q19\"], \"counter\": [\"Q7\"], \"checks\": [{\"tool\": \"get_morphology_groups\", \"purpose\": \"support\", \"question\": \"Are there strain pattern or repolarization abnormalities?\"}, {\"tool\": \"get_lead_table\", \"purpose\": \"falsify\", \"question\": \"Do voltage criteria meet LVH thresholds in multiple leads?\"}], \"uncertainty\": \"High voltage is present but strain pattern and multi-lead criteria need assessment.\"}, {\"id\": \"c5\", \"code\": \"st_elevation\", \"domains\": [\"voltage_chamber_r_progression\"], \"support\": [\"Q11\", \"Q12\"], \"counter\": [\"Q13\", \"Q14\"], \"checks\": [{\"tool\": \"get_morphology_groups\", \"purpose\": \"support\", \"question\": \"Is ST elevation present in contiguous leads?\"}, {\"tool\": \"get_lead_table\", \"purpose\": \"falsify\", \"question\": \"Is ST elevation reciprocal in other leads?\"}], \"uncertainty\": \"ST deviations are present but contiguity and reciprocity need confirmation.\"}], \"review_tools\": [\"get_morphology_groups\", \"get_lead_table\"], \"quality_limitations\": []}",
+          "stop_reason": "end_turn",
+          "refusal": null
+        }
+      ]
+    },
+    {
+      "phase": "adjudicate",
+      "tool_budget": 15,
+      "exposed_tools": [],
+      "prefetched_tool_calls": 15,
+      "turns": 1,
+      "tool_calls": 15,
+      "rejected_calls": 0,
+      "elapsed_s": 123.52,
+      "stop_reason": "end_turn",
+      "duplicate_batches": 0,
+      "tool_loop_fused": false,
+      "phase_guard_attempts": 0,
+      "phase_guard_passed": true,
+      "phase_guard_problems": [],
+      "phase_sanitizations": [],
+      "text": "{\"overall_status\": \"insufficient_evidence\", \"decisions\": [{\"id\": \"c1\", \"code\": \"bradycardia\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"planned_falsification\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q81\", \"claim\": \"A sampled P event is conducted without ectopy.\"}, {\"citation\": \"Q84\", \"claim\": \"Another sampled P event is conducted without ectopy.\"}, {\"citation\": \"Q87\", \"claim\": \"A further sampled P event is conducted without ectopy.\"}], \"note\": \"Conducted P events do not establish the bradycardia mechanism.\"}]}, {\"id\": \"r5_prior_infarct_q_wave_pattern\", \"code\": \"prior_infarct_q_wave_pattern\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"q_wave_morphology\", \"status\": \"fail\", \"evidence\": [{\"citation\": \"Q101\", \"claim\": \"Lead I Q duration is unavailable.\"}, {\"citation\": \"Q104\", \"claim\": \"Lead II Q duration is unavailable.\"}, {\"citation\": \"Q117\", \"claim\": \"V1 Q duration is unavailable.\"}], \"note\": \"Required Q-wave duration is not reliably present in relevant leads.\"}, {\"id\": \"q_wave_distribution\", \"status\": \"unknown\", \"evidence\": [], \"note\": \"The native beat profile did not establish a repeated infarct Q-wave distribution.\"}]}, {\"id\": \"r6_poor_r_wave_progression\", \"code\": \"poor_r_wave_progression\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"alternative_qrs_cause_excluded\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q139\", \"claim\": \"The sampled native beat is not paced.\"}, {\"citation\": \"Q140\", \"claim\": \"The sampled native beat has a measurable QRS duration.\"}], \"note\": \"The view does not exclude infarction, conduction abnormality, or lead placement.\"}]}, {\"id\": \"r8_counterclockwise_rotation\", \"code\": \"counterclockwise_rotation\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"alternative_qrs_cause_excluded\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q139\", \"claim\": \"The sampled native beat is not paced.\"}, {\"citation\": \"Q140\", \"claim\": \"The sampled native beat has a measurable QRS duration.\"}], \"note\": \"The view does not exclude an alternative QRS cause.\"}]}, {\"id\": \"c4\", \"code\": \"left_ventricular_hypertrophy\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"cross_lead_voltage_criterion\", \"status\": \"pass\", \"evidence\": [{\"citation\": \"Q114\", \"claim\": \"aVL R amplitude is present.\"}, {\"citation\": \"Q19\", \"claim\": \"V3 S amplitude is large.\"}, {\"citation\": \"Q192\", \"claim\": \"V4 S amplitude is large.\"}], \"note\": \"The cross-lead voltage combination supports the stated hypertrophy criterion.\"}, {\"id\": \"qrs_morphology_compatible\", \"status\": \"pass\", \"evidence\": [{\"citation\": \"Q193\", \"claim\": \"Lead I QRS morphology is measurable and compatible.\"}, {\"citation\": \"Q197\", \"claim\": \"V5 QRS morphology is measurable and compatible.\"}, {\"citation\": \"Q198\", \"claim\": \"V6 QRS morphology is measurable and compatible.\"}], \"note\": \"QRS morphology does not invalidate the voltage criterion.\"}]}, {\"id\": \"c5\", \"code\": \"st_elevation\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"st_change_distribution\", \"status\": \"fail\", \"evidence\": [{\"citation\": \"Q11\", \"claim\": \"V5 ST is depressed rather than elevated.\"}, {\"citation\": \"Q199\", \"claim\": \"Lead I ST is depressed rather than elevated.\"}, {\"citation\": \"Q214\", \"claim\": \"aVF ST is depressed rather than elevated.\"}], \"note\": \"Reliable ST changes do not support a contiguous elevation distribution.\"}, {\"id\": \"st_territorial_confirmation\", \"status\": \"unknown\", \"evidence\": [], \"note\": \"The requested lead-table ST view returned no citable measurements.\"}, {\"id\": \"secondary_qrs_context\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q139\", \"claim\": \"The sampled native beat is not paced.\"}, {\"citation\": \"Q140\", \"claim\": \"The sampled native beat has a measurable QRS duration.\"}], \"note\": \"The view does not establish whether a secondary QRS cause alters ST interpretation.\"}]}], \"interval_contexts\": [{\"interval\": \"QT_QTc\", \"status\": \"unavailable\", \"assessment\": \"QT is not reportable because T-wave fusion reliability is absent.\", \"impact\": \"QT-related interpretation is limited.\", \"evidence\": [{\"citation\": \"Q23\", \"claim\": \"QT reliability is marked unreliable.\"}, {\"citation\": \"Q42\", \"claim\": \"T-wave fusion reliability is absent.\"}, {\"citation\": \"Q41\", \"claim\": \"Lead I T amplitude is measurable.\"}], \"what_would_resolve_it\": \"A reliable T-wave endpoint or clean QT measurement would resolve the limitation.\"}]}",
+      "response_history": [
+        {
+          "turn": 1,
+          "text": "{\"overall_status\": \"insufficient_evidence\", \"decisions\": [{\"id\": \"c1\", \"code\": \"bradycardia\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"planned_falsification\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q81\", \"claim\": \"A sampled P event is conducted without ectopy.\"}, {\"citation\": \"Q84\", \"claim\": \"Another sampled P event is conducted without ectopy.\"}, {\"citation\": \"Q87\", \"claim\": \"A further sampled P event is conducted without ectopy.\"}], \"note\": \"Conducted P events do not establish the bradycardia mechanism.\"}]}, {\"id\": \"r5_prior_infarct_q_wave_pattern\", \"code\": \"prior_infarct_q_wave_pattern\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"q_wave_morphology\", \"status\": \"fail\", \"evidence\": [{\"citation\": \"Q101\", \"claim\": \"Lead I Q duration is unavailable.\"}, {\"citation\": \"Q104\", \"claim\": \"Lead II Q duration is unavailable.\"}, {\"citation\": \"Q117\", \"claim\": \"V1 Q duration is unavailable.\"}], \"note\": \"Required Q-wave duration is not reliably present in relevant leads.\"}, {\"id\": \"q_wave_distribution\", \"status\": \"unknown\", \"evidence\": [], \"note\": \"The native beat profile did not establish a repeated infarct Q-wave distribution.\"}]}, {\"id\": \"r6_poor_r_wave_progression\", \"code\": \"poor_r_wave_progression\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"alternative_qrs_cause_excluded\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q139\", \"claim\": \"The sampled native beat is not paced.\"}, {\"citation\": \"Q140\", \"claim\": \"The sampled native beat has a measurable QRS duration.\"}], \"note\": \"The view does not exclude infarction, conduction abnormality, or lead placement.\"}]}, {\"id\": \"r8_counterclockwise_rotation\", \"code\": \"counterclockwise_rotation\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"alternative_qrs_cause_excluded\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q139\", \"claim\": \"The sampled native beat is not paced.\"}, {\"citation\": \"Q140\", \"claim\": \"The sampled native beat has a measurable QRS duration.\"}], \"note\": \"The view does not exclude an alternative QRS cause.\"}]}, {\"id\": \"c4\", \"code\": \"left_ventricular_hypertrophy\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"cross_lead_voltage_criterion\", \"status\": \"pass\", \"evidence\": [{\"citation\": \"Q114\", \"claim\": \"aVL R amplitude is present.\"}, {\"citation\": \"Q19\", \"claim\": \"V3 S amplitude is large.\"}, {\"citation\": \"Q192\", \"claim\": \"V4 S amplitude is large.\"}], \"note\": \"The cross-lead voltage combination supports the stated hypertrophy criterion.\"}, {\"id\": \"qrs_morphology_compatible\", \"status\": \"pass\", \"evidence\": [{\"citation\": \"Q193\", \"claim\": \"Lead I QRS morphology is measurable and compatible.\"}, {\"citation\": \"Q197\", \"claim\": \"V5 QRS morphology is measurable and compatible.\"}, {\"citation\": \"Q198\", \"claim\": \"V6 QRS morphology is measurable and compatible.\"}], \"note\": \"QRS morphology does not invalidate the voltage criterion.\"}]}, {\"id\": \"c5\", \"code\": \"st_elevation\", \"urgency\": \"ROUTINE\", \"pathway_steps\": [{\"id\": \"st_change_distribution\", \"status\": \"fail\", \"evidence\": [{\"citation\": \"Q11\", \"claim\": \"V5 ST is depressed rather than elevated.\"}, {\"citation\": \"Q199\", \"claim\": \"Lead I ST is depressed rather than elevated.\"}, {\"citation\": \"Q214\", \"claim\": \"aVF ST is depressed rather than elevated.\"}], \"note\": \"Reliable ST changes do not support a contiguous elevation distribution.\"}, {\"id\": \"st_territorial_confirmation\", \"status\": \"unknown\", \"evidence\": [], \"note\": \"The requested lead-table ST view returned no citable measurements.\"}, {\"id\": \"secondary_qrs_context\", \"status\": \"unknown\", \"evidence\": [{\"citation\": \"Q139\", \"claim\": \"The sampled native beat is not paced.\"}, {\"citation\": \"Q140\", \"claim\": \"The sampled native beat has a measurable QRS duration.\"}], \"note\": \"The view does not establish whether a secondary QRS cause alters ST interpretation.\"}]}], \"interval_contexts\": [{\"interval\": \"QT_QTc\", \"status\": \"unavailable\", \"assessment\": \"QT is not reportable because T-wave fusion reliability is absent.\", \"impact\": \"QT-related interpretation is limited.\", \"evidence\": [{\"citation\": \"Q23\", \"claim\": \"QT reliability is marked unreliable.\"}, {\"citation\": \"Q42\", \"claim\": \"T-wave fusion reliability is absent.\"}, {\"citation\": \"Q41\", \"claim\": \"Lead I T amplitude is measurable.\"}], \"what_would_resolve_it\": \"A reliable T-wave endpoint or clean QT measurement would resolve the limitation.\"}]}",
+          "stop_reason": "end_turn",
+          "refusal": null
+        }
+      ]
+    }
+  ],
+  "audit": {
+    "agent_protocol": "ecgagent.diagnostic.v43",
+    "prompt_fingerprint": "1b5d6da87dad4e65c4b90dba5ad89c13b834a0b4c54649ae35c623b7ac7d6e9a",
+    "mode": "diagnose",
+    "input_fingerprint": "sha256:6e376d5691429a636dc3286d508bbffb42643ea8a6d62170822753e6a566a887",
+    "evidence_access_contract": {
+      "version": "ecgagent.diagnosis-evidence.v4",
+      "dropped_top_level": [
+        "_ecgagent_extraction",
+        "clinical_interpretation",
+        "interpretation",
+        "reference_metadata",
+        "statement_engine"
+      ],
+      "unclassified_top_level": [
+        "_ecgagent_extraction"
+      ],
+      "dropped_metadata": [
+        "clinical_interpretation",
+        "confidence_semantics",
+        "confirmed_pacing_context",
+        "rhythm_analysis",
+        "st_amplitude_signal"
+      ],
+      "dropped_rhythm_sections": [
+        "statement_evidence"
+      ],
+      "dropped_morphology_sections": [
+        "derived_facts",
+        "statement_evidence"
+      ],
+      "dropped_sensitive_fields": [
+        "/beat_features/0/glasgow_measurements",
+        "/beat_features/1/glasgow_measurements",
+        "/beat_features/10/glasgow_measurements",
+        "/beat_features/11/glasgow_measurements",
+        "/beat_features/12/glasgow_measurements",
+        "/beat_features/13/glasgow_measurements",
+        "/beat_features/14/glasgow_measurements",
+        "/beat_features/15/glasgow_measurements",
+        "/beat_features/16/glasgow_measurements",
+        "/beat_features/17/glasgow_measurements",
+        "/beat_features/18/glasgow_measurements",
+        "/beat_features/19/glasgow_measurements",
+        "/beat_features/2/glasgow_measurements",
+        "/beat_features/20/glasgow_measurements",
+        "/beat_features/21/glasgow_measurements",
+        "/beat_features/22/glasgow_measurements",
+        "/beat_features/23/glasgow_measurements",
+        "/beat_features/24/glasgow_measurements",
+        "/beat_features/25/glasgow_measurements",
+        "/beat_features/26/glasgow_measurements",
+        "/beat_features/27/glasgow_measurements",
+        "/beat_features/28/glasgow_measurements",
+        "/beat_features/29/glasgow_measurements",
+        "/beat_features/3/glasgow_measurements",
+        "/beat_features/30/glasgow_measurements",
+        "/beat_features/31/glasgow_measurements",
+        "/beat_features/32/glasgow_measurements",
+        "/beat_features/33/glasgow_measurements",
+        "/beat_features/34/glasgow_measurements",
+        "/beat_features/35/glasgow_measurements",
+        "/beat_features/36/glasgow_measurements",
+        "/beat_features/37/glasgow_measurements",
+        "/beat_features/38/glasgow_measurements",
+        "/beat_features/39/glasgow_measurements",
+        "/beat_features/4/glasgow_measurements",
+        "/beat_features/40/glasgow_measurements",
+        "/beat_features/41/glasgow_measurements",
+        "/beat_features/42/glasgow_measurements",
+        "/beat_features/43/glasgow_measurements",
+        "/beat_features/44/glasgow_measurements",
+        "/beat_features/45/glasgow_measurements",
+        "/beat_features/46/glasgow_measurements",
+        "/beat_features/47/glasgow_measurements",
+        "/beat_features/48/glasgow_measurements",
+        "/beat_features/49/glasgow_measurements",
+        "/beat_features/5/glasgow_measurements",
+        "/beat_features/50/glasgow_measurements",
+        "/beat_features/51/glasgow_measurements",
+        "/beat_features/52/glasgow_measurements",
+        "/beat_features/53/glasgow_measurements",
+        "/beat_features/54/glasgow_measurements",
+        "/beat_features/55/glasgow_measurements",
+        "/beat_features/56/glasgow_measurements",
+        "/beat_features/57/glasgow_measurements",
+        "/beat_features/58/glasgow_measurements",
+        "/beat_features/59/glasgow_measurements",
+        "/beat_features/6/glasgow_measurements",
+        "/beat_features/60/glasgow_measurements",
+        "/beat_features/61/glasgow_measurements",
+        "/beat_features/62/glasgow_measurements",
+        "/beat_features/63/glasgow_measurements",
+        "/beat_features/64/glasgow_measurements",
+        "/beat_features/65/glasgow_measurements",
+        "/beat_features/66/glasgow_measurements",
+        "/beat_features/67/glasgow_measurements",
+        "/beat_features/68/glasgow_measurements",
+        "/beat_features/69/glasgow_measurements",
+        "/beat_features/7/glasgow_measurements",
+        "/beat_features/70/glasgow_measurements",
+        "/beat_features/71/glasgow_measurements",
+        "/beat_features/72/glasgow_measurements",
+        "/beat_features/73/glasgow_measurements",
+        "/beat_features/74/glasgow_measurements",
+        "/beat_features/75/glasgow_measurements",
+        "/beat_features/76/glasgow_measurements",
+        "/beat_features/77/glasgow_measurements",
+        "/beat_features/78/glasgow_measurements",
+        "/beat_features/79/glasgow_measurements",
+        "/beat_features/8/glasgow_measurements",
+        "/beat_features/80/glasgow_measurements",
+        "/beat_features/81/glasgow_measurements",
+        "/beat_features/82/glasgow_measurements",
+        "/beat_features/83/glasgow_measurements",
+        "/beat_features/84/glasgow_measurements",
+        "/beat_features/85/glasgow_measurements",
+        "/beat_features/86/glasgow_measurements",
+        "/beat_features/87/glasgow_measurements",
+        "/beat_features/88/glasgow_measurements",
+        "/beat_features/89/glasgow_measurements",
+        "/beat_features/9/glasgow_measurements",
+        "/beat_features/90/glasgow_measurements",
+        "/beat_features/91/glasgow_measurements",
+        "/beat_features/92/glasgow_measurements",
+        "/beat_features/93/glasgow_measurements",
+        "/beat_features/94/glasgow_measurements",
+        "/beat_features/95/glasgow_measurements",
+        "/clinical_interpretation",
+        "/interpretation",
+        "/metadata/clinical_interpretation",
+        "/metadata/confirmed_pacing_context",
+        "/metadata/patient_meta/clinical_classifications",
+        "/metadata/patient_meta/meds",
+        "/metadata/rhythm_analysis",
+        "/morphology_inputs/derived_facts",
+        "/morphology_inputs/record/clinical_dx_codes",
+        "/morphology_inputs/record/rx_codes",
+        "/morphology_inputs/statement_evidence",
+        "/p_wave_assessments/0/p_state",
+        "/p_wave_assessments/1/p_state",
+        "/p_wave_assessments/2/p_state",
+        "/p_wave_assessments/3/p_state",
+        "/p_wave_assessments/4/p_state",
+        "/p_wave_assessments/5/p_state",
+        "/p_wave_assessments/6/p_state",
+        "/p_wave_assessments/7/p_state",
+        "/reference_metadata",
+        "/representative_leads/I/params/glasgow_measurements",
+        "/representative_leads/II/params/glasgow_measurements",
+        "/representative_leads/III/params/glasgow_measurements",
+        "/representative_leads/V1/params/glasgow_measurements",
+        "/representative_leads/V2/params/glasgow_measurements",
+        "/representative_leads/V3/params/glasgow_measurements",
+        "/representative_leads/V4/params/glasgow_measurements",
+        "/representative_leads/V5/params/glasgow_measurements",
+        "/representative_leads/V6/params/glasgow_measurements",
+        "/representative_leads/aVF/params/glasgow_measurements",
+        "/representative_leads/aVL/params/glasgow_measurements",
+        "/representative_leads/aVR/params/glasgow_measurements",
+        "/rhythm_inputs/af_afl/atrial_rhythm_classification",
+        "/rhythm_inputs/af_afl/diagnostic_confidence",
+        "/rhythm_inputs/af_afl/probable_af",
+        "/rhythm_inputs/af_afl/probable_flutter",
+        "/rhythm_inputs/av_block/second_degree_avb",
+        "/rhythm_inputs/preexcitation/accessory_pathway_side",
+        "/rhythm_inputs/preexcitation/wpw_pattern",
+        "/rhythm_inputs/record/availability/reasons",
+        "/rhythm_inputs/statement_evidence",
+        "/statement_engine"
+      ],
+      "unclassified_fields": [
+        "/_ecgagent_extraction",
+        "/metadata/confidence_semantics",
+        "/metadata/patient_meta/patient_id",
+        "/metadata/st_amplitude_signal"
+      ]
+    },
+    "phase_config": [
+      {
+        "key": "plan",
+        "tool_budget": 1,
+        "structured": true,
+        "has_response_schema": true,
+        "max_tokens": 1600,
+        "max_turns": 5,
+        "minimum_tool_calls": 1,
+        "coverage_requirements": [],
+        "require_novel_tool_views": false,
+        "required_tool_counts": [
+          [
+            "get_diagnostic_overview",
+            1
+          ]
+        ],
+        "required_tool_calls": [],
+        "prefetch_tool_calls": [
+          {
+            "tool": "get_diagnostic_overview",
+            "arguments": {}
+          }
+        ],
+        "allowed_tools": [
+          "get_diagnostic_overview"
+        ]
+      },
+      {
+        "key": "adjudicate",
+        "tool_budget": 15,
+        "structured": true,
+        "has_response_schema": true,
+        "max_tokens": 4096,
+        "max_turns": 9,
+        "minimum_tool_calls": 0,
+        "coverage_requirements": [],
+        "require_novel_tool_views": true,
+        "required_tool_counts": [],
+        "required_tool_calls": [],
+        "prefetch_tool_calls": [],
+        "allowed_tools": [
+          "get_diagnostic_overview",
+          "get_global_table",
+          "get_measurement",
+          "get_lead_table",
+          "get_beat_table",
+          "search_measurements",
+          "get_rhythm_profile",
+          "get_atrial_event_table",
+          "get_p_assessment_table",
+          "get_morphology_groups",
+          "get_morphology_map",
+          "get_qrs_measurement_bundle",
+          "get_interval_waveform_context",
+          "get_pacing_profile",
+          "get_native_beat_profile"
+        ]
+      }
+    ],
+    "tools": {
+      "format": "tool-audit.compact.v1",
+      "full_pointer_manifest": "standalone_agent_trace",
+      "record_id": "ecg_06eed3ccac10de22b2fc3f55",
+      "n_calls": 16,
+      "budget": 15,
+      "calls": [
+        {
+          "call_id": "T0001",
+          "program_only": false,
+          "tool": "get_diagnostic_overview",
+          "args": {},
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 86,
+            "touched_evidence_set_id": "sha256:77243fff173822aacd052f62b18d6efcf19e179226424069b11617f43aca2dbd",
+            "visible_count": 40,
+            "visible_evidence_set_id": "sha256:f2448adbce05c058aa1a637bf603f79ccb2d14050ac42267efa67ad635f0a468",
+            "hidden_count": 46
+          },
+          "elapsed_ms": 1.69,
+          "phase": "plan",
+          "result_summary": "| observation | value and citation | reliability | caveat | |--------------------------------------------------|---------------------------------------------------------------------------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------| | patient age (years) | 73 [ev:/metadata/patient_meta/age] | usable | | | patient age (days) | 26663.25 [ev:/metadata/patient_meta/age_days]...",
+          "result_sha256": "0bfd024316402a661b3f6e1ea2c2fff40cdfacf231d7eb05918034a568de5f68",
+          "error_note": null
+        },
+        {
+          "call_id": "T0002",
+          "program_only": false,
+          "tool": "get_interval_waveform_context",
+          "args": {
+            "interval": "qt",
+            "include_beat_flags": false
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 177,
+            "touched_evidence_set_id": "sha256:88834232649d2fc2af2d5b874ea315b0046782dff535367093628246ae52f6d2",
+            "visible_count": 4,
+            "visible_evidence_set_id": "sha256:7bae65152c1f75ba3dae3874d682836ed18007f4d8fefb521ce880f8dd6b485e",
+            "hidden_count": 173
+          },
+          "elapsed_ms": 2.7,
+          "phase": "adjudicate",
+          "result_summary": "QT/QTc measurement status | observation | pointer | value | |------------------------------|-----------------------------------------------|-----------------------------------------------------------------------------------------------------------------| | qt_ms | /global_features/qt_ms | 444 ms [ev:/global_features/qt_ms]* | | qtc_bazett_ms | /global_features/qtc_bazett_ms | 405 ms [ev:/global_features/qtc_bazett_ms]* | | qtc_fridericia_ms | /global_features/qtc_fridericia_ms | 418 ms [ev:/g...",
+          "result_sha256": "03a2dbcab01028e57dced7301b310c737a1fb0d890dea8193882a899f9c522a0",
+          "error_note": null
+        },
+        {
+          "call_id": "T0003",
+          "program_only": true,
+          "tool": "get_global_table",
+          "args": {
+            "fields": [
+              "heart_rate_bpm",
+              "rr_cv"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 2,
+            "touched_evidence_set_id": "sha256:9694cc2f122ba0ad756b4c0a15ab260ca9828e434f77af81cdea6744fc2d7b59",
+            "visible_count": 0,
+            "visible_evidence_set_id": null,
+            "hidden_count": 2
+          },
+          "elapsed_ms": 0.07,
+          "phase": "adjudicate",
+          "result_summary": "| requested | pointer | value | unit | reliability | caveat | |----------------|------------------------------------|-------|------|-------------|--------| | heart_rate_bpm | ev:/global_features/heart_rate_bpm | 50 | bpm | usable | | | rr_cv | ev:/global_features/rr_cv | 0.002 | | usable | |",
+          "result_sha256": "f3161c672a50eb2d8f21c03629511371a9b17c1328fe3b485b8509b2499fa55b",
+          "error_note": null
+        },
+        {
+          "call_id": "T0004",
+          "program_only": false,
+          "tool": "get_atrial_event_table",
+          "args": {
+            "fields": [
+              "association_type",
+              "confidence",
+              "pr_ms",
+              "template_similarity",
+              "source_leads"
+            ],
+            "limit": 12,
+            "event_ids": [
+              0,
+              2,
+              5,
+              7
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 20,
+            "touched_evidence_set_id": "sha256:4a9974fc8df0bf89232b55f15d15784ba9e8324e69d4d945f31caac381e39f63",
+            "visible_count": 11,
+            "visible_evidence_set_id": "sha256:b19a7f7d34e303ed14d9be6eec4f33f3e0e40aeedaca26d06eeda1fdc659c523",
+            "hidden_count": 9
+          },
+          "elapsed_ms": 0.33,
+          "phase": "adjudicate",
+          "result_summary": "independent atrial-event stream | event | association_type | confidence | pr_ms (ms) | template_similarity | source_leads | |-------|-----------------------------------------------------------|---------------------------------------------|------------------------------------------|-------------------------------------------------------|-------------------------------------------------------| | 0 | conducted [ev:/rhythm_inputs/p_events/0/association_type] | 1 [ev:/rhythm_inputs/p_events/0/conf...",
+          "result_sha256": "38d0f9c720055572136e5d688d034629719690d5821a534cfa288de7808c1da0",
+          "error_note": null
+        },
+        {
+          "call_id": "T0005",
+          "program_only": true,
+          "tool": "get_interval_waveform_context",
+          "args": {
+            "interval": "pr",
+            "include_beat_flags": false
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 218,
+            "touched_evidence_set_id": "sha256:7efa21f1a7428c3f533f151efa189220f8e0c93349a805bad7cc2f24e6756b83",
+            "visible_count": 0,
+            "visible_evidence_set_id": null,
+            "hidden_count": 218
+          },
+          "elapsed_ms": 2.92,
+          "phase": "adjudicate",
+          "result_summary": "PR measurement and atrial-availability status | observation | pointer | value | |--------------------------------------|------------------------------------------------------------|-----------------------------------------------------------------------| | PR interval | /global_features/pr_ms | 212 ms [ev:/global_features/pr_ms] | | P duration | /global_features/p_duration_ms | 130 ms [ev:/global_features/p_duration_ms] | | P-duration reliability | /global_features/p_duration_reliability | rel...",
+          "result_sha256": "370368c651b811a417d7031488267cfc0fc1775ffadb6b9bb04d223588fdb4f4",
+          "error_note": null
+        },
+        {
+          "call_id": "T0006",
+          "program_only": true,
+          "tool": "get_atrial_event_table",
+          "args": {
+            "fields": [
+              "association_type",
+              "confidence",
+              "pr_ms",
+              "source_leads",
+              "associated_qrs_beat_id"
+            ],
+            "limit": 12
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 40,
+            "touched_evidence_set_id": "sha256:0addc6590c3f1c6f98361d938376dde4279aa20cb6955ff998cb53ac0dab45d0",
+            "visible_count": 0,
+            "visible_evidence_set_id": null,
+            "hidden_count": 40
+          },
+          "elapsed_ms": 0.57,
+          "phase": "adjudicate",
+          "result_summary": "independent atrial-event stream | event | association_type | confidence | pr_ms (ms) | source_leads | associated_qrs_beat_id | |-------|-----------------------------------------------------------|---------------------------------------------|------------------------------------------|---------------------------------------------------------|---------------------------------------------------------| | 0 | conducted [ev:/rhythm_inputs/p_events/0/association_type] | 1 [ev:/rhythm_inputs/p_events...",
+          "result_sha256": "5024d902ad3a91f1c64b47b54c41254426c3e6b9397093d5c30ddd8c0491cb11",
+          "error_note": null
+        },
+        {
+          "call_id": "T0007",
+          "program_only": false,
+          "tool": "get_lead_table",
+          "args": {
+            "fields": [
+              "q_duration_ms",
+              "q_amp_mv",
+              "r_amp_mv",
+              "qrs_ms"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 48,
+            "touched_evidence_set_id": "sha256:489ff516e85ebff21be2485cabae64a5d9eda40208bbd054cd927cf370ed9fe0",
+            "visible_count": 39,
+            "visible_evidence_set_id": "sha256:136a46bcea1238ee318dee12558420bb7d6af529e874cb2d0a080567e1dd60c7",
+            "hidden_count": 9
+          },
+          "elapsed_ms": 0.81,
+          "phase": "adjudicate",
+          "result_summary": "| lead | q_duration_ms (ms) | q_amp_mv (mV) | r_amp_mv (mV) | qrs_ms (ms) | |------|--------------------------------------------------------|-------------------------------------------------------|------------------------------------------------------|--------------------------------------------------| | I | - [ev:/representative_leads/I/params/q_duration_ms] | 0.063 [ev:/representative_leads/I/params/q_amp_mv] | 0.755 [ev:/representative_leads/I/params/r_amp_mv] | 124 [ev:/representative_lea...",
+          "result_sha256": "adbc9e34829dd782f0b07a237890b15a07fa11653e33ee2c388f1250cf07e90d",
+          "error_note": null
+        },
+        {
+          "call_id": "T0008",
+          "program_only": false,
+          "tool": "get_native_beat_profile",
+          "args": {
+            "profile": "qrs_infarct",
+            "max_beats": 3
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 468,
+            "touched_evidence_set_id": "sha256:ac7f3d1538ea4c4c52303de2d4a7075ff5bf5b5192f4d606457dd4aa917e9c73",
+            "visible_count": 5,
+            "visible_evidence_set_id": "sha256:77b849996b2756672487c0e3e55128ce533f581fc786cf7f58696bfdc53091a3",
+            "hidden_count": 463
+          },
+          "elapsed_ms": 5.06,
+          "phase": "adjudicate",
+          "result_summary": "qrs_infarct repeated-beat profile; selected group=1, beats=[0, 4, 7] | beat | group | lead | paced | qrs_ms (ms) | q_duration_ms (ms) | q_amp_mv (mV) | q_r_ratio | r_amp_mv (mV) | s_amp_mv (mV) | initial_qrs_net_mv (mV) | qrs_confidence | beat_measurement_reliable | |------------------------------------------------------------|-------------------------------------------------------------|-----------------------------------------------------------|----------------------------------------------...",
+          "result_sha256": "528003dd48d589ccf55d54a09b0348593e73964df88e0993ecad519ff0364c24",
+          "error_note": null
+        },
+        {
+          "call_id": "T0009",
+          "program_only": true,
+          "tool": "get_lead_table",
+          "args": {
+            "fields": [
+              "r_amp_mv",
+              "s_amp_mv",
+              "q_amp_mv",
+              "qrs_ms"
+            ],
+            "leads": [
+              "V1",
+              "V2",
+              "V3",
+              "V4",
+              "V5",
+              "V6"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 24,
+            "touched_evidence_set_id": "sha256:e4e72c3ad30406caf034a987cc2be1c75c7ab6cdcd77c8c682650733808e380f",
+            "visible_count": 0,
+            "visible_evidence_set_id": null,
+            "hidden_count": 24
+          },
+          "elapsed_ms": 0.5,
+          "phase": "adjudicate",
+          "result_summary": "| lead | r_amp_mv (mV) | s_amp_mv (mV) | q_amp_mv (mV) | qrs_ms (ms) | |------|-----------------------------------------------------|------------------------------------------------------|------------------------------------------------------|-------------------------------------------------| | V1 | 0.153 [ev:/representative_leads/V1/params/r_amp_mv] | 0.153 [ev:/representative_leads/V1/params/s_amp_mv] | -1.422 [ev:/representative_leads/V1/params/q_amp_mv] | 190 [ev:/representative_leads/V1/...",
+          "result_sha256": "b0621ddd0a8ec4f88412b83993887ef7485cde22c3b7ac7821a1e44f71fb88b9",
+          "error_note": null
+        },
+        {
+          "call_id": "T0010",
+          "program_only": false,
+          "tool": "get_morphology_groups",
+          "args": {
+            "include_beats": false
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 19,
+            "touched_evidence_set_id": "sha256:7404fe643dc72f2865fc2f5ccdbd77239e3c46a8e7cb9b78836af582f5747b6d",
+            "visible_count": 3,
+            "visible_evidence_set_id": "sha256:cd797d19ff2e3d12699efc5932ee6eeca1a15e5776b351d713553e594f01cdf9",
+            "hidden_count": 16
+          },
+          "elapsed_ms": 0.29,
+          "phase": "adjudicate",
+          "result_summary": "| group | member_count | member_pct | longest_run | mean_rr_ms | mean_pr_ms | mean_qrs_ms | mean_qt_ms | mean_ventr_rate_bpm | dominant | wide_qrs | template_members | template_outliers | template_used | template_corr | |-------|-------------------------------|-------------------------------|------------------------------|--------------------------------|-------------------------------|--------------------------------|-------------------------------|---------------------------------------|---...",
+          "result_sha256": "32bb250f10fe247091be44d98946f66b060d27dbbe18e8b37a6d6772ecfd4178",
+          "error_note": null
+        },
+        {
+          "call_id": "T0011",
+          "program_only": true,
+          "tool": "get_pacing_profile",
+          "args": {
+            "include_beats": false
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 28,
+            "touched_evidence_set_id": "sha256:9884b33738dd080ea82e05c285bc1fa2fe0cb9eeb422e672aaab695a467c8c91",
+            "visible_count": 0,
+            "visible_evidence_set_id": null,
+            "hidden_count": 28
+          },
+          "elapsed_ms": 0.37,
+          "phase": "adjudicate",
+          "result_summary": "| observation | pointer | value | |------------------------------------------------------|-----------------------------------------------------------|------------------------------------------------------------------------------------------------------| | detector enabled | /rhythm_inputs/pacing/enabled | false [ev:/rhythm_inputs/pacing/enabled] | | pacing state | /rhythm_inputs/pacing/state | off [ev:/rhythm_inputs/pacing/state] | | measurement state | /rhythm_inputs/pacing/measurement_state...",
+          "result_sha256": "80c114f48692af8339029469961c8668d0fcca1c79eebedaae850936c85740d8",
+          "error_note": null
+        },
+        {
+          "call_id": "T0012",
+          "program_only": false,
+          "tool": "get_lead_table",
+          "args": {
+            "fields": [
+              "r_amp_mv",
+              "s_amp_mv"
+            ],
+            "leads": [
+              "aVL",
+              "V2",
+              "V3",
+              "V4"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 8,
+            "touched_evidence_set_id": "sha256:8fed3ccfd913dbaee2954572953b7b29eb9b7a72e02c113f85c38cb7c2788037",
+            "visible_count": 8,
+            "visible_evidence_set_id": "sha256:8fed3ccfd913dbaee2954572953b7b29eb9b7a72e02c113f85c38cb7c2788037",
+            "hidden_count": 0
+          },
+          "elapsed_ms": 0.22,
+          "phase": "adjudicate",
+          "result_summary": "| lead | r_amp_mv (mV) | s_amp_mv (mV) | |------|------------------------------------------------------|-------------------------------------------------------| | aVL | 0.343 [ev:/representative_leads/aVL/params/r_amp_mv] | -0.361 [ev:/representative_leads/aVL/params/s_amp_mv] | | V2 | 0.195 [ev:/representative_leads/V2/params/r_amp_mv] | 0.195 [ev:/representative_leads/V2/params/s_amp_mv] | | V3 | 0.129 [ev:/representative_leads/V3/params/r_amp_mv] | -4.629 [ev:/representative_leads/V3/param...",
+          "result_sha256": "353938fa55d705f303cd23966b821d45eaefb48e12c2e802561ca40f5ec7d195",
+          "error_note": null
+        },
+        {
+          "call_id": "T0013",
+          "program_only": false,
+          "tool": "get_qrs_measurement_bundle",
+          "args": {
+            "leads": [
+              "I",
+              "aVL",
+              "V1",
+              "V2",
+              "V5",
+              "V6"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 24,
+            "touched_evidence_set_id": "sha256:03da2ca59072e6f4b6d087f6031c74c9545f066acacd2ec7398985f3111888d8",
+            "visible_count": 6,
+            "visible_evidence_set_id": "sha256:19ee367a245070a0a7b0857f690e5d5ec865328b641c14a29efef625046c38bc",
+            "hidden_count": 18
+          },
+          "elapsed_ms": 0.46,
+          "phase": "adjudicate",
+          "result_summary": "compact QRS measurement bundles | observation | pointer | value | |---------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| | lead I QRS measurements | /measurement_bundles/qrs_by_lead/I | {\"qrs_ms...",
+          "result_sha256": "2dd4ad8a4fa2bcf83e82e3449e642b540b4fc522d8098a01f658c308c211e2fe",
+          "error_note": null
+        },
+        {
+          "call_id": "T0014",
+          "program_only": false,
+          "tool": "get_morphology_map",
+          "args": {
+            "profile": "st"
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 108,
+            "touched_evidence_set_id": "sha256:e4e476f8f2d0bfdf3a125966c2c65262087b2340f7c262b677b02ff0eec3374c",
+            "visible_count": 38,
+            "visible_evidence_set_id": "sha256:f3e49314b62373103462c19544d0fe32bf0ce235f7260a9b77d5dab72f1904fd",
+            "hidden_count": 70
+          },
+          "elapsed_ms": 1.65,
+          "phase": "adjudicate",
+          "result_summary": "st morphology map | lead | st_hybrid_j_mv (mV) | st_hybrid_60ms_mv (mV) | st_hybrid_80ms_mv (mV) | st_hybrid_slope_mv_per_ms (mV/ms) | st_hybrid_shape | st_pattern_class | st_hybrid_baseline_confidence | st_hybrid_reliable | st_hybrid_unreliable_reason | |------|-------------------------------------------------------------|----------------------------------------------------------------|----------------------------------------------------------------|------------------------------------------...",
+          "result_sha256": "03803336d8e35e3e052785cd253d20333dc5629e8795f8e03f19aa4903b598bf",
+          "error_note": null
+        },
+        {
+          "call_id": "T0015",
+          "program_only": false,
+          "tool": "get_lead_table",
+          "args": {
+            "fields": [
+              "st_hybrid_j_mv",
+              "st_hybrid_60ms_mv",
+              "st_hybrid_shape",
+              "st_hybrid_reliable"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 48,
+            "touched_evidence_set_id": "sha256:aeef079975b2e034e67d52b5b8c7e8c93e3b2ab80a3f14a025725b8e1194a007",
+            "visible_count": 16,
+            "visible_evidence_set_id": "sha256:850fdf80754897df868128b2af6c067db7e352aebae49ddebe2462ae5fa733ec",
+            "hidden_count": 32
+          },
+          "elapsed_ms": 0.84,
+          "phase": "adjudicate",
+          "result_summary": "| lead | st_hybrid_j_mv (mV) | st_hybrid_60ms_mv (mV) | st_hybrid_shape | st_hybrid_reliable | |------|-------------------------------------------------------------|----------------------------------------------------------------|-------------------------------------------------------------------|--------------------------------------------------------------| | I | -0.088 [ev:/representative_leads/I/params/st_hybrid_j_mv] | -0.104 [ev:/representative_leads/I/params/st_hybrid_60ms_mv] | straig...",
+          "result_sha256": "7646bc239934bc2970912bdceedd6ea16f2bdcb272aae64b3cd17ebeb900e901",
+          "error_note": null
+        },
+        {
+          "call_id": "T0016",
+          "program_only": false,
+          "tool": "get_lead_table",
+          "args": {
+            "fields": [
+              "qrs_ms",
+              "q_duration_ms",
+              "q_amp_mv",
+              "r_amp_mv",
+              "s_amp_mv",
+              "qrs_slur_flag"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 72,
+            "touched_evidence_set_id": "sha256:99c180d764db25f25a845f136d4bc1971600554b92e403ed6dabe120525d5b82",
+            "visible_count": 32,
+            "visible_evidence_set_id": "sha256:e8c433a60f1e690ddc87a07469ebdbd410351e0d17313f6543cf7b2b46b5ddb4",
+            "hidden_count": 40
+          },
+          "elapsed_ms": 1.16,
+          "phase": "adjudicate",
+          "result_summary": "| lead | qrs_ms (ms) | q_duration_ms (ms) | q_amp_mv (mV) | r_amp_mv (mV) | s_amp_mv (mV) | qrs_slur_flag | |------|--------------------------------------------------|--------------------------------------------------------|-------------------------------------------------------|------------------------------------------------------|-------------------------------------------------------|---------------------------------------------------------| | I | 124 [ev:/representative_leads/I/params/qr...",
+          "result_sha256": "b64034b92a9b2bb3d12804dc527f959fe2bee30eb0adde20df3d0ec11b61cebe",
+          "error_note": null
+        }
+      ],
+      "duplicate_calls_suppressed": 0,
+      "whitelist_size": 149,
+      "model_visible_whitelist_size": 140,
+      "program_authorized_whitelist_size": 25,
+      "provenance": {
+        "touched_size": 1199,
+        "visible_size": 140,
+        "hidden_after_render_size": 1059,
+        "touched_evidence_set_id": "sha256:7bab089f13a3ad45e20074b9174faf767a5690ce1e8214ea97ad6b198cbd4d74",
+        "visible_evidence_set_id": "sha256:61e1c10470208346d8cd9ab43c7bc076fafdbbf38af7dc8e840889744c6fd05f",
+        "hidden_evidence_set_id": "sha256:c29183af71aab41f59ce774540d03fcf7ff000f5062442b40c2c7c123cddbb2d",
+        "visible_by_source": {
+          "adjudicate:prefetch:prefetch-adjudicate-1": {
+            "count": 4,
+            "evidence_set_id": "sha256:7bae65152c1f75ba3dae3874d682836ed18007f4d8fefb521ce880f8dd6b485e"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-11": {
+            "count": 8,
+            "evidence_set_id": "sha256:8fed3ccfd913dbaee2954572953b7b29eb9b7a72e02c113f85c38cb7c2788037"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-12": {
+            "count": 6,
+            "evidence_set_id": "sha256:19ee367a245070a0a7b0857f690e5d5ec865328b641c14a29efef625046c38bc"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-13": {
+            "count": 38,
+            "evidence_set_id": "sha256:f3e49314b62373103462c19544d0fe32bf0ce235f7260a9b77d5dab72f1904fd"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-14": {
+            "count": 16,
+            "evidence_set_id": "sha256:850fdf80754897df868128b2af6c067db7e352aebae49ddebe2462ae5fa733ec"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-15": {
+            "count": 32,
+            "evidence_set_id": "sha256:e8c433a60f1e690ddc87a07469ebdbd410351e0d17313f6543cf7b2b46b5ddb4"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-3": {
+            "count": 11,
+            "evidence_set_id": "sha256:b19a7f7d34e303ed14d9be6eec4f33f3e0e40aeedaca26d06eeda1fdc659c523"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-6": {
+            "count": 39,
+            "evidence_set_id": "sha256:136a46bcea1238ee318dee12558420bb7d6af529e874cb2d0a080567e1dd60c7"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-7": {
+            "count": 5,
+            "evidence_set_id": "sha256:77b849996b2756672487c0e3e55128ce533f581fc786cf7f58696bfdc53091a3"
+          },
+          "adjudicate:prefetch:prefetch-adjudicate-9": {
+            "count": 3,
+            "evidence_set_id": "sha256:cd797d19ff2e3d12699efc5932ee6eeca1a15e5776b351d713553e594f01cdf9"
+          },
+          "chart_briefing": {
+            "count": 0,
+            "evidence_set_id": null
+          },
+          "plan:prefetch:prefetch-plan-1": {
+            "count": 40,
+            "evidence_set_id": "sha256:f2448adbce05c058aa1a637bf603f79ccb2d14050ac42267efa67ad635f0a468"
+          }
+        },
+        "program_authorized_size": 25,
+        "program_authorized_evidence_set_id": "sha256:a2f959fb7af5bd3e5ffcf0441fb43f039be465457ae7988e95f586006f9aaf2c",
+        "program_by_source": {
+          "deterministic_pathway:c1:rate_threshold:legacy_definition_level_measurement_gate": {
+            "count": 1,
+            "evidence_set_id": "sha256:44618e2ffed7ef63649ec97ba02ef61849ddb12cc8c34b72c8766958d01d1cbb"
+          },
+          "deterministic_pathway:c2:one_to_one_av:stable_unique_one_to_one_av_association": {
+            "count": 7,
+            "evidence_set_id": "sha256:884826cc4e5a0cf160f620f9e2b2eb6c84407973de59e450c4e66e0a5dc952c4"
+          },
+          "deterministic_pathway:c2:pr_criterion:pr_above_first_degree_threshold": {
+            "count": 2,
+            "evidence_set_id": "sha256:3ff6680c91034f97068339369a21724b74e33c575edf7c01ac9d7a985ea6290a"
+          },
+          "deterministic_pathway:c4:voltage_criteria_pacing_valid:no_ventricular_pacing_detected": {
+            "count": 2,
+            "evidence_set_id": "sha256:ae2c92d29c6da6cafbaa33a5a7e43cb2902901c4ddb633fee67476a9231ce8aa"
+          },
+          "deterministic_pathway:c4:voltage_criteria_qrs_valid:voltage_criteria_invalid_under_wide_qrs": {
+            "count": 1,
+            "evidence_set_id": "sha256:5a7812d5bb87e28fa1d686ce8e26e02f7fd5e9f22e3b2d58a661e27b3f51ddee"
+          },
+          "deterministic_pathway:r6_poor_r_wave_progression:precordial_progression:precordial_progression_pattern_borderline_or_requires_context": {
+            "count": 12,
+            "evidence_set_id": "sha256:6a261dcc614d4deafdd2c9d5dfba34a25ea9d005ff506e5e0ca0dc40756491a5"
+          },
+          "deterministic_pathway:r8_counterclockwise_rotation:precordial_progression:early_precordial_transition": {
+            "count": 12,
+            "evidence_set_id": "sha256:6a261dcc614d4deafdd2c9d5dfba34a25ea9d005ff506e5e0ca0dc40756491a5"
+          }
+        }
+      },
+      "seeded_provenance": {
+        "chart_briefing": {
+          "count": 0,
+          "evidence_set_id": null
+        }
+      },
+      "effective_evidence": {
+        "selection": "final_verdict_citations_only",
+        "count": 12,
+        "evidence_set_id": "sha256:5cbb33f181549bf3dfedf484bc77a57411cfa939ab5a9a819312ab9e50417bb7",
+        "items": [
+          {
+            "pointer": "/global_features/pr_ms",
+            "citation": "ev:/global_features/pr_ms",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:c2:pr_criterion:pr_above_first_degree_threshold"
+            ],
+            "value": 212.3,
+            "unit": "ms",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.global",
+            "uses": [
+              {
+                "path": "diagnoses[0].evidence[0]",
+                "role": "supporting",
+                "subject": "first_degree_av_block",
+                "claim": "Programmatic definition-level assessment using the global reportable PR interval"
+              }
+            ]
+          },
+          {
+            "pointer": "/rhythm_inputs/p_events/0/association_type",
+            "citation": "ev:/rhythm_inputs/p_events/0/association_type",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:c2:one_to_one_av:stable_unique_one_to_one_av_association"
+            ],
+            "value": "conducted",
+            "unit": null,
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.rhythm_modality",
+            "uses": [
+              {
+                "path": "diagnoses[0].evidence[1]",
+                "role": "supporting",
+                "subject": "first_degree_av_block",
+                "claim": "Programmatic count of P-QRS association types among reliable atrial events"
+              }
+            ]
+          },
+          {
+            "pointer": "/rhythm_inputs/p_events/1/association_type",
+            "citation": "ev:/rhythm_inputs/p_events/1/association_type",
+            "status": "resolved_program_deterministic",
+            "model_visible": false,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:c2:one_to_one_av:stable_unique_one_to_one_av_association"
+            ],
+            "value": "conducted",
+            "unit": null,
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.rhythm_modality",
+            "uses": [
+              {
+                "path": "diagnoses[0].evidence[2]",
+                "role": "supporting",
+                "subject": "first_degree_av_block",
+                "claim": "Programmatic count of P-QRS association types among reliable atrial events"
+              }
+            ]
+          },
+          {
+            "pointer": "/rhythm_inputs/p_events/3/association_type",
+            "citation": "ev:/rhythm_inputs/p_events/3/association_type",
+            "status": "resolved_program_deterministic",
+            "model_visible": false,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:c2:one_to_one_av:stable_unique_one_to_one_av_association"
+            ],
+            "value": "conducted",
+            "unit": null,
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.rhythm_modality",
+            "uses": [
+              {
+                "path": "diagnoses[0].evidence[3]",
+                "role": "supporting",
+                "subject": "first_degree_av_block",
+                "claim": "Programmatic count of P-QRS association types among reliable atrial events"
+              }
+            ]
+          },
+          {
+            "pointer": "/representative_leads/V1/params/r_amp_mv",
+            "citation": "ev:/representative_leads/V1/params/r_amp_mv",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:r6_poor_r_wave_progression:precordial_progression:precordial_progression_pattern_borderline_or_requires_context",
+              "deterministic_pathway:r8_counterclockwise_rotation:precordial_progression:early_precordial_transition"
+            ],
+            "value": 0.153102,
+            "unit": "mV",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.representative_beat",
+            "uses": [
+              {
+                "path": "diagnoses[1].evidence[0]",
+                "role": "supporting",
+                "subject": "counterclockwise_rotation",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              },
+              {
+                "path": "differential_diagnoses[1].supporting_evidence[0]",
+                "role": "differential_support",
+                "subject": "poor_r_wave_progression",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              }
+            ]
+          },
+          {
+            "pointer": "/representative_leads/V3/params/r_amp_mv",
+            "citation": "ev:/representative_leads/V3/params/r_amp_mv",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:r6_poor_r_wave_progression:precordial_progression:precordial_progression_pattern_borderline_or_requires_context",
+              "deterministic_pathway:r8_counterclockwise_rotation:precordial_progression:early_precordial_transition"
+            ],
+            "value": 0.129386,
+            "unit": "mV",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.representative_beat",
+            "uses": [
+              {
+                "path": "diagnoses[1].evidence[1]",
+                "role": "supporting",
+                "subject": "counterclockwise_rotation",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              },
+              {
+                "path": "differential_diagnoses[1].supporting_evidence[1]",
+                "role": "differential_support",
+                "subject": "poor_r_wave_progression",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              }
+            ]
+          },
+          {
+            "pointer": "/representative_leads/V4/params/r_amp_mv",
+            "citation": "ev:/representative_leads/V4/params/r_amp_mv",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:r6_poor_r_wave_progression:precordial_progression:precordial_progression_pattern_borderline_or_requires_context",
+              "deterministic_pathway:r8_counterclockwise_rotation:precordial_progression:early_precordial_transition"
+            ],
+            "value": 0.412972,
+            "unit": "mV",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.representative_beat",
+            "uses": [
+              {
+                "path": "diagnoses[1].evidence[2]",
+                "role": "supporting",
+                "subject": "counterclockwise_rotation",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              },
+              {
+                "path": "differential_diagnoses[1].supporting_evidence[2]",
+                "role": "differential_support",
+                "subject": "poor_r_wave_progression",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              }
+            ]
+          },
+          {
+            "pointer": "/representative_leads/V6/params/r_amp_mv",
+            "citation": "ev:/representative_leads/V6/params/r_amp_mv",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:r6_poor_r_wave_progression:precordial_progression:precordial_progression_pattern_borderline_or_requires_context",
+              "deterministic_pathway:r8_counterclockwise_rotation:precordial_progression:early_precordial_transition"
+            ],
+            "value": 2.272094,
+            "unit": "mV",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.representative_beat",
+            "uses": [
+              {
+                "path": "diagnoses[1].evidence[3]",
+                "role": "supporting",
+                "subject": "counterclockwise_rotation",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              },
+              {
+                "path": "differential_diagnoses[1].supporting_evidence[3]",
+                "role": "differential_support",
+                "subject": "poor_r_wave_progression",
+                "claim": "Programmatic calculation of R-wave progression and R/S transition from V1 through V6"
+              }
+            ]
+          },
+          {
+            "pointer": "/global_features/heart_rate_bpm",
+            "citation": "ev:/global_features/heart_rate_bpm",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:c1:rate_threshold:legacy_definition_level_measurement_gate"
+            ],
+            "value": 49.916805,
+            "unit": "bpm",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.global",
+            "uses": [
+              {
+                "path": "differential_diagnoses[0].supporting_evidence[0]",
+                "role": "differential_support",
+                "subject": "bradycardia",
+                "claim": "Global heart rate used for the definition-level rate assessment"
+              }
+            ]
+          },
+          {
+            "pointer": "/rhythm_inputs/native_beat_profiles/rows/0/paced",
+            "citation": "ev:/rhythm_inputs/native_beat_profiles/rows/0/paced",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": false,
+            "program_sources": [],
+            "value": false,
+            "unit": null,
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.rhythm_modality",
+            "uses": [
+              {
+                "path": "differential_diagnoses[1].supporting_evidence[4]",
+                "role": "differential_support",
+                "subject": "poor_r_wave_progression",
+                "claim": "The sampled native beat is not paced."
+              }
+            ]
+          },
+          {
+            "pointer": "/rhythm_inputs/native_beat_profiles/rows/0/qrs_ms",
+            "citation": "ev:/rhythm_inputs/native_beat_profiles/rows/0/qrs_ms",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": false,
+            "program_sources": [],
+            "value": 158.0,
+            "unit": "ms",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.rhythm_modality",
+            "uses": [
+              {
+                "path": "differential_diagnoses[1].supporting_evidence[5]",
+                "role": "differential_support",
+                "subject": "poor_r_wave_progression",
+                "claim": "The sampled native beat has a measurable QRS duration."
+              }
+            ]
+          },
+          {
+            "pointer": "/representative_leads/I/params/t_amp_mv",
+            "citation": "ev:/representative_leads/I/params/t_amp_mv",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": false,
+            "program_sources": [],
+            "value": -0.098972,
+            "unit": "mV",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.representative_beat",
+            "uses": [
+              {
+                "path": "interval_measurement_contexts[0].residual_evidence[0]",
+                "role": "residual_context",
+                "subject": "QT_QTc",
+                "claim": "Lead I: Lead T amplitude is measurable."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "model": {
+      "backend": "qwen-local",
+      "capabilities": {
+        "native_tool_calls": true,
+        "structured_output_level": "schema",
+        "context_compaction": true,
+        "citation_aliases": true,
+        "phase_memory": true,
+        "orchestrated_prefetch": true,
+        "enforce_phase_coverage": true,
+        "max_parallel_tool_calls": 3,
+        "hard_phase_guards": true
+      },
+      "usage": {
+        "prompt_tokens": 16230,
+        "completion_tokens": 2729,
+        "total_tokens": 18959,
+        "turns": 2
+      },
+      "config": {
+        "model": "ecgagent-review",
+        "endpoint": {
+          "display": "http://127.0.0.1:8127",
+          "fingerprint": "sha256:79b280f37273061704a9e0ad168958526214762963cdc13b7a8e2085ad59a8fe",
+          "source": "explicit"
+        },
+        "proxy_environment_trusted": false,
+        "max_tokens": 8192,
+        "timeout_seconds": 600.0,
+        "max_retries": 2,
+        "thinking": true,
+        "thinking_token_budget": 768,
+        "preserve_thinking": true,
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "context_compaction": {
+          "tool_result_contract": "ecgagent.model-evidence.v5",
+          "max_retained_evidence_chars": 8000,
+          "max_required_evidence_chars": 24000,
+          "effective_evidence_chars": 24000,
+          "retain_committed_tool_views": false,
+          "citation_format": "Q{sequence}",
+          "citation_alias_count": 265,
+          "retained_views": 0,
+          "completed_phases": []
+        },
+        "required_vllm_flags": [
+          "--enable-auto-tool-choice",
+          "--tool-call-parser qwen3_xml",
+          "--reasoning-parser qwen3"
+        ]
+      },
+      "cache": "vLLM prefix cache: 0/16230 prompt tokens reported as cached across 2 turns"
+    },
+    "briefing_chars": 362,
+    "context_compactions": [
+      {
+        "phase": "plan",
+        "kind": "orchestrated_prefetch",
+        "before_chars": 7732,
+        "after_chars": 7791,
+        "saved_chars": 0,
+        "tool_calls": 1
+      },
+      {
+        "phase": "adjudicate",
+        "kind": "orchestrated_prefetch",
+        "before_chars": 59881,
+        "after_chars": 29491,
+        "saved_chars": 30390,
+        "tool_calls": 15
+      }
+    ],
+    "verdict_normalizations": [
+      {
+        "kind": "deterministic_evidence_value_materialization",
+        "paths": [
+          "diagnoses[0].evidence[0].value",
+          "diagnoses[0].evidence[0].unit",
+          "diagnoses[1].evidence[0].value",
+          "diagnoses[1].evidence[0].unit",
+          "diagnoses[1].evidence[1].value",
+          "diagnoses[1].evidence[1].unit",
+          "diagnoses[1].evidence[2].value",
+          "diagnoses[1].evidence[2].unit",
+          "diagnoses[1].evidence[3].value",
+          "diagnoses[1].evidence[3].unit",
+          "differential_diagnoses[0].supporting_evidence[0].value",
+          "differential_diagnoses[0].supporting_evidence[0].unit",
+          "differential_diagnoses[1].supporting_evidence[0].value",
+          "differential_diagnoses[1].supporting_evidence[0].unit",
+          "differential_diagnoses[1].supporting_evidence[1].value",
+          "differential_diagnoses[1].supporting_evidence[1].unit",
+          "differential_diagnoses[1].supporting_evidence[2].value",
+          "differential_diagnoses[1].supporting_evidence[2].unit",
+          "differential_diagnoses[1].supporting_evidence[3].value",
+          "differential_diagnoses[1].supporting_evidence[3].unit",
+          "differential_diagnoses[1].supporting_evidence[5].value",
+          "differential_diagnoses[1].supporting_evidence[5].unit",
+          "interval_measurement_contexts[0].residual_evidence[0].value",
+          "interval_measurement_contexts[0].residual_evidence[0].unit"
+        ]
+      }
+    ],
+    "runtime_controls": {
+      "elapsed_seconds": 167.585,
+      "model_turns": 2,
+      "model_requests": [
+        {
+          "phase": "plan",
+          "elapsed_seconds": 43.961113,
+          "prompt_tokens": 2707,
+          "completion_tokens": 721,
+          "stop_reason": "end_turn"
+        },
+        {
+          "phase": "adjudicate",
+          "elapsed_seconds": 123.100696,
+          "prompt_tokens": 13523,
+          "completion_tokens": 2008,
+          "stop_reason": "end_turn"
+        }
+      ],
+      "prompt_tokens": 16230,
+      "completion_tokens": 2729,
+      "total_tokens": 18959,
+      "consecutive_max_tokens": 0,
+      "limits": {
+        "max_model_turns": 28,
+        "max_total_tokens": 400000,
+        "max_wall_seconds": 1200.0,
+        "max_consecutive_max_tokens": 3,
+        "phase_state_retries": 1
+      }
+    },
+    "knowledge_navigation": {
+      "enabled": false,
+      "requested": true,
+      "status": "disabled",
+      "max_chunks": 4,
+      "patient_evidence": false,
+      "injected_after_phase": "survey",
+      "removed_after_phase": "hypothesize"
+    },
+    "knowledge_challenge": {
+      "enabled": false,
+      "first_pass_isolated": true,
+      "first_pass_knowledge_navigation": false,
+      "posthoc_excerpts_isolated": true,
+      "max_chunks": 8
+    },
+    "phase_state_updates": [],
+    "diagnostic_ledger": {
+      "ledger_schema": "diagnostic-ledger.v3",
+      "record_id": "ecg_06eed3ccac10de22b2fc3f55",
+      "version": 0,
+      "current_phase": "not_started",
+      "frozen": false,
+      "snapshot_hash": "sha256:d791b603dea724cd6b7385ecb3244c939479d3b2c0e111283d9e4a5cb66881d9",
+      "domains": {},
+      "hypotheses": [],
+      "evidence": {},
+      "targeted_checks": [],
+      "detector_conflicts": [],
+      "unresolved": [],
+      "phase_summary": "",
+      "allowed_final_placement": {
+        "diagnoses": [],
+        "differential_diagnoses": [],
+        "rejected_audit_only": [],
+        "abstentions": []
+      },
+      "last_event_id": null,
+      "input_fingerprint": "sha256:6e376d5691429a636dc3286d508bbffb42643ea8a6d62170822753e6a566a887",
+      "history": [],
+      "phase_summaries": {}
+    },
+    "diagnostic_ledger_commits": [],
+    "dynamic_tool_selection": [
+      {
+        "phase": "plan",
+        "workflow": "compact",
+        "independent_candidate_count": 4,
+        "candidate_count": 7,
+        "rule_merge": {
+          "selection_policy": "urgency_domain_coverage_usable_support_per_new_view.v1",
+          "proposed_candidate_codes": [
+            "bradycardia",
+            "first_degree_av_block",
+            "left_ventricular_hypertrophy",
+            "st_elevation",
+            "rbbb_pattern",
+            "rvh_pattern",
+            "prior_infarct_q_wave_pattern",
+            "poor_r_wave_progression",
+            "counterclockwise_rotation"
+          ],
+          "independent_candidate_codes": [
+            "bradycardia",
+            "first_degree_av_block",
+            "left_ventricular_hypertrophy",
+            "st_elevation"
+          ],
+          "independent_candidate_count": 4,
+          "merged_candidate_count": 7,
+          "rule_added_codes": [
+            "prior_infarct_q_wave_pattern",
+            "poor_r_wave_progression",
+            "counterclockwise_rotation"
+          ],
+          "rule_annotated_codes": [
+            "bradycardia"
+          ],
+          "rule_annotated_family_codes": [
+            "first_degree_av_delay",
+            "lvh_voltage_criteria"
+          ],
+          "rule_excluded": [],
+          "rule_deferred_by_cap": [
+            "rbbb_pattern",
+            "rvh_pattern"
+          ],
+          "candidates_dropped_by_view_budget": [
+            {
+              "id": "r2_rbbb_pattern",
+              "code": "rbbb_pattern",
+              "sources": [
+                "ecgfeat_rule_second_opinion"
+              ],
+              "required_new_views": 2,
+              "projected_view_count": 17,
+              "reason": "view_budget"
+            },
+            {
+              "id": "r4_rvh_pattern",
+              "code": "rvh_pattern",
+              "sources": [
+                "ecgfeat_rule_second_opinion"
+              ],
+              "required_new_views": 2,
+              "projected_view_count": 17,
+              "reason": "view_budget"
+            }
+          ],
+          "merged_candidate_cap": 10,
+          "exact_view_cap": 15,
+          "reserved_review_views": [
+            {
+              "tool": "get_morphology_groups",
+              "arguments": {
+                "include_beats": false
+              }
+            },
+            {
+              "tool": "get_lead_table",
+              "arguments": {
+                "fields": [
+                  "qrs_ms",
+                  "q_duration_ms",
+                  "q_amp_mv",
+                  "r_amp_mv",
+                  "s_amp_mv",
+                  "qrs_slur_flag"
+                ]
+              }
+            }
+          ]
+        },
+        "sanitizations": [
+          "candidate[2] `left_axis_deviation` dropped: [diagnosis_measurement_conflict] the authorized reliable QRS axis contradicts this candidate's definition range",
+          "candidate `rbbb_pattern` dropped before adjudication: its complete pathway exceeds the compact exact-view budget",
+          "candidate `rvh_pattern` dropped before adjudication: its complete pathway exceeds the compact exact-view budget"
+        ]
+      },
+      {
+        "phase": "adjudicate",
+        "workflow": "compact",
+        "configured_budget": 15,
+        "effective_budget": 15,
+        "exposed_tools": [],
+        "program_prefetch": [
+          {
+            "tool": "get_interval_waveform_context",
+            "arguments": {
+              "interval": "qt",
+              "include_beat_flags": false
+            }
+          },
+          {
+            "tool": "get_global_table",
+            "arguments": {
+              "fields": [
+                "heart_rate_bpm",
+                "rr_cv"
+              ]
+            }
+          },
+          {
+            "tool": "get_atrial_event_table",
+            "arguments": {
+              "fields": [
+                "association_type",
+                "confidence",
+                "pr_ms",
+                "template_similarity",
+                "source_leads"
+              ],
+              "limit": 12,
+              "event_ids": [
+                0,
+                2,
+                5,
+                7
+              ]
+            }
+          },
+          {
+            "tool": "get_interval_waveform_context",
+            "arguments": {
+              "interval": "pr",
+              "include_beat_flags": false
+            }
+          },
+          {
+            "tool": "get_atrial_event_table",
+            "arguments": {
+              "fields": [
+                "association_type",
+                "confidence",
+                "pr_ms",
+                "source_leads",
+                "associated_qrs_beat_id"
+              ],
+              "limit": 12
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "q_duration_ms",
+                "q_amp_mv",
+                "r_amp_mv",
+                "qrs_ms"
+              ]
+            }
+          },
+          {
+            "tool": "get_native_beat_profile",
+            "arguments": {
+              "profile": "qrs_infarct",
+              "max_beats": 3
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "r_amp_mv",
+                "s_amp_mv",
+                "q_amp_mv",
+                "qrs_ms"
+              ],
+              "leads": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6"
+              ]
+            }
+          },
+          {
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            }
+          },
+          {
+            "tool": "get_pacing_profile",
+            "arguments": {
+              "include_beats": false
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "r_amp_mv",
+                "s_amp_mv"
+              ],
+              "leads": [
+                "aVL",
+                "V2",
+                "V3",
+                "V4"
+              ]
+            }
+          },
+          {
+            "tool": "get_qrs_measurement_bundle",
+            "arguments": {
+              "leads": [
+                "I",
+                "aVL",
+                "V1",
+                "V2",
+                "V5",
+                "V6"
+              ]
+            }
+          },
+          {
+            "tool": "get_morphology_map",
+            "arguments": {
+              "profile": "st"
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "st_hybrid_j_mv",
+                "st_hybrid_60ms_mv",
+                "st_hybrid_shape",
+                "st_hybrid_reliable"
+              ]
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "qrs_ms",
+                "q_duration_ms",
+                "q_amp_mv",
+                "r_amp_mv",
+                "s_amp_mv",
+                "qrs_slur_flag"
+              ]
+            }
+          }
+        ],
+        "program_only_prefetch": [
+          {
+            "tool": "get_global_table",
+            "arguments": {
+              "fields": [
+                "heart_rate_bpm",
+                "rr_cv"
+              ]
+            }
+          },
+          {
+            "tool": "get_interval_waveform_context",
+            "arguments": {
+              "interval": "pr",
+              "include_beat_flags": false
+            }
+          },
+          {
+            "tool": "get_atrial_event_table",
+            "arguments": {
+              "fields": [
+                "association_type",
+                "confidence",
+                "pr_ms",
+                "source_leads",
+                "associated_qrs_beat_id"
+              ],
+              "limit": 12
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "r_amp_mv",
+                "s_amp_mv",
+                "q_amp_mv",
+                "qrs_ms"
+              ],
+              "leads": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6"
+              ]
+            }
+          },
+          {
+            "tool": "get_pacing_profile",
+            "arguments": {
+              "include_beats": false
+            }
+          }
+        ],
+        "plan_routing": [
+          {
+            "coverage_id": "required_interval:QT_QTc",
+            "tool": "get_interval_waveform_context",
+            "arguments": {
+              "interval": "qt",
+              "include_beat_flags": false
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c1:pathway:rate_threshold",
+            "tool": "get_global_table",
+            "arguments": {
+              "fields": [
+                "heart_rate_bpm",
+                "rr_cv"
+              ]
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c1:pathway:planned_falsification",
+            "tool": "get_atrial_event_table",
+            "arguments": {
+              "fields": [
+                "association_type",
+                "confidence",
+                "pr_ms",
+                "template_similarity",
+                "source_leads"
+              ],
+              "limit": 12,
+              "event_ids": [
+                0,
+                2,
+                5,
+                7
+              ]
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c2:pathway:pr_criterion",
+            "tool": "get_interval_waveform_context",
+            "arguments": {
+              "interval": "pr",
+              "include_beat_flags": false
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c2:pathway:one_to_one_av",
+            "tool": "get_atrial_event_table",
+            "arguments": {
+              "fields": [
+                "association_type",
+                "confidence",
+                "pr_ms",
+                "source_leads",
+                "associated_qrs_beat_id"
+              ],
+              "limit": 12
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "r5_prior_infarct_q_wave_pattern:pathway:q_wave_morphology",
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "q_duration_ms",
+                "q_amp_mv",
+                "r_amp_mv",
+                "qrs_ms"
+              ]
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "r5_prior_infarct_q_wave_pattern:pathway:q_wave_distribution",
+            "tool": "get_native_beat_profile",
+            "arguments": {
+              "profile": "qrs_infarct",
+              "max_beats": 3
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "r6_poor_r_wave_progression:pathway:precordial_progression",
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "r_amp_mv",
+                "s_amp_mv",
+                "q_amp_mv",
+                "qrs_ms"
+              ],
+              "leads": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6"
+              ]
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "r6_poor_r_wave_progression:pathway:alternative_qrs_cause_excluded",
+            "tool": "get_native_beat_profile",
+            "arguments": {
+              "profile": "qrs_infarct",
+              "max_beats": 3
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": true
+          },
+          {
+            "coverage_id": "r8_counterclockwise_rotation:pathway:precordial_progression",
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "r_amp_mv",
+                "s_amp_mv",
+                "q_amp_mv",
+                "qrs_ms"
+              ],
+              "leads": [
+                "V1",
+                "V2",
+                "V3",
+                "V4",
+                "V5",
+                "V6"
+              ]
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": true
+          },
+          {
+            "coverage_id": "r8_counterclockwise_rotation:pathway:alternative_qrs_cause_excluded",
+            "tool": "get_native_beat_profile",
+            "arguments": {
+              "profile": "qrs_infarct",
+              "max_beats": 3
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": true
+          },
+          {
+            "coverage_id": "c4:pathway:voltage_criteria_qrs_valid",
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c4:pathway:voltage_criteria_pacing_valid",
+            "tool": "get_pacing_profile",
+            "arguments": {
+              "include_beats": false
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c4:pathway:cross_lead_voltage_criterion",
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "r_amp_mv",
+                "s_amp_mv"
+              ],
+              "leads": [
+                "aVL",
+                "V2",
+                "V3",
+                "V4"
+              ]
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c4:pathway:qrs_morphology_compatible",
+            "tool": "get_qrs_measurement_bundle",
+            "arguments": {
+              "leads": [
+                "I",
+                "aVL",
+                "V1",
+                "V2",
+                "V5",
+                "V6"
+              ]
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c5:pathway:st_change_distribution",
+            "tool": "get_morphology_map",
+            "arguments": {
+              "profile": "st"
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c5:pathway:st_territorial_confirmation",
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "st_hybrid_j_mv",
+                "st_hybrid_60ms_mv",
+                "st_hybrid_shape",
+                "st_hybrid_reliable"
+              ]
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "c5:pathway:secondary_qrs_context",
+            "tool": "get_native_beat_profile",
+            "arguments": {
+              "profile": "qrs_infarct",
+              "max_beats": 3
+            },
+            "required": true,
+            "consumer": "model",
+            "deduplicated": true
+          },
+          {
+            "coverage_id": "c1:support:1",
+            "tool": "get_rhythm_profile",
+            "required": false,
+            "covered_by_pathway_tool": false,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "c1:falsify:2",
+            "tool": "get_atrial_event_table",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": true
+          },
+          {
+            "coverage_id": "c2:support:1",
+            "tool": "get_interval_waveform_context",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "c2:falsify:2",
+            "tool": "get_atrial_event_table",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "r5_prior_infarct_q_wave_pattern:support:1",
+            "tool": "get_native_beat_profile",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "r5_prior_infarct_q_wave_pattern:falsify:2",
+            "tool": "get_morphology_map",
+            "required": false,
+            "covered_by_pathway_tool": false,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "r6_poor_r_wave_progression:support:1",
+            "tool": "get_native_beat_profile",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "r6_poor_r_wave_progression:falsify:2",
+            "tool": "get_morphology_map",
+            "required": false,
+            "covered_by_pathway_tool": false,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "r8_counterclockwise_rotation:support:1",
+            "tool": "get_native_beat_profile",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "r8_counterclockwise_rotation:falsify:2",
+            "tool": "get_morphology_map",
+            "required": false,
+            "covered_by_pathway_tool": false,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "c4:support:1",
+            "tool": "get_morphology_groups",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "c4:falsify:2",
+            "tool": "get_lead_table",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "c5:support:1",
+            "tool": "get_morphology_groups",
+            "required": false,
+            "covered_by_pathway_tool": false,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "c5:falsify:2",
+            "tool": "get_lead_table",
+            "required": false,
+            "covered_by_pathway_tool": true,
+            "compiled_as_falsification": false
+          },
+          {
+            "coverage_id": "domain_review:1",
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            },
+            "required": false,
+            "consumer": "model",
+            "deduplicated": true
+          },
+          {
+            "coverage_id": "domain_review:2",
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "qrs_ms",
+                "q_duration_ms",
+                "q_amp_mv",
+                "r_amp_mv",
+                "s_amp_mv",
+                "qrs_slur_flag"
+              ]
+            },
+            "required": false,
+            "consumer": "model",
+            "deduplicated": false
+          }
+        ],
+        "required_interval_views": [
+          "QT_QTc"
+        ],
+        "missing_required_pathway_views": []
+      }
+    ],
+    "diagnostic_protocol_config": {
+      "version": "ecgagent.diagnostic.v43",
+      "evidence_contract_version": "ecgagent.diagnosis-evidence.v4",
+      "safety_policy_version": "ecgagent.clinical-safety.v2",
+      "runtime": {
+        "max_model_turns": 28,
+        "max_total_tokens": 400000,
+        "max_wall_seconds": 1200.0,
+        "max_consecutive_max_tokens": 3,
+        "phase_state_retries": 2,
+        "max_revisions": 4
+      },
+      "phases": {
+        "compact_plan_max_tokens": 1600,
+        "compact_adjudicate_max_tokens": 4096,
+        "compact_tool_ceiling": 15,
+        "compact_model_evidence_chars": 8000,
+        "compact_phase_state_retries": 1,
+        "compact_review_view_reserve": 2,
+        "survey_budget": 1,
+        "investigate_floor": 4,
+        "investigate_default": 8,
+        "investigate_ceiling": 12,
+        "challenge_floor": 2,
+        "challenge_default": 4,
+        "challenge_ceiling": 6,
+        "challenge_minimum_calls": 0,
+        "survey_max_tokens": 1800,
+        "hypothesize_max_tokens": 2600,
+        "investigate_max_tokens": 2800,
+        "challenge_max_tokens": 2200,
+        "synthesize_max_tokens": 5120,
+        "max_planned_tools": 8
+      },
+      "knowledge": {
+        "default_max_chunks": 8,
+        "navigation_ceiling": 4,
+        "challenge_ceiling": 12
+      }
+    },
+    "clinical_safety_policy": {
+      "version": "ecgagent.clinical-safety.v2",
+      "population": "adult",
+      "bradycardia_upper_exclusive_bpm": 60.0,
+      "tachycardia_lower_exclusive_bpm": 100.0,
+      "atrial_tachycardia_lower_exclusive_bpm": 100.0,
+      "first_degree_av_block_pr_lower_exclusive_ms": 200.0,
+      "short_pr_upper_exclusive_ms": 120.0,
+      "complete_bundle_hard_exclusion_qrs_ms": 115.0,
+      "nonspecific_ivcd_lower_exclusive_ms": 110.0,
+      "prolonged_qt_hard_exclusion_qtc_ms": 400.0,
+      "short_qt_hard_exclusion_qtc_ms": 400.0,
+      "retrograde_min_beats": 2,
+      "retrograde_min_leads": 2,
+      "urgent_bradycardia_below_bpm": 40.0,
+      "urgent_tachycardia_above_bpm": 150.0,
+      "urgent_wide_qrs_at_least_ms": 120.0,
+      "urgent_qtc_bazett_above_ms": 500.0,
+      "sources": [
+        "AHA/ACCF/HRS ECG standardization recommendations",
+        "ACC/AHA/HRS bradycardia and conduction-delay definitions",
+        "Project diagnostic reference corpus; versioned review required before change"
+      ]
+    },
+    "diagnostic_gate_validation": {
+      "version": "ecgagent.quality-gate-validation.v1",
+      "state": "pass",
+      "source": "validated_artifact",
+      "stop_reasons": []
+    },
+    "deterministic_pathway_policy": {
+      "version": "ecgagent.deterministic-pathway-facts.v2",
+      "min_sequence_events": 5,
+      "min_repeated_events": 2,
+      "min_representative_beats": 3,
+      "representative_member_pct": 50.0,
+      "weak_member_pct": 20.0,
+      "clean_p_min_count": 3,
+      "clean_p_min_fraction": 0.5,
+      "p_boundary_min_confidence": 0.5,
+      "p_boundary_min_leads": 2,
+      "atrial_event_min_confidence": 0.8,
+      "atrial_event_min_leads": 2,
+      "irregular_rr_pass_cv": 0.12,
+      "regular_rr_fail_cv": 0.05,
+      "sinus_p_axis_lower_deg": 0.0,
+      "sinus_p_axis_upper_deg": 90.0,
+      "sinus_rate_difference_fraction": 0.1,
+      "premature_rr_ratio": 0.8,
+      "compensatory_pause_ratio": 1.1,
+      "background_regular_rr_tolerance_fraction": 0.2,
+      "background_regular_min_fraction": 0.8,
+      "qrs_complete_bundle_pass_ms": 120.0,
+      "qrs_complete_bundle_fail_below_ms": 110.0,
+      "qrs_incomplete_rbbb_lower_ms": 110.0,
+      "qrs_incomplete_rbbb_upper_ms": 120.0,
+      "qtc_prolonged_pass_ms": 480.0,
+      "qtc_prolonged_fail_below_ms": 450.0,
+      "qtc_marked_prolonged_pass_ms": 500.0,
+      "qtc_short_pass_ms": 340.0,
+      "qtc_marked_short_pass_ms": 330.0,
+      "qtc_short_borderline_upper_ms": 360.0,
+      "qtc_short_fail_at_least_ms": 370.0,
+      "low_voltage_limb_mv": 0.5,
+      "low_voltage_precordial_mv": 1.0,
+      "pacing_min_spikes": 3,
+      "pacing_support_fraction": 0.5,
+      "pacing_strong_capture_fraction": 0.8,
+      "pacing_failure_fraction": 0.25,
+      "voltage_criteria_invalid_qrs_ms": 120.0,
+      "pvc_single_wide_qrs_ms": 140.0
+    },
+    "urgent_review": {
+      "policy_version": "ecgagent.urgent-review.v2",
+      "safety_policy_version": "ecgagent.clinical-safety.v2",
+      "urgent_review_required": false,
+      "critical_pattern_possible": false,
+      "do_not_delay_human_review": false,
+      "technical_quality_stop": false,
+      "triggers": [],
+      "adult_thresholds_applicable": true,
+      "unassessed_categories": [
+        "acute_st_injury_pattern",
+        "pacing_sensing_failure"
+      ],
+      "scope_note": "Routing flag only; it neither confirms a diagnosis nor represents a complete urgent-ECG detector."
+    },
+    "final_hypothesis_state": null,
+    "diagnostic_workflow": "compact",
+    "compact_plan": {
+      "candidates": [
+        {
+          "id": "c1",
+          "code": "bradycardia",
+          "domains": [
+            "rhythm_rate"
+          ],
+          "support": [
+            "Q5",
+            "Q27"
+          ],
+          "counter": [
+            "Q21",
+            "Q29"
+          ],
+          "checks": [
+            {
+              "tool": "get_rhythm_profile",
+              "purpose": "support",
+              "question": "Is the bradycardia sinus in origin with regular RR intervals?"
+            },
+            {
+              "tool": "get_atrial_event_table",
+              "purpose": "falsify",
+              "question": "Are there ectopic atrial events or pauses suggesting non-sinus bradycardia?"
+            }
+          ],
+          "uncertainty": "Rate is low but mechanism and regularity need confirmation.",
+          "sources": [
+            "independent_measurement_plan",
+            "ecgfeat_rule_second_opinion"
+          ],
+          "rule_second_opinions": [
+            {
+              "code": "bradycardia",
+              "label": "Bradycardia",
+              "publication": "final",
+              "status": "matched",
+              "confidence": "HIGH",
+              "priority": "P5"
+            }
+          ],
+          "rule_second_opinion": {
+            "code": "bradycardia",
+            "label": "Bradycardia",
+            "publication": "final",
+            "status": "matched",
+            "confidence": "HIGH",
+            "priority": "P5"
+          },
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "bradycardia",
+            "display_name": "Bradycardia",
+            "steps": [
+              {
+                "id": "rate_threshold",
+                "gate": "required",
+                "question": "Does the global heart rate meet the definition-level criterion for this rate candidate?",
+                "tool": "get_global_table",
+                "arguments": {
+                  "fields": [
+                    "heart_rate_bpm",
+                    "rr_cv"
+                  ]
+                },
+                "owner": "program"
+              },
+              {
+                "id": "planned_falsification",
+                "gate": "required",
+                "tool": "get_atrial_event_table",
+                "arguments": {
+                  "fields": [
+                    "association_type",
+                    "confidence",
+                    "pr_ms",
+                    "template_similarity",
+                    "source_leads"
+                  ],
+                  "limit": 12,
+                  "event_ids": [
+                    0,
+                    2,
+                    5,
+                    7
+                  ]
+                },
+                "owner": "model",
+                "question": "Do these direct measurements corroborate the candidate after checking alternatives? Pass requires positive corroboration, fail requires direct contradiction, otherwise use unknown. Investigation requested: Are there ectopic atrial events or pauses suggesting non-sinus bradycardia?"
+              }
+            ],
+            "cautions": [
+              "A rate abnormality does not establish the rhythm mechanism; sinus, atrial and ventricular origins require independent assessment."
+            ]
+          }
+        },
+        {
+          "id": "c2",
+          "code": "first_degree_av_block",
+          "domains": [
+            "conduction_preexcitation"
+          ],
+          "support": [
+            "Q6"
+          ],
+          "counter": [
+            "Q38"
+          ],
+          "checks": [
+            {
+              "tool": "get_interval_waveform_context",
+              "purpose": "support",
+              "question": "Is the PR interval consistently prolonged across beats?"
+            },
+            {
+              "tool": "get_atrial_event_table",
+              "purpose": "falsify",
+              "question": "Are P waves consistently preceding QRS complexes without dropped beats?"
+            }
+          ],
+          "uncertainty": "PR is prolonged but consistency and P-wave morphology need verification.",
+          "sources": [
+            "independent_measurement_plan",
+            "ecgfeat_rule_second_opinion"
+          ],
+          "rule_second_opinions": [
+            {
+              "code": "first_degree_av_delay",
+              "label": "First-degree AV delay",
+              "publication": "final",
+              "status": "matched",
+              "confidence": "HIGH",
+              "priority": "P2"
+            }
+          ],
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "first_degree_av_block",
+            "display_name": "First-degree AV block",
+            "steps": [
+              {
+                "id": "pr_criterion",
+                "gate": "required",
+                "question": "Does the reliable PR measurement meet this candidate's definition-level criterion?",
+                "tool": "get_interval_waveform_context",
+                "arguments": {
+                  "interval": "pr",
+                  "include_beat_flags": false
+                },
+                "owner": "program"
+              },
+              {
+                "id": "one_to_one_av",
+                "gate": "required",
+                "question": "Is there stable one-to-one P-QRS association?",
+                "tool": "get_atrial_event_table",
+                "arguments": {
+                  "fields": [
+                    "association_type",
+                    "confidence",
+                    "pr_ms",
+                    "source_leads",
+                    "associated_qrs_beat_id"
+                  ],
+                  "limit": 12
+                },
+                "owner": "program"
+              }
+            ],
+            "cautions": [
+              "When PR does not meet the definition threshold, this step must fail; borderline wording must not upgrade it."
+            ]
+          }
+        },
+        {
+          "id": "r5_prior_infarct_q_wave_pattern",
+          "code": "prior_infarct_q_wave_pattern",
+          "domains": [
+            "q_st_t_u"
+          ],
+          "support": [],
+          "counter": [],
+          "checks": [
+            {
+              "tool": "get_native_beat_profile",
+              "purpose": "support",
+              "question": "Review the relevant waveforms in representative native beats"
+            },
+            {
+              "tool": "get_morphology_map",
+              "purpose": "falsify",
+              "question": "Seek cross-lead morphology that refutes this candidate"
+            }
+          ],
+          "uncertainty": "The rule-based second opinion only raises a candidate for review; it requires independent confirmation from measurement views in this run.",
+          "sources": [
+            "ecgfeat_rule_second_opinion"
+          ],
+          "rule_second_opinion": {
+            "code": "prior_infarct_q_wave_pattern",
+            "label": "Prior infarct Q-wave pattern",
+            "publication": "final",
+            "status": "matched",
+            "confidence": "HIGH",
+            "priority": "P2"
+          },
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "prior_infarct_q_wave_pattern",
+            "display_name": "Prior infarct Q-wave pattern",
+            "steps": [
+              {
+                "id": "q_wave_morphology",
+                "gate": "required",
+                "question": "Are Q-wave duration, amplitude and the Q/R relationship reliably present in the relevant leads?",
+                "tool": "get_lead_table",
+                "arguments": {
+                  "fields": [
+                    "q_duration_ms",
+                    "q_amp_mv",
+                    "r_amp_mv",
+                    "qrs_ms"
+                  ]
+                },
+                "owner": "model"
+              },
+              {
+                "id": "q_wave_distribution",
+                "gate": "required",
+                "question": "Does representative-beat Q-wave distribution support this candidate and exclude an isolated variant?",
+                "tool": "get_native_beat_profile",
+                "arguments": {
+                  "profile": "qrs_infarct",
+                  "max_beats": 3
+                },
+                "owner": "model"
+              }
+            ],
+            "cautions": [
+              "A small Q wave in one lead or an automated detector flag cannot confirm pathological Q waves."
+            ]
+          }
+        },
+        {
+          "id": "r6_poor_r_wave_progression",
+          "code": "poor_r_wave_progression",
+          "domains": [
+            "q_st_t_u"
+          ],
+          "support": [],
+          "counter": [],
+          "checks": [
+            {
+              "tool": "get_native_beat_profile",
+              "purpose": "support",
+              "question": "Review the relevant waveforms in representative native beats"
+            },
+            {
+              "tool": "get_morphology_map",
+              "purpose": "falsify",
+              "question": "Seek cross-lead morphology that refutes this candidate"
+            }
+          ],
+          "uncertainty": "The rule-based second opinion only raises a candidate for review; it requires independent confirmation from measurement views in this run.",
+          "sources": [
+            "ecgfeat_rule_second_opinion"
+          ],
+          "rule_second_opinion": {
+            "code": "poor_r_wave_progression",
+            "label": "Poor R-wave progression",
+            "publication": "final",
+            "status": "matched",
+            "confidence": "LOW",
+            "priority": "P4"
+          },
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "poor_r_wave_progression",
+            "display_name": "Poor R-wave progression",
+            "steps": [
+              {
+                "id": "precordial_progression",
+                "gate": "required",
+                "question": "Do R/S progression and transition from V1 through V6 support this candidate?",
+                "tool": "get_lead_table",
+                "arguments": {
+                  "fields": [
+                    "r_amp_mv",
+                    "s_amp_mv",
+                    "q_amp_mv",
+                    "qrs_ms"
+                  ],
+                  "leads": [
+                    "V1",
+                    "V2",
+                    "V3",
+                    "V4",
+                    "V5",
+                    "V6"
+                  ]
+                },
+                "owner": "program"
+              },
+              {
+                "id": "alternative_qrs_cause_excluded",
+                "gate": "invalidator",
+                "question": "Does the representative QRS view avoid showing an alternative cause such as infarction, conduction abnormality or lead placement?",
+                "tool": "get_native_beat_profile",
+                "arguments": {
+                  "profile": "qrs_infarct",
+                  "max_beats": 3
+                },
+                "owner": "model"
+              }
+            ],
+            "cautions": [
+              "Abnormal R-wave progression must be distinguished from lead placement, conduction abnormalities and Q-wave changes."
+            ]
+          }
+        },
+        {
+          "id": "r8_counterclockwise_rotation",
+          "code": "counterclockwise_rotation",
+          "domains": [
+            "q_st_t_u"
+          ],
+          "support": [],
+          "counter": [],
+          "checks": [
+            {
+              "tool": "get_native_beat_profile",
+              "purpose": "support",
+              "question": "Review the relevant waveforms in representative native beats"
+            },
+            {
+              "tool": "get_morphology_map",
+              "purpose": "falsify",
+              "question": "Seek cross-lead morphology that refutes this candidate"
+            }
+          ],
+          "uncertainty": "The rule-based second opinion only raises a candidate for review; it requires independent confirmation from measurement views in this run.",
+          "sources": [
+            "ecgfeat_rule_second_opinion"
+          ],
+          "rule_second_opinion": {
+            "code": "counterclockwise_rotation",
+            "label": "Counterclockwise precordial rotation",
+            "publication": "final",
+            "status": "matched",
+            "confidence": "LOW",
+            "priority": "P5"
+          },
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "counterclockwise_rotation",
+            "display_name": "Counterclockwise precordial rotation",
+            "steps": [
+              {
+                "id": "precordial_progression",
+                "gate": "required",
+                "question": "Do R/S progression and transition from V1 through V6 support this candidate?",
+                "tool": "get_lead_table",
+                "arguments": {
+                  "fields": [
+                    "r_amp_mv",
+                    "s_amp_mv",
+                    "q_amp_mv",
+                    "qrs_ms"
+                  ],
+                  "leads": [
+                    "V1",
+                    "V2",
+                    "V3",
+                    "V4",
+                    "V5",
+                    "V6"
+                  ]
+                },
+                "owner": "program"
+              },
+              {
+                "id": "alternative_qrs_cause_excluded",
+                "gate": "invalidator",
+                "question": "Does the representative QRS view avoid showing an alternative cause such as infarction, conduction abnormality or lead placement?",
+                "tool": "get_native_beat_profile",
+                "arguments": {
+                  "profile": "qrs_infarct",
+                  "max_beats": 3
+                },
+                "owner": "model"
+              }
+            ],
+            "cautions": [
+              "Abnormal R-wave progression must be distinguished from lead placement, conduction abnormalities and Q-wave changes."
+            ]
+          }
+        },
+        {
+          "id": "c4",
+          "code": "left_ventricular_hypertrophy",
+          "domains": [
+            "voltage_chamber_r_progression"
+          ],
+          "support": [
+            "Q18",
+            "Q19"
+          ],
+          "counter": [
+            "Q7"
+          ],
+          "checks": [
+            {
+              "tool": "get_morphology_groups",
+              "purpose": "support",
+              "question": "Are there strain pattern or repolarization abnormalities?"
+            },
+            {
+              "tool": "get_lead_table",
+              "purpose": "falsify",
+              "question": "Do voltage criteria meet LVH thresholds in multiple leads?"
+            }
+          ],
+          "uncertainty": "High voltage is present but strain pattern and multi-lead criteria need assessment.",
+          "sources": [
+            "independent_measurement_plan",
+            "ecgfeat_rule_second_opinion"
+          ],
+          "rule_second_opinions": [
+            {
+              "code": "lvh_voltage_criteria",
+              "label": "LVH voltage criteria",
+              "publication": "final",
+              "status": "matched",
+              "confidence": "HIGH",
+              "priority": "P2"
+            }
+          ],
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "left_ventricular_hypertrophy",
+            "display_name": "Left ventricular hypertrophy pattern",
+            "steps": [
+              {
+                "id": "voltage_criteria_qrs_valid",
+                "gate": "invalidator",
+                "question": "Is dominant QRS duration narrow enough for voltage criteria to remain valid?",
+                "tool": "get_morphology_groups",
+                "arguments": {
+                  "include_beats": false
+                },
+                "owner": "program"
+              },
+              {
+                "id": "voltage_criteria_pacing_valid",
+                "gate": "invalidator",
+                "question": "Is ventricular pacing absent so that voltage criteria remain valid?",
+                "tool": "get_pacing_profile",
+                "arguments": {
+                  "include_beats": false
+                },
+                "owner": "program"
+              },
+              {
+                "id": "cross_lead_voltage_criterion",
+                "gate": "required",
+                "question": "Does the cross-lead voltage combination meet the stated hypertrophy criterion?",
+                "tool": "get_lead_table",
+                "arguments": {
+                  "fields": [
+                    "r_amp_mv",
+                    "s_amp_mv"
+                  ],
+                  "leads": [
+                    "aVL",
+                    "V2",
+                    "V3",
+                    "V4"
+                  ]
+                },
+                "owner": "model"
+              },
+              {
+                "id": "qrs_morphology_compatible",
+                "gate": "supporting",
+                "question": "Do QRS morphology and lead distribution support the pattern without invalidating the voltage criterion?",
+                "tool": "get_qrs_measurement_bundle",
+                "arguments": {
+                  "leads": [
+                    "I",
+                    "aVL",
+                    "V1",
+                    "V2",
+                    "V5",
+                    "V6"
+                  ]
+                },
+                "owner": "model"
+              }
+            ],
+            "cautions": [
+              "A rule hit is not patient evidence; the component voltages must be read directly.",
+              "Voltage criteria do not establish anatomic ventricular hypertrophy.",
+              "Ventricular pacing, bundle branch block or marked intraventricular conduction delay may increase voltage; voltage criteria are not valid in that context."
+            ]
+          }
+        },
+        {
+          "id": "c5",
+          "code": "st_elevation",
+          "domains": [
+            "voltage_chamber_r_progression"
+          ],
+          "support": [
+            "Q11",
+            "Q12"
+          ],
+          "counter": [
+            "Q13",
+            "Q14"
+          ],
+          "checks": [
+            {
+              "tool": "get_morphology_groups",
+              "purpose": "support",
+              "question": "Is ST elevation present in contiguous leads?"
+            },
+            {
+              "tool": "get_lead_table",
+              "purpose": "falsify",
+              "question": "Is ST elevation reciprocal in other leads?"
+            }
+          ],
+          "uncertainty": "ST deviations are present but contiguity and reciprocity need confirmation.",
+          "sources": [
+            "independent_measurement_plan"
+          ],
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "st_elevation",
+            "display_name": "ST elevation",
+            "steps": [
+              {
+                "id": "st_change_distribution",
+                "gate": "required",
+                "question": "Do reliable ST changes and their contiguous-lead distribution support this candidate?",
+                "tool": "get_morphology_map",
+                "arguments": {
+                  "profile": "st"
+                },
+                "owner": "model"
+              },
+              {
+                "id": "st_territorial_confirmation",
+                "gate": "required",
+                "question": "Do ST changes form a consistent distribution in the relevant leads?",
+                "tool": "get_lead_table",
+                "arguments": {
+                  "fields": [
+                    "st_hybrid_j_mv",
+                    "st_hybrid_60ms_mv",
+                    "st_hybrid_shape",
+                    "st_hybrid_reliable"
+                  ]
+                },
+                "owner": "model"
+              },
+              {
+                "id": "secondary_qrs_context",
+                "gate": "supporting",
+                "question": "Does wide QRS or another secondary cause alter the ST interpretation?",
+                "tool": "get_native_beat_profile",
+                "arguments": {
+                  "profile": "qrs_infarct",
+                  "max_beats": 3
+                },
+                "owner": "model"
+              }
+            ],
+            "cautions": [
+              "A single-lead or low-quality ST candidate cannot confirm an ischemic interpretation."
+            ]
+          }
+        }
+      ],
+      "review_tools": [
+        "get_morphology_groups",
+        "get_lead_table"
+      ],
+      "quality_limitations": [],
+      "independent_candidate_count": 4,
+      "rule_second_opinion_version": "ecgagent.rule-second-opinion.v3"
+    },
+    "measurement_limitation_sources": [],
+    "model_evidence_coverage": {
+      "interval:QT_QTc": {
+        "required_atom_count": 2,
+        "visible_atom_count": 2,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "c1:planned_falsification": {
+        "required_atom_count": 9,
+        "visible_atom_count": 9,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "r5_prior_infarct_q_wave_pattern:q_wave_morphology": {
+        "required_atom_count": 36,
+        "visible_atom_count": 36,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "r5_prior_infarct_q_wave_pattern:q_wave_distribution": {
+        "required_atom_count": 3,
+        "visible_atom_count": 3,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "r6_poor_r_wave_progression:alternative_qrs_cause_excluded": {
+        "required_atom_count": 3,
+        "visible_atom_count": 3,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "r8_counterclockwise_rotation:alternative_qrs_cause_excluded": {
+        "required_atom_count": 3,
+        "visible_atom_count": 3,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "c4:cross_lead_voltage_criterion": {
+        "required_atom_count": 8,
+        "visible_atom_count": 8,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "c4:qrs_morphology_compatible": {
+        "required_atom_count": 6,
+        "visible_atom_count": 6,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "c5:st_change_distribution": {
+        "required_atom_count": 36,
+        "visible_atom_count": 36,
+        "missing_pointers": [],
+        "status": "visible"
+      },
+      "c5:st_territorial_confirmation": {
+        "required_atom_count": 36,
+        "visible_atom_count": 14,
+        "missing_pointers": [
+          "/representative_leads/I/params/st_hybrid_60ms_mv",
+          "/representative_leads/II/params/st_hybrid_60ms_mv",
+          "/representative_leads/III/params/st_hybrid_60ms_mv",
+          "/representative_leads/III/params/st_hybrid_shape",
+          "/representative_leads/V1/params/st_hybrid_60ms_mv",
+          "/representative_leads/V1/params/st_hybrid_shape",
+          "/representative_leads/V2/params/st_hybrid_60ms_mv",
+          "/representative_leads/V2/params/st_hybrid_shape",
+          "/representative_leads/V3/params/st_hybrid_60ms_mv",
+          "/representative_leads/V3/params/st_hybrid_shape",
+          "/representative_leads/V4/params/st_hybrid_60ms_mv",
+          "/representative_leads/V4/params/st_hybrid_shape",
+          "/representative_leads/V5/params/st_hybrid_60ms_mv",
+          "/representative_leads/V5/params/st_hybrid_shape",
+          "/representative_leads/V6/params/st_hybrid_60ms_mv",
+          "/representative_leads/V6/params/st_hybrid_shape",
+          "/representative_leads/aVF/params/st_hybrid_60ms_mv",
+          "/representative_leads/aVF/params/st_hybrid_shape",
+          "/representative_leads/aVL/params/st_hybrid_60ms_mv",
+          "/representative_leads/aVL/params/st_hybrid_shape",
+          "/representative_leads/aVR/params/st_hybrid_60ms_mv",
+          "/representative_leads/aVR/params/st_hybrid_shape"
+        ],
+        "status": "omitted"
+      },
+      "c5:secondary_qrs_context": {
+        "required_atom_count": 3,
+        "visible_atom_count": 3,
+        "missing_pointers": [],
+        "status": "visible"
+      }
+    },
+    "compact_decision": {
+      "workflow": "compact_pathway",
+      "model_overall_status": "insufficient_evidence",
+      "program_overall_status": "confirmed_diagnosis",
+      "rejected_model_rows": [],
+      "repaired_model_rows": [],
+      "decisions": [
+        {
+          "id": "c1",
+          "code": "bradycardia",
+          "model_decision_present": true,
+          "final_placement": "unresolved",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 1,
+          "uncertain_context_evidence_count": 3,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "rate_threshold",
+              "gate": "required",
+              "tool": "get_global_table",
+              "requested_status": "unknown",
+              "effective_status": "pass",
+              "model_status": "unknown",
+              "program_status": "pass",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 1,
+              "deterministic_reason_code": "legacy_definition_level_measurement_gate",
+              "deterministic_metrics": {},
+              "model_evidence_coverage": null
+            },
+            {
+              "id": "planned_falsification",
+              "gate": "required",
+              "tool": "get_atrial_event_table",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 3,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 9,
+                "visible_atom_count": 9,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            }
+          ]
+        },
+        {
+          "id": "c2",
+          "code": "first_degree_av_block",
+          "model_decision_present": false,
+          "final_placement": "confirmed",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 2,
+          "uncertain_context_evidence_count": 0,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "pr_criterion",
+              "gate": "required",
+              "tool": "get_interval_waveform_context",
+              "requested_status": "unknown",
+              "effective_status": "pass",
+              "model_status": "unknown",
+              "program_status": "pass",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 1,
+              "deterministic_reason_code": "pr_above_first_degree_threshold",
+              "deterministic_metrics": {
+                "pr_ms": 212.3,
+                "threshold_ms": 200.0
+              },
+              "model_evidence_coverage": null
+            },
+            {
+              "id": "one_to_one_av",
+              "gate": "required",
+              "tool": "get_atrial_event_table",
+              "requested_status": "unknown",
+              "effective_status": "pass",
+              "model_status": "unknown",
+              "program_status": "pass",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 3,
+              "deterministic_reason_code": "stable_unique_one_to_one_av_association",
+              "deterministic_metrics": {
+                "analyzed_atrial_events": 7,
+                "conducted_count": 7,
+                "blocked_count": 0,
+                "retrograde_count": 0,
+                "conducted_fraction": 1.0,
+                "unique_associated_qrs_count": 7
+              },
+              "model_evidence_coverage": null
+            }
+          ]
+        },
+        {
+          "id": "r5_prior_infarct_q_wave_pattern",
+          "code": "prior_infarct_q_wave_pattern",
+          "model_decision_present": true,
+          "final_placement": "rejected",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 0,
+          "uncertain_context_evidence_count": 0,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "q_wave_morphology",
+              "gate": "required",
+              "tool": "get_lead_table",
+              "requested_status": "fail",
+              "effective_status": "fail",
+              "model_status": "fail",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 3,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 36,
+                "visible_atom_count": 36,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            },
+            {
+              "id": "q_wave_distribution",
+              "gate": "required",
+              "tool": "get_native_beat_profile",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "none",
+              "authorized_evidence_count": 0,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 3,
+                "visible_atom_count": 3,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            }
+          ]
+        },
+        {
+          "id": "r6_poor_r_wave_progression",
+          "code": "poor_r_wave_progression",
+          "model_decision_present": true,
+          "final_placement": "unresolved",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 0,
+          "uncertain_context_evidence_count": 6,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "precordial_progression",
+              "gate": "required",
+              "tool": "get_lead_table",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": "unknown",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 4,
+              "deterministic_reason_code": "precordial_progression_pattern_borderline_or_requires_context",
+              "deterministic_metrics": {
+                "analyzable_precordial_leads": 6,
+                "r_s_ratios": {
+                  "V1": 1.0,
+                  "V2": 1.0,
+                  "V3": 0.028,
+                  "V4": 0.1563,
+                  "V5": 1.0416,
+                  "V6": 6.411
+                },
+                "transition_lead": "V1"
+              },
+              "model_evidence_coverage": null
+            },
+            {
+              "id": "alternative_qrs_cause_excluded",
+              "gate": "invalidator",
+              "tool": "get_native_beat_profile",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 2,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 3,
+                "visible_atom_count": 3,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            }
+          ]
+        },
+        {
+          "id": "r8_counterclockwise_rotation",
+          "code": "counterclockwise_rotation",
+          "model_decision_present": true,
+          "final_placement": "confirmed",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 1,
+          "uncertain_context_evidence_count": 2,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "precordial_progression",
+              "gate": "required",
+              "tool": "get_lead_table",
+              "requested_status": "unknown",
+              "effective_status": "pass",
+              "model_status": "unknown",
+              "program_status": "pass",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 4,
+              "deterministic_reason_code": "early_precordial_transition",
+              "deterministic_metrics": {
+                "analyzable_precordial_leads": 6,
+                "r_s_ratios": {
+                  "V1": 1.0,
+                  "V2": 1.0,
+                  "V3": 0.028,
+                  "V4": 0.1563,
+                  "V5": 1.0416,
+                  "V6": 6.411
+                },
+                "transition_lead": "V1"
+              },
+              "model_evidence_coverage": null
+            },
+            {
+              "id": "alternative_qrs_cause_excluded",
+              "gate": "invalidator",
+              "tool": "get_native_beat_profile",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 2,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 3,
+                "visible_atom_count": 3,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            }
+          ]
+        },
+        {
+          "id": "c4",
+          "code": "left_ventricular_hypertrophy",
+          "model_decision_present": true,
+          "final_placement": "rejected",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 3,
+          "uncertain_context_evidence_count": 0,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "voltage_criteria_qrs_valid",
+              "gate": "invalidator",
+              "tool": "get_morphology_groups",
+              "requested_status": "unknown",
+              "effective_status": "fail",
+              "model_status": "unknown",
+              "program_status": "fail",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 1,
+              "deterministic_reason_code": "voltage_criteria_invalid_under_wide_qrs",
+              "deterministic_metrics": {
+                "mean_qrs_ms": 204.0,
+                "invalid_at_or_above_ms": 120.0
+              },
+              "model_evidence_coverage": null
+            },
+            {
+              "id": "voltage_criteria_pacing_valid",
+              "gate": "invalidator",
+              "tool": "get_pacing_profile",
+              "requested_status": "unknown",
+              "effective_status": "pass",
+              "model_status": "unknown",
+              "program_status": "pass",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 1,
+              "deterministic_reason_code": "no_ventricular_pacing_detected",
+              "deterministic_metrics": {
+                "pacing_state": "off",
+                "ventricular_pacing_present": false
+              },
+              "model_evidence_coverage": null
+            },
+            {
+              "id": "cross_lead_voltage_criterion",
+              "gate": "required",
+              "tool": "get_lead_table",
+              "requested_status": "pass",
+              "effective_status": "pass",
+              "model_status": "pass",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 3,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 8,
+                "visible_atom_count": 8,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            },
+            {
+              "id": "qrs_morphology_compatible",
+              "gate": "supporting",
+              "tool": "get_qrs_measurement_bundle",
+              "requested_status": "pass",
+              "effective_status": "pass",
+              "model_status": "pass",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 3,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 6,
+                "visible_atom_count": 6,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            }
+          ]
+        },
+        {
+          "id": "c5",
+          "code": "st_elevation",
+          "model_decision_present": true,
+          "final_placement": "rejected",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 0,
+          "uncertain_context_evidence_count": 2,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "st_change_distribution",
+              "gate": "required",
+              "tool": "get_morphology_map",
+              "requested_status": "fail",
+              "effective_status": "fail",
+              "model_status": "fail",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 3,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 36,
+                "visible_atom_count": 36,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            },
+            {
+              "id": "st_territorial_confirmation",
+              "gate": "required",
+              "tool": "get_lead_table",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "required_model_evidence_not_visible",
+              "authorized_evidence_count": 0,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 36,
+                "visible_atom_count": 14,
+                "missing_pointers": [
+                  "/representative_leads/I/params/st_hybrid_60ms_mv",
+                  "/representative_leads/II/params/st_hybrid_60ms_mv",
+                  "/representative_leads/III/params/st_hybrid_60ms_mv",
+                  "/representative_leads/III/params/st_hybrid_shape",
+                  "/representative_leads/V1/params/st_hybrid_60ms_mv",
+                  "/representative_leads/V1/params/st_hybrid_shape",
+                  "/representative_leads/V2/params/st_hybrid_60ms_mv",
+                  "/representative_leads/V2/params/st_hybrid_shape",
+                  "/representative_leads/V3/params/st_hybrid_60ms_mv",
+                  "/representative_leads/V3/params/st_hybrid_shape",
+                  "/representative_leads/V4/params/st_hybrid_60ms_mv",
+                  "/representative_leads/V4/params/st_hybrid_shape",
+                  "/representative_leads/V5/params/st_hybrid_60ms_mv",
+                  "/representative_leads/V5/params/st_hybrid_shape",
+                  "/representative_leads/V6/params/st_hybrid_60ms_mv",
+                  "/representative_leads/V6/params/st_hybrid_shape",
+                  "/representative_leads/aVF/params/st_hybrid_60ms_mv",
+                  "/representative_leads/aVF/params/st_hybrid_shape",
+                  "/representative_leads/aVL/params/st_hybrid_60ms_mv",
+                  "/representative_leads/aVL/params/st_hybrid_shape",
+                  "/representative_leads/aVR/params/st_hybrid_60ms_mv",
+                  "/representative_leads/aVR/params/st_hybrid_shape"
+                ],
+                "status": "omitted"
+              }
+            },
+            {
+              "id": "secondary_qrs_context",
+              "gate": "supporting",
+              "tool": "get_native_beat_profile",
+              "requested_status": "unknown",
+              "effective_status": "unknown",
+              "model_status": "unknown",
+              "program_status": null,
+              "resolution_owner": "model_with_tool_bound_evidence",
+              "authorization": "exact_view",
+              "authorized_evidence_count": 2,
+              "deterministic_reason_code": null,
+              "deterministic_metrics": {},
+              "model_evidence_coverage": {
+                "required_atom_count": 3,
+                "visible_atom_count": 3,
+                "missing_pointers": [],
+                "status": "visible"
+              }
+            }
+          ]
+        }
+      ],
+      "pathway_placement_is_program_owned": true,
+      "rule_candidates_without_measurement_adjudication": []
+    },
+    "rule_second_opinion": {
+      "version": "ecgagent.rule-second-opinion.v3",
+      "candidate_rows": [
+        {
+          "code": "first_degree_av_delay",
+          "label": "First-degree AV delay",
+          "category": "conduction",
+          "rule_id": "CLIN-INTERVAL-PR-01",
+          "rule_domain": "intervals",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "HIGH",
+          "priority": "P2",
+          "severity": "abnormal",
+          "missing_inputs": [],
+          "suppressed_by": []
+        },
+        {
+          "code": "rbbb_pattern",
+          "label": "Right bundle branch block pattern",
+          "category": "conduction",
+          "rule_id": "CLIN-CONDUCTION-RBBB-01",
+          "rule_domain": "conduction",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "MEDIUM",
+          "priority": "P2",
+          "severity": "abnormal",
+          "missing_inputs": [],
+          "suppressed_by": []
+        },
+        {
+          "code": "lvh_voltage_criteria",
+          "label": "LVH voltage criteria",
+          "category": "chamber",
+          "rule_id": "CLIN-HYPERTROPHY-LVH-01",
+          "rule_domain": "hypertrophy",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "HIGH",
+          "priority": "P2",
+          "severity": "abnormal",
+          "missing_inputs": [],
+          "suppressed_by": []
+        },
+        {
+          "code": "rvh_pattern",
+          "label": "RVH pattern",
+          "category": "chamber",
+          "rule_id": "CLIN-HYPERTROPHY-RVH-01",
+          "rule_domain": "hypertrophy",
+          "publication": "suppressed",
+          "status": "suppressed",
+          "confidence": "LOW",
+          "priority": "P2",
+          "severity": "abnormal",
+          "missing_inputs": [],
+          "suppressed_by": [
+            "rbbb_pattern"
+          ]
+        },
+        {
+          "code": "prior_infarct_q_wave_pattern",
+          "label": "Prior infarct Q-wave pattern",
+          "category": "ischemia_repolarization",
+          "rule_id": "CLIN-ISCHEMIA-Q-01",
+          "rule_domain": "ischemia_infarction",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "HIGH",
+          "priority": "P2",
+          "severity": "abnormal",
+          "missing_inputs": [],
+          "suppressed_by": []
+        },
+        {
+          "code": "poor_r_wave_progression",
+          "label": "Poor R-wave progression",
+          "category": "other",
+          "rule_id": "CLIN-MORPH-RPROG-01",
+          "rule_domain": "ischemia_infarction",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "LOW",
+          "priority": "P4",
+          "severity": "observation",
+          "missing_inputs": [],
+          "suppressed_by": []
+        },
+        {
+          "code": "bradycardia",
+          "label": "Bradycardia",
+          "category": "rate",
+          "rule_id": "CLIN-RHYTHM-RATE-01",
+          "rule_domain": "rhythm",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "HIGH",
+          "priority": "P5",
+          "severity": "observation",
+          "missing_inputs": [],
+          "suppressed_by": []
+        },
+        {
+          "code": "counterclockwise_rotation",
+          "label": "Counterclockwise precordial rotation",
+          "category": "other",
+          "rule_id": "CLIN-MORPH-ROTATION-01",
+          "rule_domain": "ischemia_infarction",
+          "publication": "final",
+          "status": "matched",
+          "confidence": "LOW",
+          "priority": "P5",
+          "severity": "observation",
+          "missing_inputs": [],
+          "suppressed_by": []
+        }
+      ],
+      "coverage_gaps": [
+        {
+          "rule_id": "CLIN-RHYTHM-AFL-01",
+          "rule_domain": "rhythm",
+          "status": "unavailable",
+          "missing_inputs": [
+            "rhythm.multilead_F_wave_morphology"
+          ],
+          "suppressed_by": []
+        },
+        {
+          "rule_id": "CLIN-RHYTHM-SINUS-01",
+          "rule_domain": "rhythm",
+          "status": "unavailable",
+          "missing_inputs": [
+            "global.p_axis_deg"
+          ],
+          "suppressed_by": []
+        },
+        {
+          "rule_id": "CLIN-RHYTHM-P-ORIGIN-01",
+          "rule_domain": "rhythm",
+          "status": "unavailable",
+          "missing_inputs": [
+            "two_reliable_inferior_lead_p_amplitudes"
+          ],
+          "suppressed_by": []
+        },
+        {
+          "rule_id": "CLIN-RHYTHM-MULTIFOCAL-01",
+          "rule_domain": "rhythm",
+          "status": "unavailable",
+          "missing_inputs": [
+            "eight_beats_with_reliable_lead_II_p_measurements_and_organized_p_ratio"
+          ],
+          "suppressed_by": []
+        }
+      ],
+      "counts": {
+        "eligible": 9,
+        "published": 8,
+        "coverage_gaps": 38
+      },
+      "merge": {
+        "selection_policy": "urgency_domain_coverage_usable_support_per_new_view.v1",
+        "proposed_candidate_codes": [
+          "bradycardia",
+          "first_degree_av_block",
+          "left_ventricular_hypertrophy",
+          "st_elevation",
+          "rbbb_pattern",
+          "rvh_pattern",
+          "prior_infarct_q_wave_pattern",
+          "poor_r_wave_progression",
+          "counterclockwise_rotation"
+        ],
+        "independent_candidate_codes": [
+          "bradycardia",
+          "first_degree_av_block",
+          "left_ventricular_hypertrophy",
+          "st_elevation"
+        ],
+        "independent_candidate_count": 4,
+        "merged_candidate_count": 7,
+        "rule_added_codes": [
+          "prior_infarct_q_wave_pattern",
+          "poor_r_wave_progression",
+          "counterclockwise_rotation"
+        ],
+        "rule_annotated_codes": [
+          "bradycardia"
+        ],
+        "rule_annotated_family_codes": [
+          "first_degree_av_delay",
+          "lvh_voltage_criteria"
+        ],
+        "rule_excluded": [],
+        "rule_deferred_by_cap": [
+          "rbbb_pattern",
+          "rvh_pattern"
+        ],
+        "candidates_dropped_by_view_budget": [
+          {
+            "id": "r2_rbbb_pattern",
+            "code": "rbbb_pattern",
+            "sources": [
+              "ecgfeat_rule_second_opinion"
+            ],
+            "required_new_views": 2,
+            "projected_view_count": 17,
+            "reason": "view_budget"
+          },
+          {
+            "id": "r4_rvh_pattern",
+            "code": "rvh_pattern",
+            "sources": [
+              "ecgfeat_rule_second_opinion"
+            ],
+            "required_new_views": 2,
+            "projected_view_count": 17,
+            "reason": "view_budget"
+          }
+        ],
+        "merged_candidate_cap": 10,
+        "exact_view_cap": 15,
+        "reserved_review_views": [
+          {
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            }
+          },
+          {
+            "tool": "get_lead_table",
+            "arguments": {
+              "fields": [
+                "qrs_ms",
+                "q_duration_ms",
+                "q_amp_mv",
+                "r_amp_mv",
+                "s_amp_mv",
+                "qrs_slur_flag"
+              ]
+            }
+          }
+        ]
+      },
+      "patient_evidence": false,
+      "injected_after_blind_plan": true
+    },
+    "record_identity": {
+      "model_visible_record_id": "ecg_06eed3ccac10de22b2fc3f55",
+      "strategy": "hmac-sha256-ephemeral-cli-v1",
+      "key_scope": "single_cli_invocation"
+    },
+    "external_egress": {
+      "backend": "qwen-local",
+      "external": false,
+      "authorization_required": false,
+      "authorized": false,
+      "endpoint": {
+        "display": "http://127.0.0.1:8127",
+        "fingerprint": "sha256:79b280f37273061704a9e0ad168958526214762963cdc13b7a8e2085ad59a8fe",
+        "source": "explicit"
+      }
+    }
+  }
+}

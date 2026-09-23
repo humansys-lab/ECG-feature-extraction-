@@ -45,8 +45,13 @@ jobs:
           python -m pip install -r requirements-ci.txt -r requirements-ludb-compare.txt
           python -m pip install -e ./feature_extraction --no-deps
       - name: Run pinned evaluators and compare with frozen tolerances
+        # Three tools hard-code <repo>/data/...; the mounted corpus must be
+        # byte-identical to the baseline's or the manifest check fails first.
+        # `run` exits 0 unless the harness itself fails; `compare` is the gate
+        # (0 pass, 1 regression/blocked/manifest mismatch, 2 harness error).
         run: |
-          python -m benchmarks.harness run --repo-root . --baseline-id candidate --out benchmarks/_candidate
+          ln -sfn "$ECG_DATA_ROOT" data
+          python -m benchmarks.harness run --repo-root . --baseline-id candidate --out-dir benchmarks/_candidate --raw-dir benchmarks/_raw/candidate --repeat 1 --max-workers 8
           python -m benchmarks.harness compare --baseline "benchmarks/baselines/${{ inputs.baseline || 'phase0-52a339c' }}" --candidate benchmarks/_candidate --report evaluator-report.json
       - uses: actions/upload-artifact@v4
         if: always()

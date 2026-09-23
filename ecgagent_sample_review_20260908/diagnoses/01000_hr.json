@@ -1,0 +1,1107 @@
+{
+  "record_id": "01000_hr",
+  "ok": true,
+  "verified": true,
+  "revisions": 0,
+  "refused": null,
+  "error": null,
+  "verdict": {
+    "summary": "ECG conclusion: Left axis deviation. ",
+    "ranked_complete_interpretations": [
+      {
+        "rank": 1,
+        "interpretation_type": "PRIMARY",
+        "complete_diagnosis": "Left axis deviation",
+        "confidence": "MEDIUM",
+        "basis_codes": [
+          "left_axis_deviation"
+        ],
+        "key_uncertainty": "Review against the original waveforms and clinical context is still required"
+      }
+    ],
+    "diagnoses": [
+      {
+        "code": "left_axis_deviation",
+        "statement": "Left axis deviation",
+        "category": "axis",
+        "confidence": "MEDIUM",
+        "urgency": "ROUTINE",
+        "evidence": [
+          {
+            "claim": "Global QRS axis used for the definition-level axis-range assessment",
+            "value": -31,
+            "unit": "deg",
+            "citations": [
+              "ev:/global_features/qrs_axis_deg"
+            ]
+          }
+        ],
+        "counterevidence": [],
+        "reasoning": "Every required node in the diagnosis-specific pathway is supported by its corresponding measurement view."
+      }
+    ],
+    "differential_diagnoses": [],
+    "interval_measurement_contexts": [],
+    "abstentions": [],
+    "quality_assessment": {
+      "interpretability": "adequate",
+      "limitations": []
+    },
+    "human_review": {
+      "required": true,
+      "reasons": [
+        "Review the program-confirmed diagnostic pathways against the original 12-lead evidence"
+      ]
+    }
+  },
+  "knowledge_navigation": {
+    "enabled": false,
+    "requested": true,
+    "status": "disabled",
+    "max_chunks": 4,
+    "patient_evidence": false,
+    "injected_after_phase": "survey",
+    "removed_after_phase": "hypothesize"
+  },
+  "pre_knowledge_verdict": null,
+  "knowledge_review": null,
+  "knowledge_revisions": 0,
+  "brief_report": "# Brief ECG Diagnostic Report\n\n- Record: 01000_hr\n- Result status: Passed deterministic evidence validation\n\n## Conclusion\n\nECG conclusion: Left axis deviation.\n\n## Confirmed Diagnoses\n\n- **Left axis deviation** (Confidence: Medium; Urgency: Routine)\n  - Key evidence: Global QRS axis used for the definition-level axis-range assessment (-31 deg)\n\n## Important but Unconfirmed\n\n- No differential diagnosis requires separate reporting.\n\n## Main Limitations\n\n- Overall interpretability: Adequate\n\n## Human Review Recommendations\n\n- This result requires human review.\n- Review the program-confirmed diagnostic pathways against the original 12-lead evidence\n\n> Key values come from structured ecgfeat measurements. See the full report and JSON for complete evidence paths and audit details. This report is for research assistance only and does not replace clinician waveform review, clinical information or a formal medical diagnosis.",
+  "human_report": "# ECG Agent Diagnostic Interpretation Report\n\n- Record: 01000_hr\n- Evidence and semantic validation: passed measurement-citation, reliability-qualification, numeric-logic, definition-level diagnosis-to-measurement consistency, and candidate-promotion checks\n\n## Top 3 Most Likely Complete ECG Interpretations\n\n1. **Left axis deviation** (Primary complete interpretation; overall confidence: Medium)\n   - Key uncertainty: Review against the original waveforms and clinical context is still required\n\n## Overall Conclusion\n\nECG conclusion: Left axis deviation.\n\n## Reporting Levels\n\n- Major ECG findings include only findings that reached the positive-interpretation evidence threshold.\n- Candidate-detector results and insufficiently supported mechanisms are listed under Differential Diagnoses and are not confirmed diagnoses.\n- Items that cannot be assessed reliably are listed as limited or abstained; missing values are never used to invent a diagnosis.\n\n## Data Quality and Interpretation Limitations\n\n- Overall interpretability: Adequate\n\n## Major ECG Findings (Positive-Interpretation Threshold Met)\n\n### 1. Left axis deviation\n- Code: left_axis_deviation; Category: Axis; Confidence: Medium; Urgency: Routine\n- Rationale: Every required node in the diagnosis-specific pathway is supported by its corresponding measurement view.\n  Supporting evidence:\n  - Global QRS axis used for the definition-level axis-range assessment (Structured measurement: -31 deg; Evidence location: ev:/global_features/qrs_axis_deg)\n  Counterevidence or inconsistencies:\n  - No explicit counterevidence was recorded among the evidence reviewed in this run\n\n## Differential Diagnoses (Unconfirmed Candidates)\n\nNo differential diagnosis requires separate reporting.\n\n## Waveform Information Retained When Intervals Are Limited\n\nNo limited PR or QT/QTc measurement requires separate reporting.\n\n## Indeterminate Items\n\nNo indeterminate item requires separate reporting.\n\n## Human Review Recommendations\n\n- Human review is required.\n- Review the program-confirmed diagnostic pathways against the original 12-lead evidence\n\n> Note: deterministic validation confirms that measurements, citations and reliability qualifications in the report match ecgfeat output, and applies numeric-logic, definition-level diagnosis and candidate-promotion gates. It does not cover all clinical diagnostic knowledge and does not mean that the clinical diagnosis has been validated. This report is a research aid and does not replace clinician waveform review, history, symptoms, prior testing or a formal medical diagnosis.",
+  "verification": {
+    "passed": true,
+    "n_claims": 1,
+    "n_citations": 1,
+    "n_quantities": 1,
+    "n_supported_quantities": 1,
+    "n_thresholds": 0,
+    "support_rate": 1.0,
+    "counts": {},
+    "findings": []
+  },
+  "phases": [
+    {
+      "phase": "plan",
+      "tool_budget": 1,
+      "exposed_tools": [],
+      "prefetched_tool_calls": 1,
+      "turns": 2,
+      "tool_calls": 1,
+      "rejected_calls": 0,
+      "elapsed_s": 147.45,
+      "stop_reason": "end_turn",
+      "duplicate_batches": 0,
+      "tool_loop_fused": false,
+      "phase_guard_attempts": 1,
+      "phase_guard_passed": true,
+      "phase_guard_problems": [],
+      "phase_sanitizations": [],
+      "text": "{\n  \"candidates\": [\n    {\n      \"id\": \"C1\",\n      \"code\": \"left_axis_deviation\",\n      \"domains\": [\n        \"axis\",\n        \"conduction_preexcitation\"\n      ],\n      \"support\": [\n        \"Q10\"\n      ],\n      \"counter\": [\n        \"Q21\"\n      ],\n      \"checks\": [\n        {\n          \"tool\": \"get_lead_table\",\n          \"purpose\": \"falsify\",\n          \"question\": \"Do the limb-lead QRS polarities and amplitudes support a true leftward frontal axis rather than a measurement artifact or lead-placement/lim\"\n        }\n      ]\n                                                    ,\n      \"uncertainty\": \"The axis is markedly leftward, but the P axis is normal, and the QRS duration is borderline with a consensus discrepancy. It is unclear if a\"\n    }\n  ],\n  \"review_tools\": [\n    \"get_morphology_groups\"\n  ]\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   ,\n  \"quality_limitations\": [\n    \"Q7\"\n  ]\n}"
+    },
+    {
+      "phase": "adjudicate",
+      "tool_budget": 2,
+      "exposed_tools": [],
+      "prefetched_tool_calls": 2,
+      "turns": 1,
+      "tool_calls": 2,
+      "rejected_calls": 0,
+      "elapsed_s": 51.55,
+      "stop_reason": "end_turn",
+      "duplicate_batches": 0,
+      "tool_loop_fused": false,
+      "phase_guard_attempts": 0,
+      "phase_guard_passed": true,
+      "phase_guard_problems": [],
+      "phase_sanitizations": [],
+      "text": "{\n  \"overall_status\": \"insufficient_evidence\",\n  \"decisions\": []\n  ,\n  \"interval_contexts\": []\n}"
+    }
+  ],
+  "audit": {
+    "agent_protocol": "ecgagent.diagnostic.v42",
+    "prompt_fingerprint": "181b7cac6ff3b9d27509e62dbfcce8bba221cd3e6ab6bfcbf74971e1df6615a3",
+    "mode": "diagnose",
+    "input_fingerprint": "sha256:b541fac6cf7ca347c3c6e5a6623aa2881424cdf7d1ab0199ee35a3d163f52848",
+    "evidence_access_contract": {
+      "version": "ecgagent.diagnosis-evidence.v4",
+      "dropped_top_level": [
+        "_ecgagent_extraction",
+        "clinical_interpretation",
+        "interpretation",
+        "reference_metadata",
+        "statement_engine"
+      ],
+      "unclassified_top_level": [
+        "_ecgagent_extraction"
+      ],
+      "dropped_metadata": [
+        "clinical_interpretation",
+        "confidence_semantics",
+        "confirmed_pacing_context",
+        "rhythm_analysis",
+        "st_amplitude_signal"
+      ],
+      "dropped_rhythm_sections": [
+        "statement_evidence"
+      ],
+      "dropped_morphology_sections": [
+        "derived_facts",
+        "statement_evidence"
+      ],
+      "dropped_sensitive_fields": [
+        "/beat_features/0/glasgow_measurements",
+        "/beat_features/1/glasgow_measurements",
+        "/beat_features/10/glasgow_measurements",
+        "/beat_features/100/glasgow_measurements",
+        "/beat_features/101/glasgow_measurements",
+        "/beat_features/102/glasgow_measurements",
+        "/beat_features/103/glasgow_measurements",
+        "/beat_features/104/glasgow_measurements",
+        "/beat_features/105/glasgow_measurements",
+        "/beat_features/106/glasgow_measurements",
+        "/beat_features/107/glasgow_measurements",
+        "/beat_features/108/glasgow_measurements",
+        "/beat_features/109/glasgow_measurements",
+        "/beat_features/11/glasgow_measurements",
+        "/beat_features/110/glasgow_measurements",
+        "/beat_features/111/glasgow_measurements",
+        "/beat_features/112/glasgow_measurements",
+        "/beat_features/113/glasgow_measurements",
+        "/beat_features/114/glasgow_measurements",
+        "/beat_features/115/glasgow_measurements",
+        "/beat_features/116/glasgow_measurements",
+        "/beat_features/117/glasgow_measurements",
+        "/beat_features/118/glasgow_measurements",
+        "/beat_features/119/glasgow_measurements",
+        "/beat_features/12/glasgow_measurements",
+        "/beat_features/13/glasgow_measurements",
+        "/beat_features/14/glasgow_measurements",
+        "/beat_features/15/glasgow_measurements",
+        "/beat_features/16/glasgow_measurements",
+        "/beat_features/17/glasgow_measurements",
+        "/beat_features/18/glasgow_measurements",
+        "/beat_features/19/glasgow_measurements",
+        "/beat_features/2/glasgow_measurements",
+        "/beat_features/20/glasgow_measurements",
+        "/beat_features/21/glasgow_measurements",
+        "/beat_features/22/glasgow_measurements",
+        "/beat_features/23/glasgow_measurements",
+        "/beat_features/24/glasgow_measurements",
+        "/beat_features/25/glasgow_measurements",
+        "/beat_features/26/glasgow_measurements",
+        "/beat_features/27/glasgow_measurements",
+        "/beat_features/28/glasgow_measurements",
+        "/beat_features/29/glasgow_measurements",
+        "/beat_features/3/glasgow_measurements",
+        "/beat_features/30/glasgow_measurements",
+        "/beat_features/31/glasgow_measurements",
+        "/beat_features/32/glasgow_measurements",
+        "/beat_features/33/glasgow_measurements",
+        "/beat_features/34/glasgow_measurements",
+        "/beat_features/35/glasgow_measurements",
+        "/beat_features/36/glasgow_measurements",
+        "/beat_features/37/glasgow_measurements",
+        "/beat_features/38/glasgow_measurements",
+        "/beat_features/39/glasgow_measurements",
+        "/beat_features/4/glasgow_measurements",
+        "/beat_features/40/glasgow_measurements",
+        "/beat_features/41/glasgow_measurements",
+        "/beat_features/42/glasgow_measurements",
+        "/beat_features/43/glasgow_measurements",
+        "/beat_features/44/glasgow_measurements",
+        "/beat_features/45/glasgow_measurements",
+        "/beat_features/46/glasgow_measurements",
+        "/beat_features/47/glasgow_measurements",
+        "/beat_features/48/glasgow_measurements",
+        "/beat_features/49/glasgow_measurements",
+        "/beat_features/5/glasgow_measurements",
+        "/beat_features/50/glasgow_measurements",
+        "/beat_features/51/glasgow_measurements",
+        "/beat_features/52/glasgow_measurements",
+        "/beat_features/53/glasgow_measurements",
+        "/beat_features/54/glasgow_measurements",
+        "/beat_features/55/glasgow_measurements",
+        "/beat_features/56/glasgow_measurements",
+        "/beat_features/57/glasgow_measurements",
+        "/beat_features/58/glasgow_measurements",
+        "/beat_features/59/glasgow_measurements",
+        "/beat_features/6/glasgow_measurements",
+        "/beat_features/60/glasgow_measurements",
+        "/beat_features/61/glasgow_measurements",
+        "/beat_features/62/glasgow_measurements",
+        "/beat_features/63/glasgow_measurements",
+        "/beat_features/64/glasgow_measurements",
+        "/beat_features/65/glasgow_measurements",
+        "/beat_features/66/glasgow_measurements",
+        "/beat_features/67/glasgow_measurements",
+        "/beat_features/68/glasgow_measurements",
+        "/beat_features/69/glasgow_measurements",
+        "/beat_features/7/glasgow_measurements",
+        "/beat_features/70/glasgow_measurements",
+        "/beat_features/71/glasgow_measurements",
+        "/beat_features/72/glasgow_measurements",
+        "/beat_features/73/glasgow_measurements",
+        "/beat_features/74/glasgow_measurements",
+        "/beat_features/75/glasgow_measurements",
+        "/beat_features/76/glasgow_measurements",
+        "/beat_features/77/glasgow_measurements",
+        "/beat_features/78/glasgow_measurements",
+        "/beat_features/79/glasgow_measurements",
+        "/beat_features/8/glasgow_measurements",
+        "/beat_features/80/glasgow_measurements",
+        "/beat_features/81/glasgow_measurements",
+        "/beat_features/82/glasgow_measurements",
+        "/beat_features/83/glasgow_measurements",
+        "/beat_features/84/glasgow_measurements",
+        "/beat_features/85/glasgow_measurements",
+        "/beat_features/86/glasgow_measurements",
+        "/beat_features/87/glasgow_measurements",
+        "/beat_features/88/glasgow_measurements",
+        "/beat_features/89/glasgow_measurements",
+        "/beat_features/9/glasgow_measurements",
+        "/beat_features/90/glasgow_measurements",
+        "/beat_features/91/glasgow_measurements",
+        "/beat_features/92/glasgow_measurements",
+        "/beat_features/93/glasgow_measurements",
+        "/beat_features/94/glasgow_measurements",
+        "/beat_features/95/glasgow_measurements",
+        "/beat_features/96/glasgow_measurements",
+        "/beat_features/97/glasgow_measurements",
+        "/beat_features/98/glasgow_measurements",
+        "/beat_features/99/glasgow_measurements",
+        "/clinical_interpretation",
+        "/interpretation",
+        "/metadata/clinical_interpretation",
+        "/metadata/confirmed_pacing_context",
+        "/metadata/patient_meta/clinical_classifications",
+        "/metadata/patient_meta/meds",
+        "/metadata/rhythm_analysis",
+        "/morphology_inputs/derived_facts",
+        "/morphology_inputs/record/clinical_dx_codes",
+        "/morphology_inputs/record/rx_codes",
+        "/morphology_inputs/statement_evidence",
+        "/p_wave_assessments/0/p_state",
+        "/p_wave_assessments/1/p_state",
+        "/p_wave_assessments/2/p_state",
+        "/p_wave_assessments/3/p_state",
+        "/p_wave_assessments/4/p_state",
+        "/p_wave_assessments/5/p_state",
+        "/p_wave_assessments/6/p_state",
+        "/p_wave_assessments/7/p_state",
+        "/p_wave_assessments/8/p_state",
+        "/p_wave_assessments/9/p_state",
+        "/reference_metadata",
+        "/representative_leads/I/params/glasgow_measurements",
+        "/representative_leads/II/params/glasgow_measurements",
+        "/representative_leads/III/params/glasgow_measurements",
+        "/representative_leads/V1/params/glasgow_measurements",
+        "/representative_leads/V2/params/glasgow_measurements",
+        "/representative_leads/V3/params/glasgow_measurements",
+        "/representative_leads/V4/params/glasgow_measurements",
+        "/representative_leads/V5/params/glasgow_measurements",
+        "/representative_leads/V6/params/glasgow_measurements",
+        "/representative_leads/aVF/params/glasgow_measurements",
+        "/representative_leads/aVL/params/glasgow_measurements",
+        "/representative_leads/aVR/params/glasgow_measurements",
+        "/rhythm_inputs/af_afl/atrial_rhythm_classification",
+        "/rhythm_inputs/af_afl/diagnostic_confidence",
+        "/rhythm_inputs/af_afl/probable_af",
+        "/rhythm_inputs/af_afl/probable_flutter",
+        "/rhythm_inputs/av_block/second_degree_avb",
+        "/rhythm_inputs/preexcitation/accessory_pathway_side",
+        "/rhythm_inputs/preexcitation/wpw_pattern",
+        "/rhythm_inputs/record/availability/reasons",
+        "/rhythm_inputs/statement_evidence",
+        "/statement_engine"
+      ],
+      "unclassified_fields": [
+        "/_ecgagent_extraction",
+        "/metadata/confidence_semantics",
+        "/metadata/patient_meta/patient_id",
+        "/metadata/st_amplitude_signal"
+      ]
+    },
+    "phase_config": [
+      {
+        "key": "plan",
+        "tool_budget": 1,
+        "structured": true,
+        "has_response_schema": true,
+        "max_tokens": 1600,
+        "max_turns": 5,
+        "minimum_tool_calls": 1,
+        "coverage_requirements": [],
+        "require_novel_tool_views": false,
+        "required_tool_counts": [
+          [
+            "get_diagnostic_overview",
+            1
+          ]
+        ],
+        "required_tool_calls": [],
+        "prefetch_tool_calls": [
+          {
+            "tool": "get_diagnostic_overview",
+            "arguments": {}
+          }
+        ],
+        "allowed_tools": [
+          "get_diagnostic_overview"
+        ]
+      },
+      {
+        "key": "adjudicate",
+        "tool_budget": 15,
+        "structured": true,
+        "has_response_schema": true,
+        "max_tokens": 4096,
+        "max_turns": 9,
+        "minimum_tool_calls": 0,
+        "coverage_requirements": [],
+        "require_novel_tool_views": true,
+        "required_tool_counts": [],
+        "required_tool_calls": [],
+        "prefetch_tool_calls": [],
+        "allowed_tools": [
+          "get_diagnostic_overview",
+          "get_global_table",
+          "get_measurement",
+          "get_lead_table",
+          "get_beat_table",
+          "search_measurements",
+          "get_rhythm_profile",
+          "get_atrial_event_table",
+          "get_p_assessment_table",
+          "get_morphology_groups",
+          "get_morphology_map",
+          "get_qrs_measurement_bundle",
+          "get_interval_waveform_context",
+          "get_pacing_profile",
+          "get_native_beat_profile"
+        ]
+      }
+    ],
+    "tools": {
+      "format": "tool-audit.compact.v1",
+      "full_pointer_manifest": "standalone_agent_trace",
+      "record_id": "ecg_613ca1ab9f04cd30f7e52ea6",
+      "n_calls": 3,
+      "budget": 2,
+      "calls": [
+        {
+          "call_id": "T0001",
+          "tool": "get_diagnostic_overview",
+          "args": {},
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 80,
+            "touched_evidence_set_id": "sha256:252fbc6023dbb2f2966cbaa961ce9ff57a07440de251b5229a7dd2d8273756ce",
+            "visible_count": 39,
+            "visible_evidence_set_id": "sha256:6674b1abccba85444f4c2665a883970e7ea62b5b3491cfc017d1011f7f695a70",
+            "hidden_count": 41
+          },
+          "elapsed_ms": 1.59,
+          "phase": "plan",
+          "result_summary": "| observation | value and citation | reliability | caveat | |--------------------------------------------------|---------------------------------------------------------------------------|-------------|------------------------------------------------------------------------------------------------------------------------------------------| | patient age (years) | 53 [ev:/metadata/patient_meta/age] | usable | | | patient age (days) | 19358.25 [ev:/metadata/patient_meta/age_days] | usable | | |...",
+          "result_sha256": "1f15f09d4b8aed956b9299761ad6847c0df6dc4e25b55735572bd141d883ba54",
+          "error_note": null
+        },
+        {
+          "call_id": "T0002",
+          "tool": "get_global_table",
+          "args": {
+            "fields": [
+              "qrs_axis_deg"
+            ]
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 1,
+            "touched_evidence_set_id": "sha256:461a44583d0fa00ecce60569fb4e0b313578825cdd5b3d842e458cc09de8c258",
+            "visible_count": 0,
+            "visible_evidence_set_id": null,
+            "hidden_count": 1
+          },
+          "elapsed_ms": 0.06,
+          "phase": "adjudicate",
+          "result_summary": "| requested | pointer | value | unit | reliability | caveat | |--------------|----------------------------------|-------|------|-------------|--------| | qrs_axis_deg | ev:/global_features/qrs_axis_deg | -31 | deg | usable | |",
+          "result_sha256": "428ef2dac8165fec954b6ce105c118d8cca4cb048bdef5b793b84b5772efa589",
+          "error_note": null
+        },
+        {
+          "call_id": "T0003",
+          "tool": "get_morphology_groups",
+          "args": {
+            "include_beats": false
+          },
+          "ok": true,
+          "citation_manifest": {
+            "touched_count": 19,
+            "touched_evidence_set_id": "sha256:7404fe643dc72f2865fc2f5ccdbd77239e3c46a8e7cb9b78836af582f5747b6d",
+            "visible_count": 19,
+            "visible_evidence_set_id": "sha256:7404fe643dc72f2865fc2f5ccdbd77239e3c46a8e7cb9b78836af582f5747b6d",
+            "hidden_count": 0
+          },
+          "elapsed_ms": 0.35,
+          "phase": "adjudicate",
+          "result_summary": "| group | member_count | member_pct | longest_run | mean_rr_ms | mean_pr_ms | mean_qrs_ms | mean_qt_ms | mean_ventr_rate_bpm | dominant | wide_qrs | template_members | template_outliers | template_used | template_corr | |-------|--------------------------------|-------------------------------|-------------------------------|-------------------------------|-------------------------------|-------------------------------|-------------------------------|---------------------------------------|---...",
+          "result_sha256": "df2131bae69cd01cec3f339145e3041207c92c845ad686e470ee5cf37afbc662",
+          "error_note": null
+        }
+      ],
+      "duplicate_calls_suppressed": 0,
+      "whitelist_size": 58,
+      "model_visible_whitelist_size": 58,
+      "program_authorized_whitelist_size": 1,
+      "provenance": {
+        "touched_size": 99,
+        "visible_size": 58,
+        "hidden_after_render_size": 41,
+        "touched_evidence_set_id": "sha256:83317ed7f6322fbc8a919ff00f48eafb4b69147eada78815b750c9c60392f720",
+        "visible_evidence_set_id": "sha256:72c564c60d20a30b47b5a4a1f52ded900038f9102e2b56a898ea9e2c5fa800c0",
+        "hidden_evidence_set_id": "sha256:5fc3c72426e3cb37512fc969e6f2dd4d30732e8548732df946884ff486d408bd",
+        "visible_by_source": {
+          "adjudicate:prefetch:prefetch-adjudicate-2": {
+            "count": 19,
+            "evidence_set_id": "sha256:7404fe643dc72f2865fc2f5ccdbd77239e3c46a8e7cb9b78836af582f5747b6d"
+          },
+          "chart_briefing": {
+            "count": 0,
+            "evidence_set_id": null
+          },
+          "plan:prefetch:prefetch-plan-1": {
+            "count": 39,
+            "evidence_set_id": "sha256:6674b1abccba85444f4c2665a883970e7ea62b5b3491cfc017d1011f7f695a70"
+          }
+        },
+        "program_authorized_size": 1,
+        "program_authorized_evidence_set_id": "sha256:461a44583d0fa00ecce60569fb4e0b313578825cdd5b3d842e458cc09de8c258",
+        "program_by_source": {
+          "deterministic_pathway:C1:axis_threshold:legacy_definition_level_measurement_gate": {
+            "count": 1,
+            "evidence_set_id": "sha256:461a44583d0fa00ecce60569fb4e0b313578825cdd5b3d842e458cc09de8c258"
+          }
+        }
+      },
+      "seeded_provenance": {
+        "chart_briefing": {
+          "count": 0,
+          "evidence_set_id": null
+        }
+      },
+      "effective_evidence": {
+        "selection": "final_verdict_citations_only",
+        "count": 1,
+        "evidence_set_id": "sha256:461a44583d0fa00ecce60569fb4e0b313578825cdd5b3d842e458cc09de8c258",
+        "items": [
+          {
+            "pointer": "/global_features/qrs_axis_deg",
+            "citation": "ev:/global_features/qrs_axis_deg",
+            "status": "resolved_model_visible",
+            "model_visible": true,
+            "program_authorized": true,
+            "program_sources": [
+              "deterministic_pathway:C1:axis_threshold:legacy_definition_level_measurement_gate"
+            ],
+            "value": -30.736412,
+            "unit": "deg",
+            "reliability": "reliable",
+            "caveats": [],
+            "source": "ecgfeat.global",
+            "uses": [
+              {
+                "path": "diagnoses[0].evidence[0]",
+                "role": "supporting",
+                "subject": "left_axis_deviation",
+                "claim": "Global QRS axis used for the definition-level axis-range assessment"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "model": {
+      "backend": "qwen-local",
+      "capabilities": {
+        "native_tool_calls": true,
+        "structured_output_level": "schema",
+        "context_compaction": true,
+        "citation_aliases": true,
+        "phase_memory": true,
+        "orchestrated_prefetch": true,
+        "enforce_phase_coverage": true,
+        "max_parallel_tool_calls": 3,
+        "hard_phase_guards": true
+      },
+      "usage": {
+        "prompt_tokens": 9912,
+        "completion_tokens": 3248,
+        "total_tokens": 13160,
+        "turns": 3
+      },
+      "config": {
+        "model": "ecgagent-review",
+        "endpoint": {
+          "display": "http://127.0.0.1:8127",
+          "fingerprint": "sha256:79b280f37273061704a9e0ad168958526214762963cdc13b7a8e2085ad59a8fe",
+          "source": "explicit"
+        },
+        "proxy_environment_trusted": false,
+        "max_tokens": 8192,
+        "timeout_seconds": 600.0,
+        "max_retries": 2,
+        "thinking": true,
+        "thinking_token_budget": 768,
+        "preserve_thinking": true,
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "context_compaction": {
+          "tool_result_contract": "ecgagent.model-evidence.v5",
+          "max_retained_evidence_chars": 8000,
+          "retain_committed_tool_views": false,
+          "citation_format": "Q{sequence}",
+          "citation_alias_count": 58,
+          "retained_views": 0,
+          "completed_phases": []
+        },
+        "required_vllm_flags": [
+          "--enable-auto-tool-choice",
+          "--tool-call-parser qwen3_xml",
+          "--reasoning-parser qwen3"
+        ]
+      },
+      "cache": "vLLM prefix cache: 0/9912 prompt tokens reported as cached across 3 turns"
+    },
+    "briefing_chars": 362,
+    "context_compactions": [
+      {
+        "phase": "plan",
+        "kind": "orchestrated_prefetch",
+        "before_chars": 6965,
+        "after_chars": 7024,
+        "saved_chars": 0,
+        "tool_calls": 1
+      },
+      {
+        "phase": "adjudicate",
+        "kind": "orchestrated_prefetch",
+        "before_chars": 5295,
+        "after_chars": 5360,
+        "saved_chars": 0,
+        "tool_calls": 2
+      }
+    ],
+    "verdict_normalizations": [
+      {
+        "kind": "deterministic_evidence_value_materialization",
+        "paths": [
+          "diagnoses[0].evidence[0].value",
+          "diagnoses[0].evidence[0].unit"
+        ]
+      }
+    ],
+    "runtime_controls": {
+      "elapsed_seconds": 199.032,
+      "model_turns": 3,
+      "model_requests": [
+        {
+          "phase": "plan",
+          "elapsed_seconds": 97.383661,
+          "prompt_tokens": 2548,
+          "completion_tokens": 1600,
+          "stop_reason": "max_tokens"
+        },
+        {
+          "phase": "plan",
+          "elapsed_seconds": 50.006358,
+          "prompt_tokens": 2766,
+          "completion_tokens": 844,
+          "stop_reason": "end_turn"
+        },
+        {
+          "phase": "adjudicate",
+          "elapsed_seconds": 51.54156,
+          "prompt_tokens": 4598,
+          "completion_tokens": 804,
+          "stop_reason": "end_turn"
+        }
+      ],
+      "prompt_tokens": 9912,
+      "completion_tokens": 3248,
+      "total_tokens": 13160,
+      "consecutive_max_tokens": 0,
+      "limits": {
+        "max_model_turns": 28,
+        "max_total_tokens": 400000,
+        "max_wall_seconds": 1200.0,
+        "max_consecutive_max_tokens": 3,
+        "phase_state_retries": 1
+      }
+    },
+    "knowledge_navigation": {
+      "enabled": false,
+      "requested": true,
+      "status": "disabled",
+      "max_chunks": 4,
+      "patient_evidence": false,
+      "injected_after_phase": "survey",
+      "removed_after_phase": "hypothesize"
+    },
+    "knowledge_challenge": {
+      "enabled": false,
+      "first_pass_isolated": true,
+      "first_pass_knowledge_navigation": false,
+      "posthoc_excerpts_isolated": true,
+      "max_chunks": 8
+    },
+    "phase_state_updates": [],
+    "diagnostic_ledger": {
+      "ledger_schema": "diagnostic-ledger.v3",
+      "record_id": "ecg_613ca1ab9f04cd30f7e52ea6",
+      "version": 0,
+      "current_phase": "not_started",
+      "frozen": false,
+      "snapshot_hash": "sha256:93a551a19e649fee970030bdeaaac80e77a201a018e6430bcb72cda8d6259454",
+      "domains": {},
+      "hypotheses": [],
+      "evidence": {},
+      "targeted_checks": [],
+      "detector_conflicts": [],
+      "unresolved": [],
+      "phase_summary": "",
+      "allowed_final_placement": {
+        "diagnoses": [],
+        "differential_diagnoses": [],
+        "rejected_audit_only": [],
+        "abstentions": []
+      },
+      "last_event_id": null,
+      "input_fingerprint": "sha256:b541fac6cf7ca347c3c6e5a6623aa2881424cdf7d1ab0199ee35a3d163f52848",
+      "history": [],
+      "phase_summaries": {}
+    },
+    "diagnostic_ledger_commits": [],
+    "dynamic_tool_selection": [
+      {
+        "phase": "plan",
+        "workflow": "compact",
+        "independent_candidate_count": 1,
+        "candidate_count": 1,
+        "rule_merge": {
+          "selection_policy": "urgency_domain_coverage_usable_support_per_new_view.v1",
+          "proposed_candidate_codes": [
+            "left_axis_deviation"
+          ],
+          "independent_candidate_codes": [
+            "left_axis_deviation"
+          ],
+          "independent_candidate_count": 1,
+          "merged_candidate_count": 1,
+          "rule_added_codes": [],
+          "rule_annotated_codes": [],
+          "rule_annotated_family_codes": [],
+          "rule_excluded": [],
+          "rule_deferred_by_cap": [],
+          "candidates_dropped_by_view_budget": [],
+          "merged_candidate_cap": 10,
+          "exact_view_cap": 15,
+          "reserved_review_views": [
+            {
+              "tool": "get_morphology_groups",
+              "arguments": {
+                "include_beats": false
+              }
+            }
+          ]
+        },
+        "sanitizations": []
+      },
+      {
+        "phase": "adjudicate",
+        "workflow": "compact",
+        "configured_budget": 15,
+        "effective_budget": 2,
+        "exposed_tools": [],
+        "program_prefetch": [
+          {
+            "tool": "get_global_table",
+            "arguments": {
+              "fields": [
+                "qrs_axis_deg"
+              ]
+            }
+          },
+          {
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            }
+          }
+        ],
+        "program_only_prefetch": [
+          {
+            "tool": "get_global_table",
+            "arguments": {
+              "fields": [
+                "qrs_axis_deg"
+              ]
+            }
+          }
+        ],
+        "plan_routing": [
+          {
+            "coverage_id": "C1:pathway:axis_threshold",
+            "tool": "get_global_table",
+            "arguments": {
+              "fields": [
+                "qrs_axis_deg"
+              ]
+            },
+            "required": true,
+            "consumer": "program",
+            "deduplicated": false
+          },
+          {
+            "coverage_id": "C1:falsify:1",
+            "tool": "get_lead_table",
+            "required": false,
+            "superseded_by_fixed_pathway": true
+          },
+          {
+            "coverage_id": "domain_review:1",
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            },
+            "required": false,
+            "consumer": "model",
+            "deduplicated": false
+          }
+        ],
+        "required_interval_views": [],
+        "missing_required_pathway_views": []
+      }
+    ],
+    "diagnostic_protocol_config": {
+      "version": "ecgagent.diagnostic.v42",
+      "evidence_contract_version": "ecgagent.diagnosis-evidence.v4",
+      "safety_policy_version": "ecgagent.clinical-safety.v2",
+      "runtime": {
+        "max_model_turns": 28,
+        "max_total_tokens": 400000,
+        "max_wall_seconds": 1200.0,
+        "max_consecutive_max_tokens": 3,
+        "phase_state_retries": 2,
+        "max_revisions": 4
+      },
+      "phases": {
+        "compact_plan_max_tokens": 1600,
+        "compact_adjudicate_max_tokens": 4096,
+        "compact_tool_ceiling": 15,
+        "compact_model_evidence_chars": 8000,
+        "compact_phase_state_retries": 1,
+        "compact_review_view_reserve": 2,
+        "survey_budget": 1,
+        "investigate_floor": 4,
+        "investigate_default": 8,
+        "investigate_ceiling": 12,
+        "challenge_floor": 2,
+        "challenge_default": 4,
+        "challenge_ceiling": 6,
+        "challenge_minimum_calls": 0,
+        "survey_max_tokens": 1800,
+        "hypothesize_max_tokens": 2600,
+        "investigate_max_tokens": 2800,
+        "challenge_max_tokens": 2200,
+        "synthesize_max_tokens": 5120,
+        "max_planned_tools": 8
+      },
+      "knowledge": {
+        "default_max_chunks": 8,
+        "navigation_ceiling": 4,
+        "challenge_ceiling": 12
+      }
+    },
+    "clinical_safety_policy": {
+      "version": "ecgagent.clinical-safety.v2",
+      "population": "adult",
+      "bradycardia_upper_exclusive_bpm": 60.0,
+      "tachycardia_lower_exclusive_bpm": 100.0,
+      "atrial_tachycardia_lower_exclusive_bpm": 100.0,
+      "first_degree_av_block_pr_lower_exclusive_ms": 200.0,
+      "short_pr_upper_exclusive_ms": 120.0,
+      "complete_bundle_hard_exclusion_qrs_ms": 115.0,
+      "nonspecific_ivcd_lower_exclusive_ms": 110.0,
+      "prolonged_qt_hard_exclusion_qtc_ms": 400.0,
+      "short_qt_hard_exclusion_qtc_ms": 400.0,
+      "retrograde_min_beats": 2,
+      "retrograde_min_leads": 2,
+      "urgent_bradycardia_below_bpm": 40.0,
+      "urgent_tachycardia_above_bpm": 150.0,
+      "urgent_wide_qrs_at_least_ms": 120.0,
+      "urgent_qtc_bazett_above_ms": 500.0,
+      "sources": [
+        "AHA/ACCF/HRS ECG standardization recommendations",
+        "ACC/AHA/HRS bradycardia and conduction-delay definitions",
+        "Project diagnostic reference corpus; versioned review required before change"
+      ]
+    },
+    "diagnostic_gate_validation": {
+      "version": "ecgagent.quality-gate-validation.v1",
+      "state": "pass",
+      "source": "validated_artifact",
+      "stop_reasons": []
+    },
+    "deterministic_pathway_policy": {
+      "version": "ecgagent.deterministic-pathway-facts.v2",
+      "min_sequence_events": 5,
+      "min_repeated_events": 2,
+      "min_representative_beats": 3,
+      "representative_member_pct": 50.0,
+      "weak_member_pct": 20.0,
+      "clean_p_min_count": 3,
+      "clean_p_min_fraction": 0.5,
+      "p_boundary_min_confidence": 0.5,
+      "p_boundary_min_leads": 2,
+      "atrial_event_min_confidence": 0.8,
+      "atrial_event_min_leads": 2,
+      "irregular_rr_pass_cv": 0.12,
+      "regular_rr_fail_cv": 0.05,
+      "sinus_p_axis_lower_deg": 0.0,
+      "sinus_p_axis_upper_deg": 90.0,
+      "sinus_rate_difference_fraction": 0.1,
+      "premature_rr_ratio": 0.8,
+      "compensatory_pause_ratio": 1.1,
+      "background_regular_rr_tolerance_fraction": 0.2,
+      "background_regular_min_fraction": 0.8,
+      "qrs_complete_bundle_pass_ms": 120.0,
+      "qrs_complete_bundle_fail_below_ms": 110.0,
+      "qrs_incomplete_rbbb_lower_ms": 110.0,
+      "qrs_incomplete_rbbb_upper_ms": 120.0,
+      "qtc_prolonged_pass_ms": 480.0,
+      "qtc_prolonged_fail_below_ms": 450.0,
+      "qtc_marked_prolonged_pass_ms": 500.0,
+      "qtc_short_pass_ms": 340.0,
+      "qtc_marked_short_pass_ms": 330.0,
+      "qtc_short_borderline_upper_ms": 360.0,
+      "qtc_short_fail_at_least_ms": 370.0,
+      "low_voltage_limb_mv": 0.5,
+      "low_voltage_precordial_mv": 1.0,
+      "pacing_min_spikes": 3,
+      "pacing_support_fraction": 0.5,
+      "pacing_strong_capture_fraction": 0.8,
+      "pacing_failure_fraction": 0.25,
+      "voltage_criteria_invalid_qrs_ms": 120.0,
+      "pvc_single_wide_qrs_ms": 140.0
+    },
+    "urgent_review": {
+      "policy_version": "ecgagent.urgent-review.v2",
+      "safety_policy_version": "ecgagent.clinical-safety.v2",
+      "urgent_review_required": false,
+      "critical_pattern_possible": false,
+      "do_not_delay_human_review": false,
+      "technical_quality_stop": false,
+      "triggers": [],
+      "adult_thresholds_applicable": true,
+      "unassessed_categories": [
+        "acute_st_injury_pattern",
+        "pacing_sensing_failure"
+      ],
+      "scope_note": "Routing flag only; it neither confirms a diagnosis nor represents a complete urgent-ECG detector."
+    },
+    "final_hypothesis_state": null,
+    "diagnostic_workflow": "compact",
+    "compact_plan": {
+      "candidates": [
+        {
+          "id": "C1",
+          "code": "left_axis_deviation",
+          "domains": [
+            "axis",
+            "conduction_preexcitation"
+          ],
+          "support": [
+            "Q10"
+          ],
+          "counter": [
+            "Q21"
+          ],
+          "checks": [
+            {
+              "tool": "get_lead_table",
+              "purpose": "falsify",
+              "question": "Do the limb-lead QRS polarities and amplitudes support a true leftward frontal axis rather than a measurement artifact or lead-placement/lim"
+            }
+          ],
+          "uncertainty": "The axis is markedly leftward, but the P axis is normal, and the QRS duration is borderline with a consensus discrepancy. It is unclear if a",
+          "sources": [
+            "independent_measurement_plan"
+          ],
+          "diagnostic_pathway": {
+            "version": "ecgagent.diagnostic-pathways.v8",
+            "code": "left_axis_deviation",
+            "display_name": "Left axis deviation",
+            "steps": [
+              {
+                "id": "axis_threshold",
+                "gate": "required",
+                "question": "Does the reliable QRS axis fall within the definition range for this axis candidate?",
+                "tool": "get_global_table",
+                "arguments": {
+                  "fields": [
+                    "qrs_axis_deg"
+                  ]
+                },
+                "owner": "program"
+              }
+            ],
+            "cautions": [
+              "Axis deviation is a measured phenotype and cannot by itself establish fascicular block or ventricular hypertrophy."
+            ]
+          }
+        }
+      ],
+      "review_tools": [
+        "get_morphology_groups"
+      ],
+      "quality_limitations": [
+        "Q7"
+      ],
+      "independent_candidate_count": 1,
+      "rule_second_opinion_version": "ecgagent.rule-second-opinion.v3"
+    },
+    "model_evidence_coverage": {},
+    "compact_decision": {
+      "workflow": "compact_pathway",
+      "model_overall_status": "insufficient_evidence",
+      "program_overall_status": "confirmed_diagnosis",
+      "rejected_model_rows": [],
+      "repaired_model_rows": [],
+      "decisions": [
+        {
+          "id": "C1",
+          "code": "left_axis_deviation",
+          "model_decision_present": false,
+          "final_placement": "confirmed",
+          "quality_scope_allowed": true,
+          "supporting_tool_count": 1,
+          "uncertain_context_evidence_count": 0,
+          "promotion_gate_problems": [],
+          "duplicate_step_ids": [],
+          "unexpected_step_ids": [],
+          "pathway_steps": [
+            {
+              "id": "axis_threshold",
+              "gate": "required",
+              "tool": "get_global_table",
+              "requested_status": "unknown",
+              "effective_status": "pass",
+              "model_status": "unknown",
+              "program_status": "pass",
+              "resolution_owner": "deterministic_measurement_gate",
+              "authorization": "deterministic_measurement_gate",
+              "authorized_evidence_count": 1,
+              "deterministic_reason_code": "legacy_definition_level_measurement_gate",
+              "deterministic_metrics": {},
+              "model_evidence_coverage": null
+            }
+          ]
+        }
+      ],
+      "pathway_placement_is_program_owned": true,
+      "rule_candidates_without_measurement_adjudication": []
+    },
+    "rule_second_opinion": {
+      "version": "ecgagent.rule-second-opinion.v3",
+      "candidate_rows": [],
+      "coverage_gaps": [
+        {
+          "rule_id": "CLIN-RHYTHM-MULTIFOCAL-01",
+          "rule_domain": "rhythm",
+          "status": "unavailable",
+          "missing_inputs": [
+            "eight_beats_with_reliable_lead_II_p_measurements_and_organized_p_ratio"
+          ],
+          "suppressed_by": []
+        },
+        {
+          "rule_id": "CLIN-CONDUCTION-RBBB-01",
+          "rule_domain": "conduction",
+          "status": "unavailable",
+          "missing_inputs": [
+            "lead.V1.r_prime_amp_mv"
+          ],
+          "suppressed_by": []
+        },
+        {
+          "rule_id": "CLIN-CONDUCTION-BIFASCICULAR-01",
+          "rule_domain": "conduction",
+          "status": "unavailable",
+          "missing_inputs": [
+            "CLIN-CONDUCTION-RBBB-01"
+          ],
+          "suppressed_by": []
+        },
+        {
+          "rule_id": "CLIN-CONDUCTION-TRIFASCICULAR-01",
+          "rule_domain": "conduction",
+          "status": "unavailable",
+          "missing_inputs": [
+            "CLIN-CONDUCTION-RBBB-01"
+          ],
+          "suppressed_by": []
+        }
+      ],
+      "counts": {
+        "eligible": 0,
+        "published": 0,
+        "coverage_gaps": 33
+      },
+      "merge": {
+        "selection_policy": "urgency_domain_coverage_usable_support_per_new_view.v1",
+        "proposed_candidate_codes": [
+          "left_axis_deviation"
+        ],
+        "independent_candidate_codes": [
+          "left_axis_deviation"
+        ],
+        "independent_candidate_count": 1,
+        "merged_candidate_count": 1,
+        "rule_added_codes": [],
+        "rule_annotated_codes": [],
+        "rule_annotated_family_codes": [],
+        "rule_excluded": [],
+        "rule_deferred_by_cap": [],
+        "candidates_dropped_by_view_budget": [],
+        "merged_candidate_cap": 10,
+        "exact_view_cap": 15,
+        "reserved_review_views": [
+          {
+            "tool": "get_morphology_groups",
+            "arguments": {
+              "include_beats": false
+            }
+          }
+        ]
+      },
+      "patient_evidence": false,
+      "injected_after_blind_plan": true
+    },
+    "record_identity": {
+      "model_visible_record_id": "ecg_613ca1ab9f04cd30f7e52ea6",
+      "strategy": "hmac-sha256-ephemeral-cli-v1",
+      "key_scope": "single_cli_invocation"
+    },
+    "external_egress": {
+      "backend": "qwen-local",
+      "external": false,
+      "authorization_required": false,
+      "authorized": false,
+      "endpoint": {
+        "display": "http://127.0.0.1:8127",
+        "fingerprint": "sha256:79b280f37273061704a9e0ad168958526214762963cdc13b7a8e2085ad59a8fe",
+        "source": "explicit"
+      }
+    }
+  }
+}
