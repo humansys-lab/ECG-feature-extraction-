@@ -1,7 +1,28 @@
-"""Finite migration namespace for legacy object and export names."""
+"""Finite migration namespace for legacy object and export names.
 
-from .api_v0 import ECGFeatureExtractor
-from .export_v0 import build_structured_payload, prepare_json_export, to_dict
-from .models_v0 import ECGFeatures, features_from_record
+Submodules load lazily so that importing ``ecgfeat.compat.models_v0`` (as the
+interpretation distribution does) never pulls in the legacy exporter.
+"""
 
-__all__ = ["ECGFeatureExtractor", "ECGFeatures", "features_from_record", "to_dict", "prepare_json_export", "build_structured_payload"]
+from importlib import import_module
+
+_EXPORTS = {
+    "ECGFeatureExtractor": ".api_v0",
+    "ECGFeatures": ".models_v0",
+    "features_from_record": ".models_v0",
+    "to_dict": ".export_v0",
+    "prepare_json_export": ".export_v0",
+    "build_structured_payload": ".export_v0",
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name: str):
+    try:
+        module = _EXPORTS[name]
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+    value = getattr(import_module(module, __name__), name)
+    globals()[name] = value
+    return value

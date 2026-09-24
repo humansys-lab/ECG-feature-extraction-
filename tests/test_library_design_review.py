@@ -357,8 +357,18 @@ def test_config_mismatch_is_rejected_before_engine(monkeypatch):
 def test_default_sampling_and_refinements_match_legacy_engine():
     assert ECGConfig().fs_internal is None
     config = ECGConfig(refinement=RefinementConfig(t_bidirectional=True))
-    from feature_extraction.ecgfeat.pipeline.extractor import _legacy_extractor
-    assert _legacy_extractor(config).refinement.t_bidirectional
+    from feature_extraction.ecgfeat.api import ECGFeatureExtractor
+    from feature_extraction.ecgfeat.pipeline.context import ExtractorSettings
+    from feature_extraction.ecgfeat.pipeline.extractor import _settings_from_config
+    assert _settings_from_config(config).refinement.t_bidirectional
+    # The record path's settings equal the legacy extractor's for the same options.
+    for options in ({}, {"input_mode": "limited", "fs_internal": 500}, {"st_amplitude_source": "calibrated_pr"},
+                    {"mains_frequency_hz": 60, "refinement": RefinementConfig(t_bidirectional=True)}):
+        cfg = ECGConfig(**options)
+        legacy = ECGFeatureExtractor(
+            fs_internal=cfg.fs_internal, mains_freq=cfg.mains_frequency_hz, st_amplitude_source=cfg.st_amplitude_source,
+            refinement=cfg.refinement, input_mode="limited" if cfg.input_mode == "limited" else "standard")
+        assert _settings_from_config(cfg) == ExtractorSettings.from_extractor(legacy)
     assert json.loads(json.dumps(asdict(config.refinement)))["t_bidirectional"] is True
     with pytest.raises(ValueError, match="unknown"):
         RefinementConfig.experimental("st_localization")

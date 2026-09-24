@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Dict, List
 
-from ..models import STANDARD_12_LEADS
+from ecgfeat.compat.models_v0 import STANDARD_12_LEADS
 from .context import GlasgowContext
 from .models import RuleEvaluation, RuleSpec
 

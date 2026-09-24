@@ -7,7 +7,7 @@ import numpy as np
 from scipy.ndimage import maximum_filter1d, minimum_filter1d
 from scipy.signal import find_peaks, welch
 
-from ...clinical_rules.config import DEFAULT_DIAGNOSTIC_CONFIG
+from ..foundation.thresholds import ENGINE_THRESHOLDS
 from ..foundation.models import LeadQuality, STANDARD_12_LEADS
 from ..foundation.numeric import trapezoid
 from ..preprocess import bandpass_filter, highpass_filter, lowpass_filter
@@ -277,7 +277,7 @@ def summarize_record_quality(qualities: Dict[str, LeadQuality], *, available_lea
     required_anchor_available = bool(
         preferred_anchor_available
         or (
-            reliable_qrs >= DEFAULT_DIAGNOSTIC_CONFIG.quality.minimum_usable_leads
+            reliable_qrs >= ENGINE_THRESHOLDS.quality.minimum_usable_leads
             and len(fallback_anchor_leads) >= 2
         )
     )
@@ -289,12 +289,12 @@ def summarize_record_quality(qualities: Dict[str, LeadQuality], *, available_lea
     all_bsqi_below_stop = bool(
         b_sqi_values
         and all(
-            value < DEFAULT_DIAGNOSTIC_CONFIG.quality.bsqi_record_stop
+            value < ENGINE_THRESHOLDS.quality.bsqi_record_stop
             for value in b_sqi_values
         )
     )
     if (
-        reliable_qrs < DEFAULT_DIAGNOSTIC_CONFIG.quality.minimum_usable_leads
+        reliable_qrs < ENGINE_THRESHOLDS.quality.minimum_usable_leads
         or not required_anchor_available
         or all_bsqi_below_stop
         or partial_map
@@ -327,7 +327,7 @@ def summarize_record_quality(qualities: Dict[str, LeadQuality], *, available_lea
         "all_bsqi_below_stop": all_bsqi_below_stop,
         "diagnostic_gate": "stop" if "record" in rejected_functions else (
             "partial"
-            if reliable_qrs < DEFAULT_DIAGNOSTIC_CONFIG.quality.full_coverage_leads
+            if reliable_qrs < ENGINE_THRESHOLDS.quality.full_coverage_leads
             else "pass"
         ),
     }
@@ -455,7 +455,7 @@ def build_diagnostic_gate(
     The gate controls diagnostic statements, not feature extraction.  This is
     why short/noisy records still return measurements and detailed reasons.
     """
-    cfg = DEFAULT_DIAGNOSTIC_CONFIG
+    cfg = ENGINE_THRESHOLDS
     stop_reasons: List[str] = []
     partial_reasons: List[str] = []
     if str(record_quality.get("diagnostic_gate")) == "stop":
@@ -547,7 +547,7 @@ def compute_quality(
     adc_full_scale_mv: Optional[float] = None,
 ) -> Dict[str, LeadQuality]:
     qualities: Dict[str, LeadQuality] = {}
-    thresholds = DEFAULT_DIAGNOSTIC_CONFIG.quality
+    thresholds = ENGINE_THRESHOLDS.quality
     total_band = (0.05, min(150.0, fs / 2.0 - 1.0))
     for i, lead in enumerate(STANDARD_12_LEADS):
         sig = np.asarray(ecg[i], dtype=float)

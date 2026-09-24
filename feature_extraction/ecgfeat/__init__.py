@@ -2,6 +2,10 @@
 
 from importlib import import_module
 
+from ._moved import install_interpretation_aliases as _install_interpretation_aliases
+
+_install_interpretation_aliases()
+
 _EXPORTS = {
     "ECGFeatureExtractor": (".api", "ECGFeatureExtractor"),
     "to_dict": (".export", "to_dict"),

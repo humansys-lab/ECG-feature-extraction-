@@ -21,7 +21,7 @@ from typing import Any
 
 from .runner import case_file_stem, iter_leaves
 
-MODES = ("legacy-bytes", "record-bytes", "record-crosswalk", "canonical-document")
+MODES = ("legacy-bytes", "record-bytes", "record-crosswalk", "canonical-document", "interpretation")
 
 
 def input_mismatches(expected: dict[str, Any], observed: dict[str, Any]) -> list[str]:
@@ -106,6 +106,35 @@ def compare_case(mode: str, expected: dict[str, Any], observed: dict[str, Any], 
             if got is None or got["leaf_digest"] != want["leaf_digest"]:
                 report["differences"].append({"surface": "record", "profile": profile,
                                               "baseline": want, "candidate": got})
+    elif mode == "interpretation":
+        # Document 05 Phase 5: the separately versioned Interpretation document must
+        # carry exactly the legacy payload's interpretation sections (key order
+        # ignored; wall-clock generated_at and the exporter-level
+        # artifact_fingerprint excluded).
+        before = _load_legacy_payload(baseline_payloads, case_id)
+        path = candidate_payloads / "interpretation" / f"{case_file_stem(case_id)}.json" if candidate_payloads else None
+        got = observed["outputs"].get("interpretation", {})
+        if "error" in got:
+            report["differences"].append({"surface": "interpretation", "candidate_error": got["error"]})
+        elif before is None or path is None or not path.exists():
+            report.update(status="missing_payload")
+            return report
+        else:
+            document = json.loads(path.read_bytes())
+
+            def clean(value):
+                value = dict(value or {})
+                for key in ("generated_at", "artifact_fingerprint"):
+                    value.pop(key, None)
+                return value
+
+            if document.get("interpretation") != before.get("interpretation"):
+                report["differences"].append({"surface": "interpretation", "member": "interpretation",
+                                              "pointer_diff": pointer_diff(before.get("interpretation"), document.get("interpretation"))})
+            legacy_clinical = clean((before.get("metadata") or {}).get("clinical_interpretation"))
+            if clean(document.get("clinical")) != legacy_clinical:
+                report["differences"].append({"surface": "interpretation", "member": "clinical",
+                                              "pointer_diff": pointer_diff(legacy_clinical, clean(document.get("clinical")))})
     elif mode == "record-crosswalk":
         from .crosswalk import compare_with_crosswalk
 

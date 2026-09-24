@@ -20,9 +20,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..clinical_rules.engine import analyze_clinical
-from ..interpret import interpret
-from ..rhythm_statements import build_rhythm_statement_candidates
+from ._interpretation import lazy_function
+
+# Resolved on first call, so core imports never require ecginterpret.
+analyze_clinical = lazy_function("clinical_rules.engine", "analyze_clinical")
+interpret = lazy_function("interpret", "interpret")
+build_rhythm_statement_candidates = lazy_function("rhythm_statements", "build_rhythm_statement_candidates")
 
 
 class LegacyInterpretationHooks:

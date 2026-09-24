@@ -161,8 +161,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
     label = args.label or time.strftime("check-%Y%m%dT%H%M%S")
     candidate_payloads = PAYLOAD_ROOT / "candidates" / label / args.tier
-    surfaces = ("legacy",) if args.mode == "legacy-bytes" else ("record",) if args.mode != "record-crosswalk" \
-        else ("record",)
+    surfaces = {"legacy-bytes": ("legacy",), "interpretation": ("interpretation",)}.get(args.mode, ("record",))
     if args.mode == "legacy-bytes" and args.with_record:
         surfaces = ("legacy", "record")
     started = time.perf_counter()
@@ -221,7 +220,8 @@ def build_parser() -> argparse.ArgumentParser:
     check = sub.add_parser("check", help="rerun the manifest and compare with a frozen baseline")
     check.add_argument("--tier", choices=("sentinel", "full"), default="sentinel")
     check.add_argument("--baseline-id", required=True)
-    check.add_argument("--mode", choices=("legacy-bytes", "record-bytes", "record-crosswalk", "canonical-document"),
+    check.add_argument("--mode", choices=("legacy-bytes", "record-bytes", "record-crosswalk", "canonical-document",
+                                          "interpretation"),
                        default="legacy-bytes")
     check.add_argument("--with-record", action="store_true",
                        help="in legacy-bytes mode also require exact record bytes")

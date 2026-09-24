@@ -177,6 +177,21 @@ def run_legacy(loaded: LoadedCase, spec: dict[str, Any]) -> tuple[dict[str, byte
     return outputs, debug_payload
 
 
+def run_interpretation(loaded: LoadedCase, spec: dict[str, Any]) -> bytes:
+    """Interpretation document from the legacy measurement state (ecginterpret)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        warnings.simplefilter("ignore", FutureWarning)
+        from ecginterpret import interpret_features
+
+        extractor = build_extractor(spec)
+        kwargs = {"amplitude_unit": "mV"}
+        if spec["input_mode"] == "limited":
+            kwargs["lead_names"] = list(loaded.lead_names)
+        features = extractor.extract(np.array(loaded.signal, copy=True), loaded.fs, **kwargs)
+        return canonical_json_bytes(interpret_features(features).as_dict())
+
+
 def run_record(loaded: LoadedCase, spec: dict[str, Any]) -> dict[str, bytes]:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
@@ -264,6 +279,16 @@ def execute_case(case: dict[str, Any], config_spec: dict[str, Any], data_root: P
                 target = payload_dir / "record" / f"{case_file_stem(case['case_id'])}.{profile}.json"
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
+    if "interpretation" in surfaces:
+        try:
+            document = run_interpretation(loaded, config_spec)
+            result["outputs"]["interpretation"] = {"sha256": sha256_bytes(document), "bytes": len(document)}
+            if payload_dir is not None:
+                target = payload_dir / "interpretation" / f"{case_file_stem(case['case_id'])}.json"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(document)
+        except Exception as exc:
+            result["outputs"]["interpretation"] = {"error": f"{type(exc).__name__}: {exc}"}
     return result
 
 

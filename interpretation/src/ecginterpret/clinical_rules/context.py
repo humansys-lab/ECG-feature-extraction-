@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import Any, Optional
 
-from ..models import ECGFeatures, resolve_patient_age
+from ecgfeat.compat.models_v0 import ECGFeatures, resolve_patient_age
 
 
 LIMB_LEADS = frozenset({"I", "II", "III", "aVR", "aVL", "aVF"})

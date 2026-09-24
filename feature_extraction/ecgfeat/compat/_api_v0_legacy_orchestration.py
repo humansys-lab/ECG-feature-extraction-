@@ -49,8 +49,9 @@ from .._engine.measurement.features import (
     _stable_limb_signed_t_axis_deg,
 )
 from .._engine.beats.grouping import build_beat_annotations, cluster_beats
-from ..clinical_rules.engine import analyze_clinical
-from ..interpret import interpret
+from ._interpretation import lazy_function
+analyze_clinical = lazy_function("clinical_rules.engine", "analyze_clinical")
+interpret = lazy_function("interpret", "interpret")
 from ..models import (
     ECGFeatures,
     PatientMeta,
@@ -86,7 +87,7 @@ from ..refinement import RefinementConfig
 from .._engine.delineation.refinement import correct_p_boundaries
 from .._engine.delineation.t_refinement import refine_t_wave_boundaries
 from .._engine.beats.representative import build_representative_beats_with_meta
-from ..rhythm_rules import (
+from .._engine.measurement.rhythm import (
     assess_pacing_evidence_quality,
     build_measurement_availability,
     classify_pacing_context,
@@ -97,7 +98,7 @@ from ..rhythm_rules import (
     detect_preexcitation,
     select_measurement_beat_ids,
 )
-from ..rhythm_statements import build_rhythm_statement_candidates
+build_rhythm_statement_candidates = lazy_function("rhythm_statements", "build_rhythm_statement_candidates")
 from .._engine.measurement.profiles.twelve_sl import apply_twelve_sl_measurement_profile
 from ..validation import validate_ecg_input
 

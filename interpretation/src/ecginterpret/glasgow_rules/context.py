@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, replace
 from math import isfinite
 from typing import Any, Dict, List, Optional
 
-from ..models import ECGFeatures, STANDARD_12_LEADS, resolve_patient_age
+from ecgfeat.compat.models_v0 import ECGFeatures, STANDARD_12_LEADS, resolve_patient_age
 from .models import GlasgowConfig
 
 

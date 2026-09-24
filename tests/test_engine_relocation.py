@@ -42,6 +42,7 @@ MOVED = {
     "calibration": "_engine.measurement.calibration",
     "twelve_sl": "_engine.measurement.profiles.twelve_sl",
     "glasgow_measurements": "_engine.measurement.profiles.glasgow",
+    "rhythm_rules": "_engine.measurement.rhythm",
 }
 
 
@@ -67,8 +68,11 @@ def test_warning_is_attributed_to_the_importer():
 
 
 def test_package_code_never_imports_old_paths():
-    code = ("import ecgfeat, ecgfeat.api, ecgfeat.export, ecgfeat.interpret, ecgfeat.pipeline, "
-            "ecgfeat.record, ecgfeat.cli, ecgfeat.clinical_rules.engine, ecgfeat.glasgow_rules.engine; "
+    # Interpretation modules left the package (Phase 5); their old paths are
+    # deprecated aliases covered by tests/test_interpretation_split.py.
+    code = ("import ecgfeat, ecgfeat.api, ecgfeat.export, ecgfeat.pipeline, ecgfeat.record, ecgfeat.cli, "
+            "ecgfeat.compat.api_v0, ecgfeat.compat.export_v0, ecgfeat.compat.interpretation_hooks, "
+            "ecginterpret, ecginterpret.clinical_rules.engine, ecginterpret.glasgow_rules.engine; "
             "from ecgfeat import PWaveConfig")
     subprocess.run([sys.executable, "-W", "error::DeprecationWarning", "-c", code], check=True)
 

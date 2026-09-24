@@ -49,7 +49,7 @@ from ..._engine.quality.signal import (
     remove_pacing_spikes,
 )
 from ...models import STANDARD_12_LEADS
-from ...rhythm_rules import (
+from ..._engine.measurement.rhythm import (
     build_measurement_availability,
     classify_pacing_context,
     classify_post_pause_or_interpolated_beats,

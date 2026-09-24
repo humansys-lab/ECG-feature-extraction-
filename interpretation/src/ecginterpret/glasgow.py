@@ -8,7 +8,7 @@ from .glasgow_rules.context import build_context
 from .glasgow_rules.engine import analyze_glasgow
 from .glasgow_rules.measurement_matrix import build_measurement_matrix as _build_matrix
 from .glasgow_rules.summary import SUMMARY_CODE_LABELS
-from .models import ECGFeatures
+from ecgfeat.compat.models_v0 import ECGFeatures
 
 
 def _finite(value: Any) -> Optional[float]:

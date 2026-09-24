@@ -254,6 +254,11 @@ def _python_chunks(
 
 
 def _corpus(root: Path) -> list[tuple[Path, str]]:
+    # The rule engines ship in the separate ecginterpret distribution
+    # (interpretation/src/ecginterpret); older checkouts kept them in ecgfeat.
+    rules_root = root / "interpretation" / "src" / "ecginterpret"
+    if not rules_root.exists():
+        rules_root = root / "feature_extraction" / "ecgfeat"
     fixed = [
         (
             root / "ecgagent" / "knowledge" / "english_diagnostic_reference.md",
@@ -273,20 +278,20 @@ def _corpus(root: Path) -> list[tuple[Path, str]]:
         ),
         (root / "docs" / "ecg_agent_architecture.md", "capability_blueprint"),
         (
-            root / "feature_extraction" / "ecgfeat" / "interpret.py",
+            rules_root / "interpret.py",
             "philips_dxl_reference",
         ),
         (
-            root / "feature_extraction" / "ecgfeat" / "statement_engine.py",
+            rules_root / "statement_engine.py",
             "philips_dxl_reference",
         ),
         (
-            root / "feature_extraction" / "ecgfeat" / "glasgow.py",
+            rules_root / "glasgow.py",
             "glasgow_reference",
         ),
     ]
-    clinical_dir = root / "feature_extraction" / "ecgfeat" / "clinical_rules"
-    glasgow_dir = root / "feature_extraction" / "ecgfeat" / "glasgow_rules"
+    clinical_dir = rules_root / "clinical_rules"
+    glasgow_dir = rules_root / "glasgow_rules"
     fixed.extend(
         (path, "clinical_rules_reference")
         for path in sorted(clinical_dir.glob("*.py"))

@@ -7,50 +7,65 @@ from math import isfinite, log2, sqrt
 from statistics import median
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from ..interpret import (
-    LAE_P_DUR_MS,
-    LAE_V1_NEG_AMP_MV,
-    LAE_V1_NEG_DUR_MS,
-    PEDS_DEXTRO_P_AXIS_HIGH,
-    PEDS_DEXTRO_P_AXIS_LOW,
-    PEDS_DEXTRO_S_MV,
-    PEDS_EARLY_REPOL_AGE_HIGH,
-    PEDS_EARLY_REPOL_AGE_LOW,
-    PEDS_LSH_CONSIDER_R_V1_MV,
-    PEDS_LSH_R_V1_MV,
-    PEDS_PERICARDITIS_AGE_HIGH,
-    PEDS_PERICARDITIS_AGE_LOW,
-    PEDS_RBBB_R_PRIME_DUR_MS,
-    PEDS_RBBB_R_PRIME_MV,
-    PTF_V1_DEFINITE_MV_MS,
-    PTF_V1_PROBABLE_MV_MS,
-    RAE_P_AMP_CONSIDER_MV,
-    RAE_P_DUR_MIN_MS,
-    ST_DEP_POSTERIOR_MV,
-    ST_DEP_SIGNIFICANT_MV,
-    ST_ELE_ABNORMAL_MV,
-    ST_ELE_BORDERLINE_MV,
-    TALL_T_ABS_MV,
-    TALL_T_REL_MV,
-)
-from ..mi import build_culprit_artery_evidence
 from .._engine.foundation.models import (
     ECGFeatures,
     LeadBeatFeatures,
     STANDARD_12_LEADS,
     resolve_patient_age,
 )
-from ..pediatric_rules import (
-    PEDS_BVH_Q_V6_AMP_MV,
-    PEDS_BVH_Q_V6_DUR_MS,
-    PEDS_BVH_R_V1_MV,
-    PEDS_BVH_R_V6_MV,
-    PEDS_BVH_RS_SUM_MV,
-    REQUIRED_PEDIATRIC_CRITERIA,
-    pediatric_age_bin,
-    pediatric_voltage_threshold,
-)
-from ..statement_engine import build_morphology_statement_evidence, resolve_statement_candidates
+
+# The legacy payload embeds interpretation sections, so the legacy exporter
+# needs the separately distributed ecginterpret; measurement and record APIs
+# do not.  Without it, the public entry points below raise a targeted error.
+try:
+    from ecginterpret.interpret import (
+        LAE_P_DUR_MS,
+        LAE_V1_NEG_AMP_MV,
+        LAE_V1_NEG_DUR_MS,
+        PEDS_DEXTRO_P_AXIS_HIGH,
+        PEDS_DEXTRO_P_AXIS_LOW,
+        PEDS_DEXTRO_S_MV,
+        PEDS_EARLY_REPOL_AGE_HIGH,
+        PEDS_EARLY_REPOL_AGE_LOW,
+        PEDS_LSH_CONSIDER_R_V1_MV,
+        PEDS_LSH_R_V1_MV,
+        PEDS_PERICARDITIS_AGE_HIGH,
+        PEDS_PERICARDITIS_AGE_LOW,
+        PEDS_RBBB_R_PRIME_DUR_MS,
+        PEDS_RBBB_R_PRIME_MV,
+        PTF_V1_DEFINITE_MV_MS,
+        PTF_V1_PROBABLE_MV_MS,
+        RAE_P_AMP_CONSIDER_MV,
+        RAE_P_DUR_MIN_MS,
+        ST_DEP_POSTERIOR_MV,
+        ST_DEP_SIGNIFICANT_MV,
+        ST_ELE_ABNORMAL_MV,
+        ST_ELE_BORDERLINE_MV,
+        TALL_T_ABS_MV,
+        TALL_T_REL_MV,
+    )
+    from ecginterpret.mi import build_culprit_artery_evidence
+    from ecginterpret.pediatric_rules import (
+        PEDS_BVH_Q_V6_AMP_MV,
+        PEDS_BVH_Q_V6_DUR_MS,
+        PEDS_BVH_R_V1_MV,
+        PEDS_BVH_R_V6_MV,
+        PEDS_BVH_RS_SUM_MV,
+        REQUIRED_PEDIATRIC_CRITERIA,
+        pediatric_age_bin,
+        pediatric_voltage_threshold,
+    )
+    from ecginterpret.statement_engine import build_morphology_statement_evidence, resolve_statement_candidates
+    _INTERPRETATION_ERROR = None
+except ImportError as _exc:  # ecginterpret not installed
+    _INTERPRETATION_ERROR = _exc
+
+
+def _require_interpretation() -> None:
+    if _INTERPRETATION_ERROR is not None:
+        from ._interpretation import INSTALL_HINT
+
+        raise ImportError("the legacy JSON export includes interpretation sections; " + INSTALL_HINT) from _INTERPRETATION_ERROR
 
 
 def _reject_record(value: Any, operation: str) -> None:
@@ -2424,6 +2439,7 @@ def to_dict(obj: Any, *, profile: Optional[str] = None) -> Any:
     The no-profile API retains the full historical payload.
     """
     _reject_record(obj, "use record_to_dict or dumps_record")
+    _require_interpretation()
     if profile is not None:
         profile = str(profile).strip().lower()
         if profile not in {"summary", "audit", "debug"}:
@@ -2510,6 +2526,7 @@ def prepare_json_export(
     switch remains supported and selects `debug` when no profile is supplied.
     """
     _reject_record(payload, "use record_to_dict or dumps_record")
+    _require_interpretation()
     if profile is None:
         selected_profile = "debug" if include_beat_features else "audit"
     else:
@@ -2554,6 +2571,7 @@ def prepare_json_export(
 
 def build_structured_payload(features: ECGFeatures) -> Dict[str, Any]:
     _reject_record(features, "ECGRecord cannot reconstruct a structured legacy payload")
+    _require_interpretation()
     record_quality = features.metadata.get("record_quality", {})
     diagnostic_gate = features.metadata.get("diagnostic_gate", {})
     rhythm_inputs = build_rhythm_inputs(features)

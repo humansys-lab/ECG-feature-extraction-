@@ -163,7 +163,9 @@ def test_rollback_module_is_the_verbatim_pre_decomposition_api():
     extract = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "extract")
     assert extract.end_lineno - extract.lineno > 1300
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.level:
+        # Phase 5: interpretation is reached through the compat package's own
+        # lazy forwarders (level 1); every other relative import is adjusted.
+        if isinstance(node, ast.ImportFrom) and node.level and node.module != "_interpretation":
             assert node.level >= 2, "relative imports are adjusted for the compat package"
 
 
@@ -385,7 +387,9 @@ def test_record_path_uses_the_staged_pipeline(monkeypatch, signal):
     monkeypatch.setattr(pipeline_extractor, "run_legacy_pipeline", spy)
     prepared = ecg_prepare(signal[:, :2500], sampling_rate=500.0, lead_names=STANDARD_12)
     measured = ecg_measure(prepared)
-    assert len(seen) == 1 and seen[0] is not None
+    # Phase 5: the record path runs without interpretation hooks, so core-only
+    # installations extract records without ecginterpret.
+    assert len(seen) == 1 and seen[0] is None
     assert measured.legacy_features is not None
 
 

@@ -24,7 +24,9 @@ from .._engine.foundation.models import (
     QRSCandidateWindow,
     QRSDetectorResult,
     RepresentativeLeadFeatures,
+    ResolvedPatientAge,
     WaveBounds,
+    resolve_patient_age,
 )
 
 
@@ -39,5 +41,5 @@ __all__ = [
     "BeatAnnotation", "ECGFeatures", "ECGInterpretation", "GlobalFeatures", "GroupFeatures",
     "LeadBeatFeatures", "LeadQuality", "PWaveBeatAssessment", "PWaveLeadBoundary", "PatientMeta",
     "QRSCandidateWindow", "QRSDetectorResult", "RepresentativeLeadFeatures", "STANDARD_12_LEADS",
-    "WaveBounds", "features_from_record",
+    "WaveBounds", "ResolvedPatientAge", "resolve_patient_age", "features_from_record",
 ]

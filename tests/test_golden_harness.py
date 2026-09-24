@@ -142,3 +142,26 @@ def test_crosswalk_oracle_is_independent_of_builder_and_exporter():
     source = Path("benchmarks/golden/crosswalk.py").read_text()
     assert "record_builder" not in source.split('"""', 2)[2]
     assert "export_v0" not in source.split('"""', 2)[2]
+
+
+def test_interpretation_mode_detects_changed_statements(tmp_path):
+    import gzip
+
+    from benchmarks.golden.runner import case_file_stem
+
+    case_id = "cfg/ds/1"
+    legacy = {"interpretation": {"rhythm_class": "sinus"},
+              "metadata": {"clinical_interpretation": {"statements": ["A"], "generated_at": "t", "artifact_fingerprint": "f"}}}
+    base = tmp_path / "base" / "legacy"
+    base.mkdir(parents=True)
+    (base / f"{case_file_stem(case_id)}.debug.json.gz").write_bytes(gzip.compress(json.dumps(legacy).encode()))
+    cand = tmp_path / "cand" / "interpretation"
+    cand.mkdir(parents=True)
+    want = _case({"interpretation": {"sha256": "x"}})
+    for clinical, interpretation, ok in (({"statements": ["A"], "generated_at": "u"}, {"rhythm_class": "sinus"}, True),
+                                         ({"statements": ["B"]}, {"rhythm_class": "sinus"}, False),
+                                         ({"statements": ["A"]}, {"rhythm_class": "af"}, False)):
+        (cand / f"{case_file_stem(case_id)}.json").write_text(json.dumps({"interpretation": interpretation, "clinical": clinical}))
+        report = compare.compare_case("interpretation", want, _case({"interpretation": {"sha256": "y"}}),
+                                      baseline_payloads=tmp_path / "base", candidate_payloads=tmp_path / "cand")
+        assert (report["status"] == "pass") is ok, report

@@ -5,13 +5,13 @@ from feature_extraction.ecgfeat.features import estimate_initial_qrs_axis_deg
 from feature_extraction.ecgfeat.models import RepresentativeLeadFeatures
 from feature_extraction.ecgfeat.rhythm_rules import (
     build_measurement_availability,
-    build_statement_evidence,
     classify_post_pause_or_interpolated_beats,
     detect_av_block_availability_flags,
     detect_pauses_and_av_block,
     detect_preexcitation,
 )
 from feature_extraction.ecgfeat.rhythm_statements import build_rhythm_statement_candidates
+from ecginterpret.rhythm import build_statement_evidence
 
 
 class RhythmRuleTests(unittest.TestCase):

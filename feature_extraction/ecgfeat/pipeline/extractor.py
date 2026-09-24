@@ -157,18 +157,27 @@ def ecg_prepare(
     return ECGInput(array, fs, names, unit, _patient_meta(patient), input_mode)
 
 
-def _legacy_refinement(config: ECGConfig) -> Any:
-    return config.refinement
+def _settings_from_config(config: ECGConfig) -> Any:
+    """Resolved engine settings for ``config`` (the legacy extractor's defaults).
 
+    Equal to ``ExtractorSettings.from_extractor(ECGFeatureExtractor(...))`` for
+    the same options (tested), without importing the legacy entry point.
+    """
+    from .context import ExtractorSettings
 
-def _legacy_extractor(config: ECGConfig) -> Any:
-    from ..api import ECGFeatureExtractor
-
-    return ECGFeatureExtractor(
+    return ExtractorSettings(
         fs_internal=None if config.fs_internal is None else int(config.fs_internal),
         mains_freq=config.mains_frequency_hz,
+        lp_hz=40.0,
+        enable_pacing=True,
+        enable_lead_reversal=True,
+        compute_grouping=True,
+        enable_hybrid_r_localization=True,
+        enable_hybrid_wave_localization=True,
+        enable_hybrid_st_measurement=True,
+        enable_t_wave_refinement=True,
         st_amplitude_source=config.st_amplitude_source,
-        refinement=_legacy_refinement(config),
+        refinement=config.refinement,
         input_mode="limited" if config.input_mode == "limited" else "standard",
     )
 
@@ -287,30 +296,22 @@ def ecg_measure(prepared: ECGInput, *, method: str = "default", config: ECGConfi
         raise ConfigurationError("config must be ECGConfig or ExtractionConfig")
     if resolved.input_mode != prepared.input_mode:
         raise ConfigurationError("config input_mode does not match prepared input", code="input_mode_mismatch")
-    extractor = _legacy_extractor(resolved)
-    legacy = _staged_legacy_features(extractor, prepared)
+    legacy = _staged_legacy_features(_settings_from_config(resolved), prepared)
     return ECGMeasurements(prepared, legacy, resolved, config_provenance(resolved, method=method))
 
 
-def _staged_legacy_features(extractor: Any, prepared: ECGInput) -> Any:
-    """Completed legacy ``ECGFeatures`` for the record path, via the staged pipeline.
+def _staged_legacy_features(settings: Any, prepared: ECGInput) -> Any:
+    """Completed engine measurement state for the record path, via the staged pipeline.
 
-    The legacy interpretation hooks are injected because the pre-decomposition record
-    path ran them, and record parity is exact.  ``ECGFEAT_LEGACY_ORCHESTRATION=1``
-    routes through ``ECGFeatureExtractor.extract`` and so to the preserved rollback
-    orchestration.
+    No interpretation hooks are injected: the ECG Record publishes measurements
+    only, so core-only installations extract records without ``ecginterpret``
+    (the record-crosswalk gate proves no published value depends on them).  The
+    ``ECGFEAT_LEGACY_ORCHESTRATION`` rollback switch applies to the legacy entry
+    point (``ecgfeat.compat.api_v0``) only.
     """
-    kwargs = dict(
-        meta=deepcopy(prepared.patient),
-        lead_names=list(prepared.lead_names),
-        amplitude_unit=prepared.amplitude_unit,
-    )
-    if legacy_orchestration_requested():
-        return extractor.extract(prepared.signal, prepared.sampling_rate, **kwargs)
-    from ..compat.interpretation_hooks import LEGACY_INTERPRETATION_HOOKS
-
     return run_legacy_pipeline(
-        extractor, prepared.signal, prepared.sampling_rate, hooks=LEGACY_INTERPRETATION_HOOKS, **kwargs,
+        settings, prepared.signal, prepared.sampling_rate, hooks=None, meta=deepcopy(prepared.patient),
+        lead_names=list(prepared.lead_names), amplitude_unit=prepared.amplitude_unit,
     ).features
 
 

@@ -1,7 +1,10 @@
 # Layer contracts from docs/library_design/01_architecture.md ("Layer diagram and
 # enforced dependency rules").  Run: lint-imports --config feature_extraction/.importlinter
+# External packages are included so the separately distributed interpretation
+# and plotting packages can be forbidden outside the compatibility layer.
 [importlinter]
 root_package = ecgfeat
+include_external_packages = True
 
 [importlinter:contract:record-independence]
 name = L4 ecgfeat.record imports no engine, pipeline, legacy, plotting or interpretation code
@@ -17,15 +20,9 @@ forbidden_modules =
     ecgfeat.compat
     ecgfeat.visualize
     ecgfeat.viz
-    ecgfeat.interpret
-    ecgfeat.statement_engine
-    ecgfeat.rhythm_rules
-    ecgfeat.rhythm_statements
-    ecgfeat.mi
-    ecgfeat.pediatric_rules
-    ecgfeat.glasgow
-    ecgfeat.clinical_rules
-    ecgfeat.glasgow_rules
+    ecginterpret
+    ecgrecords_viz
+    matplotlib
 
 [importlinter:contract:engine-no-upward]
 name = L1/L2 ecgfeat._engine never imports record, pipeline, compatibility, plotting or interpretation
@@ -40,19 +37,9 @@ forbidden_modules =
     ecgfeat.export
     ecgfeat.visualize
     ecgfeat.viz
-    ecgfeat.interpret
-    ecgfeat.statement_engine
-    ecgfeat.rhythm_rules
-    ecgfeat.rhythm_statements
-    ecgfeat.mi
-    ecgfeat.pediatric_rules
-    ecgfeat.glasgow
-    ecgfeat.clinical_rules
-    ecgfeat.glasgow_rules
-# Known Phase 5 debt: signal quality reads thresholds from the diagnostic rule
-# configuration.  Removed when interpretation moves to its own distribution.
-ignore_imports =
-    ecgfeat._engine.quality.signal -> ecgfeat.clinical_rules.config
+    ecginterpret
+    ecgrecords_viz
+    matplotlib
 
 [importlinter:contract:foundation-bottom]
 name = L1 foundation imports no measurement-engine siblings
@@ -68,26 +55,31 @@ forbidden_modules =
     ecgfeat._engine.atrial
     ecgfeat._engine.measurement
 
-[importlinter:contract:pipeline-stages-policies-no-interpretation]
-name = Pipeline stages and policies import no interpretation, compatibility or export code
+[importlinter:contract:pipeline-no-legacy-or-interpretation]
+name = Pipeline (stages, policies, extractor) never imports interpretation, plotting or the legacy exporter
 type = forbidden
 source_modules =
-    ecgfeat.pipeline.stages
-    ecgfeat.pipeline.policies
+    ecgfeat.pipeline
 forbidden_modules =
-    ecgfeat.interpret
-    ecgfeat.clinical_rules
-    ecgfeat.glasgow_rules
-    ecgfeat.statement_engine
-    ecgfeat.rhythm_statements
-    ecgfeat.compat
     ecgfeat.export
-# Known debt, removed in later phases (docs/library_design/05_migration_plan.md):
-# rhythm_rules still mixes measurement helpers used by the stages (pacing context,
-# measurement-beat selection, availability) with diagnostic rules (Phase 5 split),
-# and signal quality reads thresholds from the diagnostic configuration.  Only these
-# edges are exempt; any other direct or indirect path to a forbidden module fails.
-ignore_imports =
-    ecgfeat._engine.quality.signal -> ecgfeat.clinical_rules.config
-    ecgfeat.rhythm_rules -> ecgfeat.clinical_rules.config
-    ecgfeat.rhythm_rules -> ecgfeat.clinical_rules.rhythm
+    ecgfeat.compat.export_v0
+    ecgfeat.compat._api_v0_legacy_orchestration
+    ecginterpret
+    ecgrecords_viz
+    matplotlib
+
+[importlinter:contract:interpretation-only-through-compat]
+name = Only ecgfeat.compat reaches the interpretation distribution
+type = forbidden
+source_modules =
+    ecgfeat.api
+    ecgfeat.config
+    ecgfeat.errors
+    ecgfeat.io
+    ecgfeat.cli
+    ecgfeat.refinement
+    ecgfeat.validation
+forbidden_modules =
+    ecginterpret
+    ecgrecords_viz
+    matplotlib

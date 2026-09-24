@@ -23,7 +23,7 @@ from ..._engine.quality.acquisition import (
     assess_acquisition_chain,
 )
 from ..._engine.quality.signal import remove_pacing_spikes, validate_pacing_spikes_against_qrs
-from ...rhythm_rules import assess_pacing_evidence_quality, detect_pacing_failures
+from ..._engine.measurement.rhythm import assess_pacing_evidence_quality, detect_pacing_failures
 from ..context import (
     PipelineContext,
     PolicyEvent,

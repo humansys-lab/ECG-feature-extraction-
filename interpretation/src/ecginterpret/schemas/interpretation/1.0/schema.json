@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ecg-interpretation:1.0",
+  "title": "ECG Interpretation document",
+  "description": "Separately versioned rule-based interpretation output of ecginterpret. Research and engineering software; not a medical device. Never part of the ECG Record measurement contract.",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "interpreter_version",
+    "intended_use",
+    "input",
+    "interpretation",
+    "clinical"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "ecg-interpretation"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^1\\.0\\.(0|[1-9][0-9]*)$"
+    },
+    "interpreter_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "intended_use": {
+      "const": "research_and_engineering_only"
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "legacy_measurement_object",
+            "ecg_record"
+          ]
+        },
+        "record_id": {
+          "type": "string"
+        },
+        "record_schema_version": {
+          "type": "string",
+          "pattern": "^1\\."
+        },
+        "raw_signal_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "ecg_record"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "record_id",
+              "record_schema_version",
+              "raw_signal_sha256"
+            ]
+          }
+        }
+      ]
+    },
+    "interpretation": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Legacy interpreter output (flags, classes and statements); identical to the legacy export's interpretation section. Null when interpretation does not apply to the input contract (limited-lead input)."
+    },
+    "clinical": {
+      "type": "object",
+      "description": "Clinical rule-engine analysis; identical to the legacy export's metadata.clinical_interpretation section."
+    },
+    "extensions": {
+      "type": "object"
+    }
+  }
+}
