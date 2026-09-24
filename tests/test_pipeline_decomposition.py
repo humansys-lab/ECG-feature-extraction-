@@ -36,6 +36,7 @@ from feature_extraction.ecgfeat.pipeline.stages import (
     quality,
     ventricular,
 )
+from tests.optional import needs_interpretation
 
 PACKAGE = Path(api.__file__).parent
 STANDARD_12 = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"]
@@ -126,6 +127,7 @@ def staged_run(signal):
 # rollback route
 # --------------------------------------------------------------------------- #
 
+@needs_interpretation
 def test_staged_and_rollback_routes_produce_identical_legacy_json(signal, monkeypatch):
     monkeypatch.delenv(pipeline_extractor.LEGACY_ORCHESTRATION_ENV, raising=False)
     staged = ECGFeatureExtractor().extract(np.array(signal, copy=True), 500.0)
@@ -136,6 +138,7 @@ def test_staged_and_rollback_routes_produce_identical_legacy_json(signal, monkey
     assert legacy_payload_bytes(staged) == legacy_payload_bytes(rolled_back)
 
 
+@needs_interpretation
 def test_rollback_route_runs_the_preserved_orchestration(signal, monkeypatch):
     from feature_extraction.ecgfeat.compat import _api_v0_legacy_orchestration as rollback
 
@@ -330,6 +333,7 @@ def test_stages_and_policies_do_not_import_interpretation_or_compatibility_code(
 # context
 # --------------------------------------------------------------------------- #
 
+@needs_interpretation
 def test_pipeline_context_is_immutable_and_replaced_per_stage(staged_run):
     context = staged_run.context
     with pytest.raises(dataclasses.FrozenInstanceError):
@@ -348,6 +352,7 @@ def test_pipeline_context_is_immutable_and_replaced_per_stage(staged_run):
     assert context.native.lead_names == tuple(STANDARD_12)
 
 
+@needs_interpretation
 def test_policy_events_accumulate_in_context_but_not_in_legacy_output(staged_run):
     events = staged_run.policy_events
     assert events and all(isinstance(event, ctx.PolicyEvent) for event in events)
@@ -369,6 +374,7 @@ def test_policy_events_accumulate_in_context_but_not_in_legacy_output(staged_run
         assert event.policy.encode() not in blob
 
 
+@needs_interpretation
 def test_interpretation_runs_only_through_injected_hooks(signal, staged_run):
     bare = pipeline_extractor.run_legacy_pipeline(ECGFeatureExtractor(), np.array(signal, copy=True), 500.0)
     assert "clinical_interpretation" not in bare.features.metadata

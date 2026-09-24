@@ -1,17 +1,26 @@
 import unittest
 from types import SimpleNamespace
 
-from feature_extraction.ecgfeat.interpret import (
-    _apply_measurement_availability_to_interpretation,
-    _suppress_pacing_unreliable_rhythm_claims,
-)
+try:  # the interpretation rules ship in the separate ecginterpret distribution
+    from feature_extraction.ecgfeat.interpret import (
+        _apply_measurement_availability_to_interpretation,
+        _suppress_pacing_unreliable_rhythm_claims,
+    )
+    from feature_extraction.ecgfeat.clinical_rules.pacing import evaluate_pacing
+except ImportError:
+    _apply_measurement_availability_to_interpretation = None
+    _suppress_pacing_unreliable_rhythm_claims = None
+    evaluate_pacing = None
+    HAS_INTERPRETATION = False
+else:
+    HAS_INTERPRETATION = True
+INTERPRET_SKIP = "needs the interpretation rules (separate ecginterpret distribution)"
 from feature_extraction.ecgfeat.rhythm_rules import (
     assess_pacing_evidence_quality,
     classify_pacing_context,
     detect_pacing_failures,
     select_measurement_beat_ids,
 )
-from feature_extraction.ecgfeat.clinical_rules.pacing import evaluate_pacing
 
 
 class PacingPolicyTests(unittest.TestCase):
@@ -136,6 +145,7 @@ class PacingPolicyTests(unittest.TestCase):
 
         self.assertEqual([2], select_measurement_beat_ids(beat_rows))
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_pacing_suppression_preserves_pacemaker_artifact_evidence(self) -> None:
         interpretation = SimpleNamespace(
             pacemaker_like_artifact=True,
@@ -162,6 +172,7 @@ class PacingPolicyTests(unittest.TestCase):
         self.assertFalse(interpretation.rvh_suspected)
         self.assertIsNone(interpretation.rvh_class)
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_measurement_availability_masks_pr_and_p_axis_without_hiding_pacing_evidence(self) -> None:
         interpretation = SimpleNamespace(
             pr_class="normal",
@@ -220,6 +231,7 @@ class PacingPolicyTests(unittest.TestCase):
             result["sensing_failure_suspected"],
         )
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_unavailable_sensing_detector_is_not_treated_as_true(self) -> None:
         context = SimpleNamespace(
             features=SimpleNamespace(
@@ -254,6 +266,7 @@ class PacingPolicyTests(unittest.TestCase):
         self.assertEqual("unavailable", result.status)
         self.assertIsNone(result.statement_code)
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_capture_alert_requires_established_recurrent_pacing_context(self) -> None:
         context = SimpleNamespace(
             features=SimpleNamespace(
@@ -297,6 +310,7 @@ class PacingPolicyTests(unittest.TestCase):
         self.assertIsNone(result.statement_code)
         self.assertIn("recurrent_confirmed_pacing_context", result.missing_inputs)
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_intermitent_pacing_requires_capture_alignment_support(self) -> None:
         context = SimpleNamespace(
             features=SimpleNamespace(

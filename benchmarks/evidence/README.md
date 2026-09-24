@@ -11,5 +11,5 @@ SHA-256), `dataset` (name, release, content-manifest SHA-256), `baseline_id`,
 `code_revision`, and `approved_by` (the Validation Owner).
 
 There are no manifests yet: every published field of schema 1.0.0 is
-`unvalidated`. Benchmark history in `docs/` is not a manifest and does not
-promote a field.
+`unvalidated`. Benchmark results reported elsewhere are not manifests and do
+not promote a field. See docs/site/development/validation-policy.md.

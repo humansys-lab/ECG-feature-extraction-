@@ -17,6 +17,7 @@ from feature_extraction.ecgfeat.quality import (
     prepare_pacing_detection_cache,
     remove_pacing_spikes,
 )
+from tests.optional import needs_interpretation
 
 
 class PacingGroupingTests(unittest.TestCase):
@@ -322,6 +323,7 @@ class PacingGroupingTests(unittest.TestCase):
 
         self.assertTrue(any(set(members) == {1, 3} for members in groups.values()))
 
+    @needs_interpretation
     def test_extract_wires_pacing_state_and_spike_beat_ids(self) -> None:
         with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
              patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
@@ -367,6 +369,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([], mock_post_pause.call_args.kwargs["beats"])
         self.assertEqual(400.0, mock_post_pause.call_args.kwargs["background_rr_ms"])
 
+    @needs_interpretation
     def test_extract_does_not_mark_non_paced_measurement_group_as_paced(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=None,
@@ -415,6 +418,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([], mock_delineate.call_args_list[1].kwargs["paced_beat_ids"])
         self.assertFalse(mock_global.call_args.kwargs["paced"])
 
+    @needs_interpretation
     def test_extract_does_not_pace_representative_when_selected_group_is_not_paced(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=None,
@@ -488,6 +492,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([2, 3, 4], [bf.beat_id for bf in mock_rep_leads.call_args.args[0]])
         self.assertEqual([2, 3, 4], [bf.beat_id for bf in mock_global.call_args.args[1]])
 
+    @needs_interpretation
     def test_extract_uses_paced_route_only_when_measurement_group_is_paced(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=None,
@@ -545,6 +550,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([0], mock_delineate.call_args_list[1].kwargs["paced_beat_ids"])
         self.assertEqual([0], mock_delineate.call_args_list[1].kwargs["paced_qrs_floor_beat_ids"])
 
+    @needs_interpretation
     def test_extract_reselects_stable_native_family_over_paced_majority(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=None,
@@ -612,6 +618,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([7, 8, 9], sorted({bf.beat_id for bf in mock_rep_leads.call_args.args[0]}))
         self.assertFalse(mock_global.call_args.kwargs["paced"])
 
+    @needs_interpretation
     def test_extract_rejects_pacing_morphology_when_spikes_are_too_far_before_qrs(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=None,
@@ -658,6 +665,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([], mock_delineate.call_args_list[0].kwargs["paced_beat_ids"])
         self.assertFalse(mock_global.call_args.kwargs["paced"])
 
+    @needs_interpretation
     def test_extract_keeps_atrial_pacing_evidence_metadata_only(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=150.0,
@@ -711,6 +719,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([], mock_delineate.call_args_list[0].kwargs["paced_qrs_floor_beat_ids"])
         self.assertFalse(mock_global.call_args.kwargs["paced"])
 
+    @needs_interpretation
     def test_extract_downgrades_metadata_only_pacing_to_unknown_measurement_state(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=150.0,
@@ -767,6 +776,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([], mock_delineate.call_args_list[0].kwargs["paced_qrs_floor_beat_ids"])
         self.assertFalse(mock_global.call_args.kwargs["paced"])
 
+    @needs_interpretation
     def test_extract_disabled_pacing_keeps_off_state(self) -> None:
         with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value={}), \
              patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
@@ -793,6 +803,7 @@ class PacingGroupingTests(unittest.TestCase):
         self.assertEqual([], result.metadata["paced_beat_ids"])
         self.assertEqual([], mock_cluster.call_args.kwargs["paced_beat_ids"])
 
+    @needs_interpretation
     def test_extract_metadata_global_qt_includes_consensus_vs_independent_map(self) -> None:
         global_features = SimpleNamespace(
             pr_ms=None,

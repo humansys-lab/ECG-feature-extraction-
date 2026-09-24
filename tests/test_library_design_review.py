@@ -203,7 +203,7 @@ def test_full_documentation_example_is_machine_valid():
     from pathlib import Path
     import re
     import jsonschema
-    text = Path("docs/library_design/02_record_json_schema.md").read_text()
+    text = Path("docs/site/guide/record-format.md").read_text()
     examples = []
     for block in re.findall(r"```json\n(.*?)\n```", text, re.S):
         obj = json.loads(block)

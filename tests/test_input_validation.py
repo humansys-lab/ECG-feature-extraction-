@@ -7,6 +7,7 @@ from feature_extraction.ecgfeat.api import ECGFeatureExtractor
 from feature_extraction.ecgfeat.preprocess import resample_ecg
 from feature_extraction.ecgfeat.quality import _rolling_mad_sigma, detect_pacing_spikes
 from feature_extraction.ecgfeat.validation import ECGInputError, validate_ecg_input
+from tests.optional import needs_interpretation
 
 
 @pytest.mark.parametrize("fs", [0.0, -500.0, np.nan, np.inf, "invalid"])
@@ -63,6 +64,7 @@ def test_pacing_detection_is_nyquist_safe_at_supported_low_rates(fs: int) -> Non
     assert result["spike_times"] == []
 
 
+@needs_interpretation
 def test_full_pipeline_handles_minimum_supported_sampling_rate() -> None:
     result = ECGFeatureExtractor(enable_lead_reversal=False).extract(
         np.zeros((12, 200), dtype=float),

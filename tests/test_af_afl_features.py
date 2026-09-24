@@ -13,7 +13,14 @@ from feature_extraction.ecgfeat.atrial import (
     build_qrst_subtracted_residual,
     compute_pr_dispersion_ms,
 )
-from feature_extraction.ecgfeat.rhythm_statements import build_rhythm_statement_candidates
+try:  # the interpretation rules ship in the separate ecginterpret distribution
+    from feature_extraction.ecgfeat.rhythm_statements import build_rhythm_statement_candidates
+except ImportError:
+    build_rhythm_statement_candidates = None
+    HAS_INTERPRETATION = False
+else:
+    HAS_INTERPRETATION = True
+INTERPRET_SKIP = "needs the interpretation rules (separate ecginterpret distribution)"
 
 
 class AfAflFeatureTests(unittest.TestCase):
@@ -496,6 +503,7 @@ class AfAflFeatureTests(unittest.TestCase):
 
         self.assertFalse(summary["available"])
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_af_statement_requires_validated_qrst_subtraction_for_final_status(self) -> None:
         unvalidated = build_rhythm_statement_candidates(
             rhythm_summary={"primary_statement": None, "statements": []},

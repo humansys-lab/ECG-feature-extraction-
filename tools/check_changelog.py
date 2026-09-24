@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Fail unless every distribution's CHANGELOG has a section for its pyproject version."""
+"""Fail unless the CHANGELOG has a section for the pyproject version."""
 
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DISTRIBUTIONS = ("feature_extraction", "interpretation")
+DISTRIBUTIONS = ("feature_extraction",)
 
 
 def main() -> int:

@@ -120,32 +120,15 @@ def crosswalk_page() -> str:
     return "".join(lines)
 
 
-def interpretation_schema_page() -> str:
-    schema = json.loads(_resource("ecginterpret", "schemas", "interpretation", "1.0", "schema.json"))
-    import ecginterpret
-
-    lines = [HEADER, "# Interpretation document 1.0\n\n",
-             f"Produced by `ecginterpret` `{ecginterpret.__version__}`; schema version "
-             f"`{ecginterpret.INTERPRETATION_SCHEMA_VERSION}` (independent of the ECG Record schema). "
-             f"{schema.get('description', '')}\n\n| Member | Required | Description |\n|---|---|---|\n"]
-    required = set(schema["required"])
-    for name, spec in schema["properties"].items():
-        lines.append(f"| `{name}` | {'yes' if name in required else 'no'} | {spec.get('description', '')} |\n")
-    return "".join(lines)
-
-
 def pages() -> dict[str, str]:
     import ecgfeat
 
     return {
         "api-ecgfeat.md": api_page("ecgfeat", ecgfeat.PUBLIC_API, "ecg-records API (`ecgfeat`)", ecgfeat.LEGACY_API),
-        "api-ecginterpret.md": api_page("ecginterpret", [n for n in importlib.import_module("ecginterpret").__all__
-                                                          if n != "__version__"], "ecginterpret API"),
         "api-ecgfeat-viz.md": api_page("ecgfeat.viz", importlib.import_module("ecgfeat.viz").__all__,
                                        "Plotting API (`ecgfeat.viz`, `viz` extra)"),
         "ecg-record-schema-1.0.md": schema_page(),
         "legacy-crosswalk.md": crosswalk_page(),
-        "interpretation-schema-1.0.md": interpretation_schema_page(),
     }
 
 

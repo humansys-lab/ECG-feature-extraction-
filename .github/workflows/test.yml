@@ -41,7 +41,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-ci.txt "numpy${{ matrix.numpy }}" "scipy${{ matrix.scipy }}"
-          python -m pip install -e ./feature_extraction -e ./interpretation --no-deps
+          python -m pip install -e ./feature_extraction --no-deps
       - name: Core contract, schema, plotting and unit tests
         run: python -m pytest -q -p no:cacheprovider tests
 
@@ -60,12 +60,13 @@ jobs:
         run: python tools/check_validation_registry.py
       - name: Performance budget (reference case, isolated interpreter)
         run: python tools/check_performance.py reference --repeats 5
-      - name: Changelog has a section for every distribution version
+      - name: Changelog has a section for the package version
         run: python tools/check_changelog.py
-      - name: Generated reference docs match the shipped resources; site builds
+      - name: Generated reference docs match the shipped resources; examples run; site builds
         run: |
-          python -m pip install -e ./interpretation --no-deps "mkdocs>=1.6,<2"
+          python -m pip install "mkdocs>=1.6,<2"
           python tools/build_docs.py --check
+          python tools/check_doc_examples.py
           mkdocs build --strict
 
   import-boundaries:
@@ -80,8 +81,6 @@ jobs:
       - run: python -m pip install -e ./feature_extraction --no-deps
       - name: Layer contracts
         run: lint-imports --config feature_extraction/.importlinter
-      - name: Consumers never import the private engine
-        run: python tools/check_engine_imports.py
 
   os-smoke:
     name: smoke (${{ matrix.os }})
@@ -107,14 +106,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Install
+      - name: Install (NumPy/SciPy pinned to the baseline's recorded environment)
         run: |
-          python -m pip install -r requirements-ci.txt
-          python -m pip install -e ./feature_extraction -e ./interpretation --no-deps
-      - name: legacy-bytes + record-bytes parity
+          python -m pip install -r requirements-ci.txt "numpy==2.5.3" "scipy==1.18.1"
+          python -m pip install -e ./feature_extraction --no-deps
+      - name: Record parity against the frozen ecg-records 0.1.0 baseline
         run: >
           python snapshot_regression.py --data-root "$ECG_DATA_ROOT" --workers 8
-          check --tier sentinel --baseline-id phase0-52a339c --mode legacy-bytes --with-record
+          check --tier sentinel --baseline-id ecg-records-0.1.0 --mode record-bytes
           --report sentinel-report.json
       - uses: actions/upload-artifact@v4
         if: always()

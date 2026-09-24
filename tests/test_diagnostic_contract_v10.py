@@ -3,9 +3,18 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from feature_extraction.ecgfeat.clinical_rules.models import RuleEvaluation
-from feature_extraction.ecgfeat.clinical_rules.resolver import ClinicalStatementResolver
-from feature_extraction.ecgfeat.clinical_rules.serial import evaluate_serial_comparison
+try:  # the interpretation rules ship in the separate ecginterpret distribution
+    from feature_extraction.ecgfeat.clinical_rules.models import RuleEvaluation
+    from feature_extraction.ecgfeat.clinical_rules.resolver import ClinicalStatementResolver
+    from feature_extraction.ecgfeat.clinical_rules.serial import evaluate_serial_comparison
+except ImportError:
+    ClinicalStatementResolver = None
+    RuleEvaluation = None
+    evaluate_serial_comparison = None
+    HAS_INTERPRETATION = False
+else:
+    HAS_INTERPRETATION = True
+INTERPRET_SKIP = "needs the interpretation rules (separate ecginterpret distribution)"
 from feature_extraction.ecgfeat.quality import build_diagnostic_gate
 from feature_extraction.ecgfeat.validation import ECGInputError, validate_ecg_input
 
@@ -62,6 +71,7 @@ def test_diagnostic_gate_does_not_require_original_500_hz() -> None:
     assert gate["requires_original_500_hz"] is False
 
 
+@pytest.mark.skipif(not HAS_INTERPRETATION, reason=INTERPRET_SKIP)
 def test_resolver_emits_fixed_confidence_priority_review_and_snomed() -> None:
     result = ClinicalStatementResolver().resolve(
         evaluations=[
@@ -108,6 +118,7 @@ def _serial_features(*, qrs: float, rhythm_af: bool = False):
     )
 
 
+@pytest.mark.skipif(not HAS_INTERPRETATION, reason=INTERPRET_SKIP)
 def test_serial_comparison_detects_rhythm_and_qrs_change() -> None:
     prior = _serial_features(qrs=90.0)
     current = _serial_features(qrs=125.0, rhythm_af=True)
@@ -118,6 +129,7 @@ def test_serial_comparison_detects_rhythm_and_qrs_change() -> None:
     assert result.evidence["significant_metric_changes"]["qrs_ms"]["delta"] == 35.0
 
 
+@pytest.mark.skipif(not HAS_INTERPRETATION, reason=INTERPRET_SKIP)
 def test_serial_axis_comparison_uses_shortest_angular_distance() -> None:
     prior = _serial_features(qrs=90.0)
     current = _serial_features(qrs=90.0)
@@ -130,6 +142,7 @@ def test_serial_axis_comparison_uses_shortest_angular_distance() -> None:
     assert "qrs_axis_deg" not in result.evidence["significant_metric_changes"]
 
 
+@pytest.mark.skipif(not HAS_INTERPRETATION, reason=INTERPRET_SKIP)
 def test_serial_comparison_detects_focal_st_change_by_territory() -> None:
     prior = _serial_features(qrs=90.0)
     current = _serial_features(qrs=90.0)
@@ -151,6 +164,7 @@ def test_serial_comparison_detects_focal_st_change_by_territory() -> None:
     assert regional["territories"] == {"inferior": ["II", "III"]}
 
 
+@pytest.mark.skipif(not HAS_INTERPRETATION, reason=INTERPRET_SKIP)
 def test_serial_comparison_rejects_known_patient_mismatch() -> None:
     prior = _serial_features(qrs=90.0)
     current = _serial_features(qrs=125.0)

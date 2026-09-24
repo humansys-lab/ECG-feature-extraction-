@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from feature_extraction.ecgfeat.export import prepare_json_export
+from tests.optional import needs_interpretation
 
 
 class PrepareJsonExportTests(unittest.TestCase):
@@ -13,6 +14,7 @@ class PrepareJsonExportTests(unittest.TestCase):
             "clinical_interpretation": {"overall_status": "abnormal"},
         }
 
+    @needs_interpretation
     def test_drops_beat_features_by_default(self) -> None:
         result = prepare_json_export(self._payload())
 
@@ -20,6 +22,7 @@ class PrepareJsonExportTests(unittest.TestCase):
         self.assertIn("representative_leads", result)
         self.assertIn("clinical_interpretation", result)
 
+    @needs_interpretation
     def test_include_beat_features_keeps_it(self) -> None:
         result = prepare_json_export(
             self._payload(), include_beat_features=True, round_ndigits=None
@@ -30,11 +33,13 @@ class PrepareJsonExportTests(unittest.TestCase):
             [{"lead": "I", "r_amp_mv": 0.123456789}], result["beat_features"]
         )
 
+    @needs_interpretation
     def test_debug_profile_keeps_beat_features(self) -> None:
         result = prepare_json_export(self._payload(), profile="debug")
 
         self.assertIn("beat_features", result)
 
+    @needs_interpretation
     def test_summary_profile_removes_repeated_audit_details(self) -> None:
         payload = {
             **self._payload(),
@@ -55,6 +60,7 @@ class PrepareJsonExportTests(unittest.TestCase):
         self.assertIn("statement_evidence", result["morphology_inputs"])
         self.assertIn("p_wave_assessments", payload)
 
+    @needs_interpretation
     def test_rejects_invalid_or_conflicting_profile(self) -> None:
         with self.assertRaises(ValueError):
             prepare_json_export(self._payload(), profile="unknown")
@@ -65,11 +71,13 @@ class PrepareJsonExportTests(unittest.TestCase):
                 include_beat_features=True,
             )
 
+    @needs_interpretation
     def test_rounds_floats_to_default_precision(self) -> None:
         result = prepare_json_export(self._payload())
 
         self.assertEqual(0.987654, result["representative_leads"]["I"]["r_amp_mv"])
 
+    @needs_interpretation
     def test_round_ndigits_none_disables_rounding(self) -> None:
         result = prepare_json_export(self._payload(), round_ndigits=None)
 
@@ -77,6 +85,7 @@ class PrepareJsonExportTests(unittest.TestCase):
             0.987654321, result["representative_leads"]["I"]["r_amp_mv"]
         )
 
+    @needs_interpretation
     def test_does_not_mutate_input_payload(self) -> None:
         payload = self._payload()
         prepare_json_export(payload)
@@ -84,6 +93,7 @@ class PrepareJsonExportTests(unittest.TestCase):
         self.assertIn("beat_features", payload)
         self.assertEqual(0.987654321, payload["representative_leads"]["I"]["r_amp_mv"])
 
+    @needs_interpretation
     def test_nested_structures_are_rounded(self) -> None:
         payload = {"a": [{"b": 1.23456789}, 2.3456789]}
 
@@ -92,6 +102,7 @@ class PrepareJsonExportTests(unittest.TestCase):
         self.assertEqual(1.235, result["a"][0]["b"])
         self.assertEqual(2.346, result["a"][1])
 
+    @needs_interpretation
     def test_nonfinite_floats_are_exported_as_null(self) -> None:
         payload = {
             "a": float("nan"),
@@ -104,6 +115,7 @@ class PrepareJsonExportTests(unittest.TestCase):
         self.assertEqual({"a": None, "nested": [None, None]}, rounded)
         self.assertEqual({"a": None, "nested": [None, None]}, unrounded)
 
+    @needs_interpretation
     def test_removes_retired_glasgow_interpretation_fields(self) -> None:
         payload = {
             **self._payload(),

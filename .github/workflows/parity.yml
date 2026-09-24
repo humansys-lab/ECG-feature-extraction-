@@ -1,13 +1,17 @@
-# Authoritative full-data parity and evaluator gates (document 05 section B).
-# Runs only on the controlled self-hosted runner with datasets mounted read-only.
+# Full-corpus record parity against a frozen golden baseline (benchmarks/GOLDEN.md).
+# Runs only on a controlled self-hosted runner with the datasets mounted
+# read-only at $ECG_DATA_ROOT.  NumPy/SciPy are pinned to the environment the
+# baseline recorded (benchmarks/golden/baselines/<id>/expected.*.json), because
+# debug-profile diagnostics can differ in the last floating-point digit across
+# versions.
 name: parity
 
 on:
   workflow_dispatch:
     inputs:
       baseline:
-        description: golden/evaluator baseline id
-        default: phase0-52a339c
+        description: golden baseline id
+        default: ecg-records-0.1.0
   schedule:
     - cron: "17 3 * * 1"
 
@@ -16,45 +20,22 @@ permissions:
 
 jobs:
   full-golden:
+    if: ${{ vars.ECG_DATASET_RUNNER == 'enabled' }}
     runs-on: [self-hosted, ecg-datasets]
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v4
       - name: Install
         run: |
-          python -m pip install -r requirements-ci.txt
-          python -m pip install -e ./feature_extraction -e ./interpretation --no-deps
-      - name: Full-tier legacy-bytes parity
+          python -m pip install -r requirements-ci.txt "numpy==2.5.3" "scipy==1.18.1"
+          python -m pip install -e ./feature_extraction --no-deps
+      - name: Full-tier record parity
         run: >
           python snapshot_regression.py --data-root "$ECG_DATA_ROOT" --workers 12
-          check --tier full --baseline-id "${{ inputs.baseline || 'phase0-52a339c' }}"
-          --mode legacy-bytes --with-record --report full-golden-report.json
+          check --tier full --baseline-id "${{ inputs.baseline || 'ecg-records-0.1.0' }}"
+          --mode record-bytes --report full-record-bytes.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: full-golden-report
-          path: full-golden-report.json
-
-  evaluators:
-    runs-on: [self-hosted, ecg-datasets]
-    timeout-minutes: 360
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install
-        run: |
-          python -m pip install -r requirements-ci.txt -r requirements-ludb-compare.txt
-          python -m pip install -e ./feature_extraction -e ./interpretation --no-deps
-      - name: Run pinned evaluators and compare with frozen tolerances
-        # Three tools hard-code <repo>/data/...; the mounted corpus must be
-        # byte-identical to the baseline's or the manifest check fails first.
-        # `run` exits 0 unless the harness itself fails; `compare` is the gate
-        # (0 pass, 1 regression/blocked/manifest mismatch, 2 harness error).
-        run: |
-          ln -sfn "$ECG_DATA_ROOT" data
-          python -m benchmarks.harness run --repo-root . --baseline-id candidate --out-dir benchmarks/_candidate --raw-dir benchmarks/_raw/candidate --repeat 1 --max-workers 8
-          python -m benchmarks.harness compare --baseline "benchmarks/baselines/${{ inputs.baseline || 'phase0-52a339c' }}" --candidate benchmarks/_candidate --report evaluator-report.json
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: evaluator-report
-          path: evaluator-report.json
+          path: full-record-bytes.json

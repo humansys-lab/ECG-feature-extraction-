@@ -45,6 +45,7 @@ from feature_extraction.ecgfeat.features import (
     compute_global_features,
 )
 from feature_extraction.ecgfeat.models import BeatAnnotation, GlobalFeatures, LeadBeatFeatures, LeadQuality, RepresentativeLeadFeatures, STANDARD_12_LEADS, WaveBounds
+from tests.optional import needs_interpretation
 
 
 def _make_quality(
@@ -3539,6 +3540,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertIsNone(representatives["V1"].params["p_notched"])
         self.assertIsNone(representatives["V1"].params["p_biphasic"])
 
+    @needs_interpretation
     def test_p_wave_morphology_keeps_unknown_v1_biphasic_terminal_neutral_for_rae(self) -> None:
         from feature_extraction.ecgfeat.interpret import _p_wave_morphology
 
@@ -3565,6 +3567,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertEqual("probable_rae", p_class)
 
+    @needs_interpretation
     def test_p_wave_morphology_keeps_isolated_notched_p_neutral_for_lae(self) -> None:
         from feature_extraction.ecgfeat.interpret import _p_wave_morphology
 
@@ -3587,6 +3590,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertEqual("normal", p_class)
         self.assertFalse(lae_suspected)
 
+    @needs_interpretation
     def test_p_wave_morphology_uses_negative_v1_biphasic_terminal_for_lae(self) -> None:
         from feature_extraction.ecgfeat.interpret import _p_wave_morphology
 
@@ -3611,6 +3615,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertEqual("probable_lae", p_class)
         self.assertTrue(lae_suspected)
 
+    @needs_interpretation
     def test_p_wave_morphology_downgrades_ptf_v1_without_terminal_component_support(self) -> None:
         from feature_extraction.ecgfeat.interpret import _p_wave_morphology
 
@@ -3637,6 +3642,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertFalse(lae_definite)
         self.assertEqual("probable_lae", ptf_v1_class)
 
+    @needs_interpretation
     def test_p_wave_morphology_keeps_ptf_v1_definite_with_terminal_component_support(self) -> None:
         from feature_extraction.ecgfeat.interpret import _p_wave_morphology
 
@@ -3663,6 +3669,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertTrue(lae_definite)
         self.assertEqual("definite_lae", ptf_v1_class)
 
+    @needs_interpretation
     def test_p_wave_morphology_downgrades_ptf_v1_when_p_support_is_suppressed(self) -> None:
         from feature_extraction.ecgfeat.interpret import _p_wave_morphology
 
@@ -3796,6 +3803,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertEqual(422.0, representatives["II"].params["qt_ms"])
         self.assertEqual(2, representatives["II"].params["beat_count"])
 
+    @needs_interpretation
     def test_build_representative_lead_features_ignores_unreliable_st_j_values(self) -> None:
         from feature_extraction.ecgfeat.interpret import _st_j_lp
 
@@ -3822,6 +3830,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertIsNone(params["st_j_unreliable_reason"])
         self.assertEqual(0.02, _st_j_lp(representatives, "II"))
 
+    @needs_interpretation
     def test_build_representative_lead_features_marks_st_j_unreliable_when_all_guarded(self) -> None:
         from feature_extraction.ecgfeat.interpret import _st_j_lp
 
@@ -3849,6 +3858,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertEqual("qrs_tail_guard", params["st_j_unreliable_reason"])
         self.assertIsNone(_st_j_lp(representatives, "II"))
 
+    @needs_interpretation
     def test_build_representative_lead_features_does_not_rescue_all_guarded_st_j_with_rep_feature(self) -> None:
         from feature_extraction.ecgfeat.interpret import _st_j_lp
 
@@ -5629,6 +5639,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertIsNone(features.t_axis_deg)
 
+    @needs_interpretation
     def test_rr_irregularity_treats_absent_reliable_p_candidates_as_probable_af(self) -> None:
         from feature_extraction.ecgfeat.interpret import _rr_irregularity
 
@@ -5653,6 +5664,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertEqual("irregular", rr_class)
         self.assertTrue(probable_af)
 
+    @needs_interpretation
     def test_measurement_availability_masks_p_morphology_outputs(self) -> None:
         from feature_extraction.ecgfeat.interpret import _apply_measurement_availability_to_interpretation
 

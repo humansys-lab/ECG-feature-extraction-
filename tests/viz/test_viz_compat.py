@@ -9,6 +9,7 @@ import warnings
 import pytest
 
 from ecgfeat.viz import errors, plots
+from tests.optional import needs_interpretation
 
 SIX = {"plot_record", "plot_beat", "plot_beat_all_leads", "plot_representative_beat", "plot_quality_summary",
        "VisualizationInputError"}
@@ -61,6 +62,7 @@ def test_legacy_module_keeps_its_public_functions():
     assert legacy.ECGFeatures is ECGFeatures and legacy.STANDARD_12_LEADS == STANDARD_12_LEADS
 
 
+@needs_interpretation
 def test_legacy_helpers_still_plot_legacy_features(signal):
     import matplotlib.pyplot as plt
     import numpy as np

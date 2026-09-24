@@ -1,6 +1,7 @@
 """Phase 1 relocation contract: old engine paths alias the moved modules and warn."""
 
 import importlib
+import importlib.util
 import subprocess
 import sys
 import warnings
@@ -70,10 +71,11 @@ def test_warning_is_attributed_to_the_importer():
 def test_package_code_never_imports_old_paths():
     # Interpretation modules left the package (Phase 5); their old paths are
     # deprecated aliases covered by tests/test_interpretation_split.py.
-    code = ("import ecgfeat, ecgfeat.api, ecgfeat.export, ecgfeat.pipeline, ecgfeat.record, ecgfeat.cli, "
-            "ecgfeat.compat.api_v0, ecgfeat.compat.export_v0, ecgfeat.compat.interpretation_hooks, "
-            "ecginterpret, ecginterpret.clinical_rules.engine, ecginterpret.glasgow_rules.engine; "
-            "from ecgfeat import PWaveConfig")
+    modules = ("ecgfeat, ecgfeat.api, ecgfeat.export, ecgfeat.pipeline, ecgfeat.record, ecgfeat.cli, "
+               "ecgfeat.compat.api_v0, ecgfeat.compat.export_v0, ecgfeat.compat.interpretation_hooks")
+    if importlib.util.find_spec("ecginterpret") is not None:  # optional distribution
+        modules += ", ecginterpret, ecginterpret.clinical_rules.engine, ecginterpret.glasgow_rules.engine"
+    code = f"import {modules}; from ecgfeat import PWaveConfig"
     subprocess.run([sys.executable, "-W", "error::DeprecationWarning", "-c", code], check=True)
 
 

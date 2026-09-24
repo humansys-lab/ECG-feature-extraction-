@@ -14,6 +14,7 @@ from feature_extraction.ecgfeat.atrial import (
 )
 from feature_extraction.ecgfeat.export import _attach_assessment_boundaries
 from feature_extraction.ecgfeat.models import LeadBeatFeatures, LeadQuality, WaveBounds
+from tests.optional import needs_interpretation
 
 
 def _good_quality(lead: str) -> LeadQuality:
@@ -344,6 +345,7 @@ class AtrialEventBoundaryJoinTests(unittest.TestCase):
             "boundary_source": None,
         }
 
+    @needs_interpretation
     def test_conducted_event_inside_the_envelope_gets_fused_boundaries(self) -> None:
         event = self._event(600, beat_id=1)
 
@@ -355,6 +357,7 @@ class AtrialEventBoundaryJoinTests(unittest.TestCase):
         # Robust bounds, not the wider strict envelope used for containment.
         self.assertAlmostEqual(104.0, event["duration_ms"])
 
+    @needs_interpretation
     def test_event_sharing_a_beat_but_far_from_the_p_wave_is_not_joined(self) -> None:
         # Observed on 09017: the event is associated with the beat but sits
         # ~200 ms away, so it is a different deflection.
@@ -365,6 +368,7 @@ class AtrialEventBoundaryJoinTests(unittest.TestCase):
         self.assertIsNone(event["boundary_source"])
         self.assertIsNone(event["onset_ms"])
 
+    @needs_interpretation
     def test_small_boundary_rounding_still_joins(self) -> None:
         # Observed on 09009/09020: a few milliseconds outside the envelope.
         event = self._event(566, beat_id=1)
@@ -373,6 +377,7 @@ class AtrialEventBoundaryJoinTests(unittest.TestCase):
 
         self.assertEqual("p_wave_assessment_fusion", event["boundary_source"])
 
+    @needs_interpretation
     def test_non_conducted_events_never_borrow_a_beats_boundaries(self) -> None:
         for assoc in ("retrograde", "blocked"):
             with self.subTest(assoc=assoc):
@@ -385,6 +390,7 @@ class AtrialEventBoundaryJoinTests(unittest.TestCase):
                 self.assertIsNone(event["boundary_source"])
                 self.assertIsNone(event["onset_ms"])
 
+    @needs_interpretation
     def test_rejected_assessment_leaves_the_event_bare(self) -> None:
         event = self._event(600, beat_id=1)
 
@@ -394,6 +400,7 @@ class AtrialEventBoundaryJoinTests(unittest.TestCase):
 
         self.assertIsNone(event["boundary_source"])
 
+    @needs_interpretation
     def test_existing_measured_boundaries_are_not_overwritten(self) -> None:
         event = self._event(600, beat_id=1)
         event["onset_ms"] = 1100.0

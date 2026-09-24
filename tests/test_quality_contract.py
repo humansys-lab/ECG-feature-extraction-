@@ -10,6 +10,7 @@ import numpy as np
 from feature_extraction.ecgfeat.api import ECGFeatureExtractor
 from feature_extraction.ecgfeat.models import LeadQuality, STANDARD_12_LEADS
 from feature_extraction.ecgfeat.quality import summarize_record_quality
+from tests.optional import needs_interpretation
 
 
 def _make_quality(
@@ -125,6 +126,7 @@ class QualityContractTests(unittest.TestCase):
         self.assertGreaterEqual(len(summary["fallback_anchor_leads"]), 2)
         self.assertNotIn("record", summary["rejected_functions"])
 
+    @needs_interpretation
     def test_extract_adds_record_quality_summary_to_metadata(self) -> None:
         qualities = {
             lead: _make_quality(lead, reliable_for_p=False)

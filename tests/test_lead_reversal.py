@@ -10,12 +10,22 @@ import numpy as np
 
 from feature_extraction.ecgfeat.api import ECGFeatureExtractor
 from feature_extraction.ecgfeat.features import build_representative_lead_features
-from feature_extraction.ecgfeat.interpret import (
-    PRECORDIAL_LEADS,
-    _classify_qtc,
-    _lead_reversal_flags,
-    _st_analysis,
-)
+try:  # the interpretation rules ship in the separate ecginterpret distribution
+    from feature_extraction.ecgfeat.interpret import (
+        PRECORDIAL_LEADS,
+        _classify_qtc,
+        _lead_reversal_flags,
+        _st_analysis,
+    )
+except ImportError:
+    PRECORDIAL_LEADS = None
+    _classify_qtc = None
+    _lead_reversal_flags = None
+    _st_analysis = None
+    HAS_INTERPRETATION = False
+else:
+    HAS_INTERPRETATION = True
+INTERPRET_SKIP = "needs the interpretation rules (separate ecginterpret distribution)"
 from feature_extraction.ecgfeat.models import LeadBeatFeatures, LeadQuality, STANDARD_12_LEADS, WaveBounds
 from feature_extraction.ecgfeat.quality import (
     compute_adjacent_precordial_correlations,
@@ -258,6 +268,7 @@ class LeadReversalTests(unittest.TestCase):
         self.assertTrue(detail["suspected"])
         self.assertEqual(("V2", "V3"), detail["best_adjacent_swap"])
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)  # legacy extract() runs interpretation
     def test_extract_stores_structured_lead_reversal_metadata(self) -> None:
         quality = {
             lead: _make_quality(lead)
@@ -312,6 +323,7 @@ class LeadReversalTests(unittest.TestCase):
             result.metadata["lead_reversal"],
         )
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)  # legacy extract() runs interpretation
     def test_extract_passes_structured_lead_reversal_metadata_into_interpret(self) -> None:
         quality = {
             lead: _make_quality(lead)
@@ -371,6 +383,7 @@ class LeadReversalTests(unittest.TestCase):
             seen["lead_reversal"],
         )
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)  # legacy extract() runs interpretation
     def test_extract_disabled_lead_reversal_clears_precordial_flags_and_metadata(self) -> None:
         quality = {
             lead: _make_quality(lead)
@@ -416,6 +429,7 @@ class LeadReversalTests(unittest.TestCase):
             self.assertFalse(result.representative_leads[lead].params.get("probable_precordial_reversal", False))
             self.assertNotIn("precordial_reversal_detail", result.representative_leads[lead].params)
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_st_analysis_excludes_precordial_leads_suppressing_pmia(self) -> None:
         # V1/V2 ST depression >= 0.10 mV would fire the posterior (PMIA) STEMI
         # code; an inferior limb-lead depression is also present.
@@ -446,6 +460,7 @@ class LeadReversalTests(unittest.TestCase):
         self.assertNotIn("V2", dep_x)
         self.assertIn("inferior", terr_dep_x)
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_classify_qtc_only_confirmed_rvh_suppresses_prolongation(self) -> None:
         # 491 ms is above the 485 ms prolonged threshold.
         self.assertEqual("prolonged", _classify_qtc(491.0)[0])
@@ -455,6 +470,7 @@ class LeadReversalTests(unittest.TestCase):
         self.assertEqual("normal", _classify_qtc(491.0, rvh_class="probable")[0])
         self.assertEqual("normal", _classify_qtc(491.0, rvh_class="definitive")[0])
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_classify_qtc_borderline_ivcd_does_not_suppress_prolongation(self) -> None:
         # A borderline IVCD (QRS 100–110 ms) is too mild to mask a prolonged QTc.
         self.assertEqual(
@@ -468,6 +484,7 @@ class LeadReversalTests(unittest.TestCase):
         )
         self.assertEqual("normal", _classify_qtc(491.0, bbb="RBBB")[0])
 
+    @unittest.skipUnless(HAS_INTERPRETATION, INTERPRET_SKIP)
     def test_lead_reversal_flags_accept_structured_and_legacy_metadata(self) -> None:
         structured_features = type(
             "Features",

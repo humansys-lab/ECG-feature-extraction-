@@ -4,6 +4,7 @@ import pytest
 from feature_extraction.ecgfeat import ECGFeatureExtractor, ECGInputError
 from feature_extraction.ecgfeat.validation import validate_ecg_input
 from feature_extraction.ecgfeat.quality import compute_quality, summarize_record_quality
+from tests.optional import needs_interpretation
 
 
 def signal(fs=500):
@@ -52,6 +53,7 @@ def test_explicit_absence_is_distinct_from_bad_measured_channel():
     assert "record" in summarize_record_quality(compute_quality(x*0, 500), available_leads=["II", "V2"])["rejected_functions"]
 
 
+@needs_interpretation
 def test_limited_pipeline_accepts_clean_p_without_fabricating_twelve_lead_report():
     result = ECGFeatureExtractor(input_mode="limited", fs_internal=500).extract(
         signal(), fs=500, lead_names=["channel_0", "channel_1"])
