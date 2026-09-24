@@ -6,7 +6,11 @@ from unittest.mock import patch
 
 import numpy as np
 
-from feature_extraction.ecgfeat import api as ecg_api
+from feature_extraction.ecgfeat.pipeline.policies import applicability as _applicability_mod
+from feature_extraction.ecgfeat.pipeline.policies import pacing as _pacing_mod
+from feature_extraction.ecgfeat.pipeline.policies import qt as _qt_mod
+from feature_extraction.ecgfeat.pipeline.stages import beats as _beats_mod
+from feature_extraction.ecgfeat.pipeline.stages import measurement as _measurement_mod
 from feature_extraction.ecgfeat import delineate as delineate_mod
 from feature_extraction.ecgfeat.delineate import (
     _apply_multilead_consensus,
@@ -4902,7 +4906,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
             qt_confidence_reason="insufficient_reliable_qt_leads",
         )
 
-        changed = ecg_api._backfill_t_axis_after_measurement_profile(
+        changed = _measurement_mod._backfill_t_axis_after_measurement_profile(
             global_features,
             representative_leads,
             np.asarray([100, 500, 900, 1300], dtype=int),
@@ -4960,7 +4964,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
             qt_confidence_reason="insufficient_reliable_qt_leads",
         )
 
-        changed = ecg_api._backfill_t_axis_after_measurement_profile(
+        changed = _measurement_mod._backfill_t_axis_after_measurement_profile(
             global_features,
             representative_leads,
             np.asarray([100, 500, 900, 1300], dtype=int),
@@ -5013,7 +5017,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
             qt_confidence_reason=None,
         )
 
-        changed = ecg_api._backfill_t_axis_after_measurement_profile(
+        changed = _measurement_mod._backfill_t_axis_after_measurement_profile(
             global_features,
             representative_leads,
             np.asarray([100, 850, 1600, 2350], dtype=int),
@@ -5689,7 +5693,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         global_features = SimpleNamespace(pr_ms=None, p_axis_deg=None)
 
         self.assertTrue(
-            ecg_api._atrial_measurements_invalid_for_availability(
+            _applicability_mod._atrial_measurements_invalid_for_availability(
                 global_features,
                 {"rr_cv": 0.22},
             )
@@ -6201,7 +6205,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertIsNone(features.p_axis_deg)
 
     def test_select_measurement_group_prefers_non_paced_beats_when_present(self) -> None:
-        group_id, beat_ids = ecg_api._select_measurement_group(
+        group_id, beat_ids = _beats_mod._select_measurement_group(
             beat_groups={1: [0], 2: [1, 2, 3]},
             paced_beat_ids=[0],
         )
@@ -6210,7 +6214,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
         self.assertEqual([1, 2, 3], beat_ids)
 
     def test_select_measurement_group_prefers_paced_group_when_pacing_is_majority(self) -> None:
-        group_id, beat_ids = ecg_api._select_measurement_group(
+        group_id, beat_ids = _beats_mod._select_measurement_group(
             beat_groups={1: [1, 2, 4], 2: [0, 3]},
             paced_beat_ids=[1, 2, 4],
         )
@@ -6226,7 +6230,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertEqual(
             186.0,
-            ecg_api._dominant_paced_wide_qrs_override_ms(198.0, groups),
+            _pacing_mod._dominant_paced_wide_qrs_override_ms(198.0, groups),
         )
 
     def test_dominant_paced_wide_qrs_override_ignores_large_group_consensus_gap(self) -> None:
@@ -6235,7 +6239,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
             2: SimpleNamespace(mean_qrs_ms=166.0, flags={"dominant_group": False, "wide_qrs": True}),
         }
 
-        self.assertIsNone(ecg_api._dominant_paced_wide_qrs_override_ms(180.0, groups))
+        self.assertIsNone(_pacing_mod._dominant_paced_wide_qrs_override_ms(180.0, groups))
 
     def test_intermittent_paced_wide_qrs_override_blends_wide_consensus_and_wide_group(self) -> None:
         representative_leads = {
@@ -6256,7 +6260,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertEqual(
             178.0,
-            ecg_api._intermittent_paced_wide_qrs_override_ms(104.0, representative_leads, groups),
+            _pacing_mod._intermittent_paced_wide_qrs_override_ms(104.0, representative_leads, groups),
         )
 
     def test_borderline_paced_qrs_override_uses_stable_wide_offset(self) -> None:
@@ -6272,7 +6276,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertEqual(
             132.0,
-            ecg_api._borderline_paced_qrs_wide_offset_override_ms(120.0, representative_leads),
+            _pacing_mod._borderline_paced_qrs_wide_offset_override_ms(120.0, representative_leads),
         )
 
     def test_secondary_paced_wide_group_override_rejects_overextended_consensus(self) -> None:
@@ -6292,7 +6296,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertEqual(
             166.0,
-            ecg_api._secondary_paced_wide_group_qrs_override_ms(180.0, representative_leads, groups),
+            _pacing_mod._secondary_paced_wide_group_qrs_override_ms(180.0, representative_leads, groups),
         )
 
     def test_secondary_paced_wide_group_override_recovers_floor_censored_consensus(self) -> None:
@@ -6328,7 +6332,7 @@ class ECGFeaturePipelineTests(unittest.TestCase):
 
         self.assertEqual(
             152.0,
-            ecg_api._secondary_paced_wide_group_qrs_override_ms(
+            _pacing_mod._secondary_paced_wide_group_qrs_override_ms(
                 120.0,
                 representative_leads,
                 groups,
@@ -7079,7 +7083,7 @@ class QtRejectGateTests(unittest.TestCase):
 
     def test_rejects_fallback_reliability_on_poor_record_grade(self) -> None:
         gf = self._gf(qt_reliability="fallback")
-        ecg_api._apply_qt_reject_gate(gf, "Q2")
+        _qt_mod._apply_qt_reject_gate(gf, "Q2")
         self.assertIsNone(gf.qt_ms)
         self.assertIsNone(gf.qtc_bazett_ms)
         self.assertIsNone(gf.qtc_fridericia_ms)
@@ -7089,7 +7093,7 @@ class QtRejectGateTests(unittest.TestCase):
 
     def test_low_confidence_reliability_on_q3_is_rejected(self) -> None:
         gf = self._gf(qt_reliability="low_confidence")
-        ecg_api._apply_qt_reject_gate(gf, "Q3")
+        _qt_mod._apply_qt_reject_gate(gf, "Q3")
         self.assertIsNone(gf.qt_ms)
         self.assertTrue(gf.qt_rejected)
 
@@ -7098,7 +7102,7 @@ class QtRejectGateTests(unittest.TestCase):
         # shouldn't be nulled -- only the combination with poor overall
         # record quality should trigger rejection.
         gf = self._gf(qt_reliability="fallback")
-        ecg_api._apply_qt_reject_gate(gf, "Q0")
+        _qt_mod._apply_qt_reject_gate(gf, "Q0")
         self.assertEqual(380.0, gf.qt_ms)
         self.assertFalse(gf.qt_rejected)
 
@@ -7107,13 +7111,13 @@ class QtRejectGateTests(unittest.TestCase):
         # grade -- the reject gate targets the *combination* of weak QT
         # evidence and weak overall quality, not either alone.
         gf = self._gf(qt_reliability="reliable")
-        ecg_api._apply_qt_reject_gate(gf, "Q3")
+        _qt_mod._apply_qt_reject_gate(gf, "Q3")
         self.assertEqual(380.0, gf.qt_ms)
         self.assertFalse(gf.qt_rejected)
 
     def test_unavailable_reliability_is_left_alone(self) -> None:
         gf = self._gf(qt_reliability="unavailable", qt_ms=None, qtc_bazett_ms=None)
-        ecg_api._apply_qt_reject_gate(gf, "Q3")
+        _qt_mod._apply_qt_reject_gate(gf, "Q3")
         self.assertIsNone(gf.qt_ms)
         self.assertFalse(gf.qt_rejected)
 

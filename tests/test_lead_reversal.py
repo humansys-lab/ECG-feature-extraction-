@@ -4,6 +4,8 @@ import unittest
 import warnings
 from unittest.mock import patch
 
+from tests.extract_patch_helpers import patch_calls
+
 import numpy as np
 
 from feature_extraction.ecgfeat.api import ECGFeatureExtractor
@@ -276,18 +278,18 @@ class LeadReversalTests(unittest.TestCase):
                 },
             }
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value=quality), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={"probable_ra_la": True}), \
-             patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
-             patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}), \
-             patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
-             patch("feature_extraction.ecgfeat.api.delineate_beats", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value=representative), \
-             patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.compute_global_features") as mock_global, \
-             patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value=quality), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={"probable_ra_la": True}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.ventricular.detect_qrs_multilead_with_meta", "feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.stages.beats.cluster_beats", return_value={1: [0, 1]}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.beats.build_beat_annotations", return_value=[]), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.beats.build_representative_beats_with_meta", "feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_beats_with_meta", return_value=({}, {})), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.delineation.delineate_beats", "feature_extraction.ecgfeat.pipeline.stages.measurement.delineate_beats", return_value=[]), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_lead_features", return_value=representative), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_group_features", return_value={}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_global_features", "feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.compat.interpretation_hooks.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [100, 300]
             mock_global.return_value.pacing_spikes = None
             mock_global.return_value.paced_rhythm = False
@@ -335,18 +337,18 @@ class LeadReversalTests(unittest.TestCase):
             seen["lead_reversal"] = features.metadata.get("lead_reversal")
             return None
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value=quality), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_limb_lead_reversal", return_value={"probable_ra_la": True}), \
-             patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
-             patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}), \
-             patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
-             patch("feature_extraction.ecgfeat.api.delineate_beats", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value=representative), \
-             patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.compute_global_features") as mock_global, \
-             patch("feature_extraction.ecgfeat.api.interpret", side_effect=_capture_interpret):
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value=quality), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.detect_limb_lead_reversal", return_value={"probable_ra_la": True}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.ventricular.detect_qrs_multilead_with_meta", "feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.stages.beats.cluster_beats", return_value={1: [0, 1]}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.beats.build_beat_annotations", return_value=[]), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.beats.build_representative_beats_with_meta", "feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_beats_with_meta", return_value=({}, {})), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.delineation.delineate_beats", "feature_extraction.ecgfeat.pipeline.stages.measurement.delineate_beats", return_value=[]), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_lead_features", return_value=representative), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_group_features", return_value={}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_global_features", "feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.compat.interpretation_hooks.interpret", side_effect=_capture_interpret):
             mock_qrs.return_value.r_locs = [100, 300]
             mock_global.return_value.pacing_spikes = None
             mock_global.return_value.paced_rhythm = False
@@ -389,17 +391,17 @@ class LeadReversalTests(unittest.TestCase):
                 },
             }
 
-        with patch("feature_extraction.ecgfeat.api.compute_quality", return_value=quality), \
-             patch("feature_extraction.ecgfeat.api.summarize_record_quality", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.detect_qrs_multilead_with_meta") as mock_qrs, \
-             patch("feature_extraction.ecgfeat.api.cluster_beats", return_value={1: [0, 1]}), \
-             patch("feature_extraction.ecgfeat.api.build_beat_annotations", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_beats_with_meta", return_value=({}, {})), \
-             patch("feature_extraction.ecgfeat.api.delineate_beats", return_value=[]), \
-             patch("feature_extraction.ecgfeat.api.build_representative_lead_features", return_value=representative), \
-             patch("feature_extraction.ecgfeat.api.compute_group_features", return_value={}), \
-             patch("feature_extraction.ecgfeat.api.compute_global_features") as mock_global, \
-             patch("feature_extraction.ecgfeat.api.interpret", return_value=None):
+        with patch("feature_extraction.ecgfeat.pipeline.stages.quality.compute_quality", return_value=quality), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.quality.summarize_record_quality", return_value={}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.ventricular.detect_qrs_multilead_with_meta", "feature_extraction.ecgfeat.pipeline.policies.pacing.detect_qrs_multilead_with_meta") as mock_qrs, \
+             patch("feature_extraction.ecgfeat.pipeline.stages.beats.cluster_beats", return_value={1: [0, 1]}), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.beats.build_beat_annotations", return_value=[]), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.beats.build_representative_beats_with_meta", "feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_beats_with_meta", return_value=({}, {})), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.delineation.delineate_beats", "feature_extraction.ecgfeat.pipeline.stages.measurement.delineate_beats", return_value=[]), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.build_representative_lead_features", return_value=representative), \
+             patch("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_group_features", return_value={}), \
+             patch_calls("feature_extraction.ecgfeat.pipeline.stages.measurement.compute_global_features", "feature_extraction.ecgfeat.pipeline.policies.qt.compute_global_features") as mock_global, \
+             patch("feature_extraction.ecgfeat.compat.interpretation_hooks.interpret", return_value=None):
             mock_qrs.return_value.r_locs = [100, 300]
             mock_global.return_value.pacing_spikes = None
             mock_global.return_value.paced_rhythm = False

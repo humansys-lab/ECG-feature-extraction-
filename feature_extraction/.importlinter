@@ -65,3 +65,27 @@ forbidden_modules =
     ecgfeat._engine.delineation
     ecgfeat._engine.atrial
     ecgfeat._engine.measurement
+
+[importlinter:contract:pipeline-stages-policies-no-interpretation]
+name = Pipeline stages and policies import no interpretation, compatibility or export code
+type = forbidden
+source_modules =
+    ecgfeat.pipeline.stages
+    ecgfeat.pipeline.policies
+forbidden_modules =
+    ecgfeat.interpret
+    ecgfeat.clinical_rules
+    ecgfeat.glasgow_rules
+    ecgfeat.statement_engine
+    ecgfeat.rhythm_statements
+    ecgfeat.compat
+    ecgfeat.export
+# Known debt, removed in later phases (docs/library_design/05_migration_plan.md):
+# rhythm_rules still mixes measurement helpers used by the stages (pacing context,
+# measurement-beat selection, availability) with diagnostic rules (Phase 5 split),
+# and signal quality reads thresholds from the diagnostic configuration.  Only these
+# edges are exempt; any other direct or indirect path to a forbidden module fails.
+ignore_imports =
+    ecgfeat._engine.quality.signal -> ecgfeat.clinical_rules.config
+    ecgfeat.rhythm_rules -> ecgfeat.clinical_rules.config
+    ecgfeat.rhythm_rules -> ecgfeat.clinical_rules.rhythm
