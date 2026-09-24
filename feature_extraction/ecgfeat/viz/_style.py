@@ -17,7 +17,7 @@ STATUS_COLOURS = {"usable": "#0ca30c", "limited": "#fab219"}
 STATUS_UNKNOWN = MUTED
 
 #: Prefix of the ``gid`` of every artist this package adds to an Axes.
-GID = "ecgrecords_viz:"
+GID = "ecgfeat.viz:"
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,14 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ecg-records"
 version = "0.1.0"
-description = "Versioned ECG Record extraction and measurement (research and engineering software; not a medical device)"
+description = "Versioned ECG Record extraction, measurement and plotting (research and engineering software; not a medical device)"
 readme = "README.package.md"
 requires-python = ">=3.10,<3.14"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "humansys-lab" }]
 maintainers = [{ name = "humansys-lab" }]
-keywords = ["ecg", "electrocardiography", "signal-processing", "delineation", "physionet"]
+keywords = ["ecg", "electrocardiography", "signal-processing", "delineation", "physionet", "visualization"]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
@@ -22,6 +22,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Scientific/Engineering :: Medical Science Apps.",
+  "Topic :: Scientific/Engineering :: Visualization",
   "Typing :: Typed",
 ]
 dependencies = [
@@ -40,7 +41,7 @@ Changelog = "https://github.com/humansys-lab/ECG-feature-extraction-/blob/main/f
 ecg-record = "ecgfeat.cli:main"
 
 [project.optional-dependencies]
-viz = ["ecg-records-viz>=0.1,<1"]
+viz = ["matplotlib>=3.7,<4"]
 interpret = ["ecginterpret>=0.1,<1"]
 performance = ["numba>=0.59,<0.67"]
 wfdb = ["wfdb>=4.1,<5"]

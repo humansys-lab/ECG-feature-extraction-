@@ -40,7 +40,7 @@ def test_all_is_the_documented_surface_plus_grouped_legacy_names():
 
 def test_importing_the_facade_loads_no_numerical_plotting_or_interpretation_code():
     code = ("import sys, ecgfeat; ecgfeat.ECGRecord; ecgfeat.load_record; "
-            "heavy = [m for m in ('numpy', 'scipy', 'matplotlib', 'ecginterpret', 'ecgrecords_viz') if m in sys.modules]; "
+            "heavy = [m for m in ('numpy', 'scipy', 'matplotlib', 'ecginterpret', 'ecgfeat.viz.plots') if m in sys.modules]; "
             "assert not heavy, heavy")
     subprocess.run([sys.executable, "-c", code], check=True)
 
@@ -59,7 +59,7 @@ def test_legacy_top_level_functions_warn_on_use_not_on_import(name):
             function()
         except TypeError:
             pass  # called without arguments; the warning precedes the call
-        except ImportError as exc:  # optional distribution (viz/interpret) not installed
+        except ImportError as exc:  # optional extra not installed (viz: Matplotlib; interpret: ecginterpret)
             assert "pip install" in str(exc)
 
 

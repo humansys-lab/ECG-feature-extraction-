@@ -19,7 +19,7 @@ decorations (suptitle, figure legend) are added only to figures the function
 created. Showing, saving and closing the figure is the caller's job.
 
 Artists added by this package carry a ``gid`` starting with
-``"ecgrecords_viz:"`` (for example ``"ecgrecords_viz:fiducial:r_peak"``) so
+``"ecgfeat.viz:"`` (for example ``"ecgfeat.viz:fiducial:r_peak"``) so
 callers can find and restyle them.
 """
 

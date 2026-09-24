@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DISTRIBUTIONS = ("feature_extraction", "interpretation", "visualization")
+DISTRIBUTIONS = ("feature_extraction", "interpretation")
 
 
 def main() -> int:

@@ -1,8 +1,10 @@
 # 01 — Architecture
 
 Status (2026-09-24): this architecture is implemented (staged pipeline, policies,
-private engine, separate interpretation and visualization distributions); layer
-rules are enforced by import-linter. See [document 08](08_implementation_status.md).
+private engine, separate interpretation distribution); layer rules are enforced by
+import-linter. By maintainer decision, visualization ships inside `ecg-records` as
+`ecgfeat.viz` (optional Matplotlib extra) rather than as a separate distribution; the
+layer rules for it are unchanged. See [document 08](08_implementation_status.md).
 Design date: 2026-09-22. This document inherits the decisions in
 `00_overview.md`: the published consumer boundary is a versioned **ECG Record**
 JSON document plus the raw signal, the standard-record budget is 24,000

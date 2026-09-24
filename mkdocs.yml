@@ -16,4 +16,4 @@ nav:
       - Legacy crosswalk: reference/legacy-crosswalk.md
       - ecginterpret API: reference/api-ecginterpret.md
       - Interpretation document 1.0: reference/interpretation-schema-1.0.md
-      - ecg-records-viz API: reference/api-ecgrecords-viz.md
+      - Plotting API (ecgfeat.viz): reference/api-ecgfeat-viz.md

@@ -42,14 +42,14 @@ def _attr(module: str, name: str, *, install_hint: str | None = None) -> Callabl
         try:
             return getattr(importlib.import_module(module), name)
         except ModuleNotFoundError as exc:
-            if install_hint and (exc.name or "").split(".")[0] in {"ecginterpret", "ecgrecords_viz", "matplotlib"}:
+            if install_hint and (exc.name or "").split(".")[0] in {"ecginterpret", "matplotlib"}:
                 raise ImportError(install_hint, name=exc.name) from exc
             raise
 
     return resolve
 
 
-_VIZ_HINT = 'the plotting helpers moved to the ecg-records-viz distribution; install it with: pip install "ecg-records[viz]"'
+_VIZ_HINT = 'plotting needs Matplotlib; install it with: pip install "ecg-records[viz]"'
 _INTERPRET_HINT = ('interpretation moved to the separate ecginterpret distribution; install it with '
                    'pip install "ecg-records[interpret]"')
 
@@ -66,16 +66,16 @@ LEGACY_FUNCTIONS = {
         "ecgfeat.parse_wfdb_header", "ecgfeat.io.read_wfdb_header()", _attr("ecgfeat.io", "parse_wfdb_header")),
     "plot_beat": deprecated_function(
         "ecgfeat.plot_beat", "ecgfeat.viz.plot_beat(signal, record, ...)",
-        _attr("ecgrecords_viz.legacy", "plot_beat", install_hint=_VIZ_HINT)),
+        _attr("ecgfeat.viz.legacy", "plot_beat", install_hint=_VIZ_HINT)),
     "plot_beat_all_leads": deprecated_function(
         "ecgfeat.plot_beat_all_leads", "ecgfeat.viz.plot_beat_all_leads(signal, record, ...)",
-        _attr("ecgrecords_viz.legacy", "plot_beat_all_leads", install_hint=_VIZ_HINT)),
+        _attr("ecgfeat.viz.legacy", "plot_beat_all_leads", install_hint=_VIZ_HINT)),
     "plot_rep_beat": deprecated_function(
         "ecgfeat.plot_rep_beat", "ecgfeat.viz.plot_representative_beat(signal, record, ...)",
-        _attr("ecgrecords_viz.legacy", "plot_rep_beat", install_hint=_VIZ_HINT)),
+        _attr("ecgfeat.viz.legacy", "plot_rep_beat", install_hint=_VIZ_HINT)),
     "plot_quality_summary": deprecated_function(
         "ecgfeat.plot_quality_summary", "ecgfeat.viz.plot_quality_summary(signal, record, ...)",
-        _attr("ecgrecords_viz.legacy", "plot_quality_summary", install_hint=_VIZ_HINT)),
+        _attr("ecgfeat.viz.legacy", "plot_quality_summary", install_hint=_VIZ_HINT)),
 }
 
 __all__ = ["warn_legacy", "deprecated_function", "LEGACY_FUNCTIONS"]

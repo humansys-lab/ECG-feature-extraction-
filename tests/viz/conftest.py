@@ -1,4 +1,8 @@
-"""Shared fixtures: the pinned 10 s, 12-lead reference record and its signal."""
+"""Shared fixtures: the pinned 10 s, 12-lead reference record and its signal.
+
+Matplotlib is the optional ``viz`` extra. Without it only the import-isolation
+checks run (they simulate its absence anyway).
+"""
 
 from __future__ import annotations
 
@@ -9,16 +13,19 @@ from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-import matplotlib  # noqa: E402
-
-matplotlib.use("Agg")
+try:
+    import matplotlib
+except ImportError:  # the optional viz extra is not installed
+    collect_ignore = ["test_viz_plots.py", "test_viz_compat.py"]
+else:
+    matplotlib.use("Agg")
 
 import numpy as np  # noqa: E402
 import pytest  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REFERENCE_DIR = Path(
-    os.environ.get("ECGRECORDS_VIZ_REFERENCE_DIR", REPO_ROOT / "tests" / "fixtures" / "golden" / "reference_10s_12lead")
+    os.environ.get("ECGFEAT_VIZ_REFERENCE_DIR", REPO_ROOT / "tests" / "fixtures" / "golden" / "reference_10s_12lead")
 )
 
 

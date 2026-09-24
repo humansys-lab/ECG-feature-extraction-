@@ -43,8 +43,8 @@ heart_rate = query_measurement(restored, "heart_rate_bpm")
 ```
 
 - 1–8 个通道需显式 `input_mode="limited"`；读写/查询 Record 不加载数值、绘图或解释代码。
-- 解释规则在独立发行包 `ecginterpret`（`pip install "ecg-records[interpret]"`），
-  绘图在 `ecg-records-viz`（`pip install "ecg-records[viz]"`）。
+- 解释规则在独立发行包 `ecginterpret`（`pip install "ecg-records[interpret]"`）；
+  绘图在本包的 `ecgfeat.viz`，Matplotlib 为可选依赖（`pip install "ecg-records[viz]"`）。
 - 下文的 `ECGFeatureExtractor` / `to_dict` 为旧接口：使用时发出 `ECGDeprecationWarning`，
   最早 0.3.0 移除；需要旧对象时请从 `ecgfeat.compat` 导入（不告警）。
 - 输出属于研究/工程测量；schema 1.0.0 中所有已发表字段均为 `unvalidated`，不能当作临床结论。

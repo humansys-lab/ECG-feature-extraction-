@@ -19,9 +19,8 @@ from pathlib import Path
 
 REQUIRED_WHEEL = {
     "ecg_records": ["ecgfeat/py.typed", "ecgfeat/schemas/ecg-record/1.0/schema.json",
-                    "ecgfeat/schemas/ecg-record/1.0/validation-evidence.json"],
+                    "ecgfeat/schemas/ecg-record/1.0/validation-evidence.json", "ecgfeat/viz/plots.py"],
     "ecginterpret": ["ecginterpret/py.typed", "ecginterpret/schemas/interpretation/1.0/schema.json"],
-    "ecg_records_viz": ["ecgrecords_viz/py.typed"],
 }
 FORBIDDEN_PARTS = ("/tests/", "__pycache__", "/.git/", "/data/", "/dataset/", ".env", "credentials", "secrets")
 FORBIDDEN_SUFFIXES = (".pyc", ".pyo", ".npz", ".hea", ".dat", ".mat", ".edf", ".pem", ".key", ".pt", ".pth")

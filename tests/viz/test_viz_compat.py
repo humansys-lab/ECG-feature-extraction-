@@ -1,4 +1,4 @@
-"""Compatibility surface: ecgfeat.viz forwarding and the legacy ecgfeat.visualize alias."""
+"""Compatibility surface: the lazy ecgfeat.viz facade and the legacy ecgfeat.visualize alias."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import warnings
 
 import pytest
 
-import ecgrecords_viz
+from ecgfeat.viz import errors, plots
 
 SIX = {"plot_record", "plot_beat", "plot_beat_all_leads", "plot_representative_beat", "plot_quality_summary",
        "VisualizationInputError"}
@@ -20,7 +20,7 @@ def test_ecgfeat_viz_surface():
     assert set(ecgfeat.viz.__all__) == SIX
     assert SIX <= set(dir(ecgfeat.viz))
     for name in SIX:
-        assert getattr(ecgfeat.viz, name) is getattr(ecgrecords_viz, name)
+        assert getattr(ecgfeat.viz, name) is getattr(errors if name == "VisualizationInputError" else plots, name)
     with pytest.raises(AttributeError):
         ecgfeat.viz.plot_rep_beat  # noqa: B018 - legacy names are not forwarded here
     with pytest.raises(AttributeError):
@@ -35,7 +35,7 @@ def test_ecgfeat_viz_is_not_a_top_level_reexport():
 
 
 def test_legacy_alias_is_the_moved_module_and_warns_once():
-    legacy = importlib.import_module("ecgrecords_viz.legacy")
+    legacy = importlib.import_module("ecgfeat.viz.legacy")
     sys.modules.pop("ecgfeat.visualize", None)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -45,14 +45,14 @@ def test_legacy_alias_is_the_moved_module_and_warns_once():
     messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)
                 and "ecgfeat.visualize" in str(w.message)]
     assert len(messages) == 1
-    assert "ecgrecords_viz" in messages[0] and "no earlier than ecg-records 0.3.0" in messages[0]
+    assert "ecgfeat.viz.legacy" in messages[0] and "no earlier than ecg-records 0.3.0" in messages[0]
     from ecgfeat import _moved
 
     assert f"ecg-records {_moved.REMOVAL_RELEASE}" in messages[0]
 
 
 def test_legacy_module_keeps_its_public_functions():
-    from ecgrecords_viz import legacy
+    from ecgfeat.viz import legacy
 
     for name in ("plot_beat", "plot_rep_beat", "plot_beat_all_leads", "plot_quality_summary"):
         assert callable(getattr(legacy, name))
@@ -66,7 +66,7 @@ def test_legacy_helpers_still_plot_legacy_features(signal):
     import numpy as np
 
     from ecgfeat.api import ECGFeatureExtractor
-    from ecgrecords_viz import legacy
+    from ecgfeat.viz import legacy
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

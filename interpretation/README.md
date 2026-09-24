@@ -26,7 +26,10 @@ from ecginterpret import interpret_record
 
 record = ecg_record(signal, sampling_rate=500, lead_names=leads, profile="summary")
 document = interpret_record(record, signal=signal)   # versioned Interpretation document
-document.as_dict()["interpretation"]["rhythm_class"]
+result = document.as_dict()
+result["interpretation"]["heart_rate_class"]        # e.g. "normal"
+result["interpretation"]["bundle_branch_block"]     # e.g. "LBBB", or None
+[s["statement"] for s in result["clinical"]["final_statements"]]
 ```
 
 `interpret_record` needs the raw signal: ECG Record schema 1.0 does not yet

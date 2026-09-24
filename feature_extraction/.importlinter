@@ -1,7 +1,8 @@
 # Layer contracts from docs/library_design/01_architecture.md ("Layer diagram and
 # enforced dependency rules").  Run: lint-imports --config feature_extraction/.importlinter
 # External packages are included so the separately distributed interpretation
-# and plotting packages can be forbidden outside the compatibility layer.
+# package and the optional Matplotlib dependency can be forbidden outside the
+# compatibility layer and ecgfeat.viz.
 [importlinter]
 root_package = ecgfeat
 include_external_packages = True
@@ -21,7 +22,6 @@ forbidden_modules =
     ecgfeat.visualize
     ecgfeat.viz
     ecginterpret
-    ecgrecords_viz
     matplotlib
 
 [importlinter:contract:engine-no-upward]
@@ -38,7 +38,6 @@ forbidden_modules =
     ecgfeat.visualize
     ecgfeat.viz
     ecginterpret
-    ecgrecords_viz
     matplotlib
 
 [importlinter:contract:foundation-bottom]
@@ -64,8 +63,9 @@ forbidden_modules =
     ecgfeat.export
     ecgfeat.compat.export_v0
     ecgfeat.compat._api_v0_legacy_orchestration
+    ecgfeat.viz
+    ecgfeat.visualize
     ecginterpret
-    ecgrecords_viz
     matplotlib
 
 [importlinter:contract:interpretation-only-through-compat]
@@ -80,6 +80,27 @@ source_modules =
     ecgfeat.refinement
     ecgfeat.validation
 forbidden_modules =
+    ecgfeat.viz
+    ecgfeat.visualize
     ecginterpret
-    ecgrecords_viz
     matplotlib
+
+[importlinter:contract:viz-reads-records-only]
+name = ecgfeat.viz plots from records (and legacy models) and never reaches the pipeline or interpretation
+type = forbidden
+source_modules =
+    ecgfeat.viz
+forbidden_modules =
+    ecgfeat.pipeline
+    ecgfeat.api
+    ecgfeat.export
+    ecginterpret
+
+[importlinter:contract:viz-no-direct-engine]
+name = ecgfeat.viz uses the record boundary, never the private engine directly
+type = forbidden
+source_modules =
+    ecgfeat.viz
+forbidden_modules =
+    ecgfeat._engine
+allow_indirect_imports = True

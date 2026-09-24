@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Post-install smoke test for released artifacts (document 07, steps 6, 8 and 11).
 
-Run in a clean environment where ecg-records (and optionally ecginterpret /
-ecg-records-viz) were installed from wheels, TestPyPI or PyPI.  Checks the
+Run in a clean environment where ecg-records (optionally with its ``viz`` and
+``interpret`` extras) was installed from wheels, TestPyPI or PyPI.  Checks the
 import, the packaged schema resources, canonical encode/decode, the reported
 package/schema versions, and one representative extraction of a synthetic
 12-lead signal (no repository files needed).
@@ -33,7 +33,7 @@ def synthetic_signal():
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True, help="expected ecg-records version")
-    parser.add_argument("--with-extras", action="store_true", help="also check ecginterpret and ecg-records-viz")
+    parser.add_argument("--with-extras", action="store_true", help="also check ecginterpret and ecgfeat.viz")
     args = parser.parse_args(argv)
 
     import ecgfeat
@@ -56,14 +56,15 @@ def main(argv: list[str] | None = None) -> int:
               "beats": len(record.axes["beats"]), "heart_rate_bpm": heart_rate}
     if args.with_extras:
         import ecginterpret
-        import ecgrecords_viz
         import matplotlib
+
+        from ecgfeat.viz import plot_record
 
         matplotlib.use("Agg")
         document = ecginterpret.interpret_record(record, signal=signal).as_dict()
-        figure, axes = ecgrecords_viz.plot_record(signal, record, leads=["II"])
+        figure, axes = plot_record(signal, record, leads=["II"])
         report.update(ecginterpret=ecginterpret.__version__, interpretation_schema=document["schema_version"],
-                      ecgrecords_viz=ecgrecords_viz.__version__, plotted_axes=len(axes))
+                      matplotlib=matplotlib.__version__, plotted_axes=len(axes))
     print(json.dumps(report))
     return 0
 

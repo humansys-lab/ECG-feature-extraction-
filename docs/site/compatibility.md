@@ -1,7 +1,8 @@
 # Compatibility policy
 
-- **Code versions** follow SemVer per distribution (`ecg-records`,
-  `ecginterpret`, `ecg-records-viz` are versioned independently).
+- **Code versions** follow SemVer per distribution (`ecg-records` and
+  `ecginterpret` are versioned independently; plotting ships inside
+  `ecg-records` as `ecgfeat.viz`).
 - **Schema versions** are independent of package versions. A schema minor
   (additive fields, reason codes, validation evidence) forces at least a code
   minor; a schema major forces a code major.

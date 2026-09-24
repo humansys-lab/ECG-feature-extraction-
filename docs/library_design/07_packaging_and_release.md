@@ -20,6 +20,12 @@ release gates exist.
 
 ## Distribution topology
 
+> **Maintainer decision (2026-09-24):** plotting ships inside `ecg-records` as the
+> `ecgfeat.viz` subpackage, with Matplotlib as the optional `viz` extra, instead of a
+> separate `ecg-records-viz` distribution. `ecginterpret` stays separate. The layer rules
+> are unchanged: `import ecgfeat` never loads Matplotlib, and import-linter forbids
+> `ecgfeat.viz` from the record, engine and pipeline layers (see document 08).
+
 Publish three distributions.
 
 | Distribution | Import surface | Contains | Does not contain |

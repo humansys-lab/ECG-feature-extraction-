@@ -2,8 +2,9 @@
 """Reject imports of the private engine from consumer code (document 01).
 
 ``import-linter`` guards layers inside ``ecgfeat``; this AST check guards the
-consumers outside it: ``ecgagent/``, the interpretation and visualization
-distributions, and root-level tools.  They must use the ECG Record boundary.
+consumers outside it: ``ecgagent/``, the interpretation distribution, and
+root-level tools.  They must use the ECG Record boundary.  (``ecgfeat.viz`` is
+inside the package and guarded by the import-linter contracts instead.)
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CONSUMERS = ("ecgagent", "interpretation", "visualization")
+CONSUMERS = ("ecgagent", "interpretation")
 PRIVATE = ("_engine", "_kalman", "numeric", "preprocess", "acquisition_qc", "quality", "qrs",
            "adaptive_qrs", "grouping", "representative", "family_representative", "delineate",
            "classical_candidates", "boundary_refinement", "wave_localization", "r_localization",

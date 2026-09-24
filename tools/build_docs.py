@@ -141,8 +141,8 @@ def pages() -> dict[str, str]:
         "api-ecgfeat.md": api_page("ecgfeat", ecgfeat.PUBLIC_API, "ecg-records API (`ecgfeat`)", ecgfeat.LEGACY_API),
         "api-ecginterpret.md": api_page("ecginterpret", [n for n in importlib.import_module("ecginterpret").__all__
                                                           if n != "__version__"], "ecginterpret API"),
-        "api-ecgrecords-viz.md": api_page("ecgrecords_viz", [n for n in importlib.import_module("ecgrecords_viz").__all__
-                                                              if n != "__version__"], "ecg-records-viz API"),
+        "api-ecgfeat-viz.md": api_page("ecgfeat.viz", importlib.import_module("ecgfeat.viz").__all__,
+                                       "Plotting API (`ecgfeat.viz`, `viz` extra)"),
         "ecg-record-schema-1.0.md": schema_page(),
         "legacy-crosswalk.md": crosswalk_page(),
         "interpretation-schema-1.0.md": interpretation_schema_page(),

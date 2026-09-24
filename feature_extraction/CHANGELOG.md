@@ -25,7 +25,12 @@ First release of the redesigned library (previously the unpublished
 - Verified NPZ sidecar for dense matrices (`serialize_record(..., sidecar_uri=...)`,
   CLI `measure --sidecar`), deterministic bytes, SHA-256 and identity bound.
 - `ecg-record` command line: `measure`, `validate`, `query`, `resolve`, `select`, `batch`.
-- Extras: `viz` (installs `ecg-records-viz`), `interpret` (installs `ecginterpret`),
+- Record-based plotting in `ecgfeat.viz`: `plot_record`, `plot_beat`,
+  `plot_beat_all_leads`, `plot_representative_beat`, `plot_quality_summary`, all
+  taking `(signal, record)` and returning `(Figure, axes)` through the
+  object-oriented Matplotlib API; the signal is checked against the record's
+  raw-signal SHA-256. `import ecgfeat` never imports Matplotlib.
+- Extras: `viz` (Matplotlib, for `ecgfeat.viz`), `interpret` (installs `ecginterpret`),
   `performance` (Numba), `wfdb`.
 
 ### Changed
@@ -35,7 +40,8 @@ First release of the redesigned library (previously the unpublished
   legacy output is byte-identical to the pre-migration baseline on 1,063 golden
   records from seven public datasets.
 - Engine modules are private (`ecgfeat._engine`); interpretation moved to the
-  `ecginterpret` distribution and plotting to `ecg-records-viz`.
+  `ecginterpret` distribution; the legacy `ECGFeatures` plots moved to
+  `ecgfeat.viz.legacy`.
 - Published records never contain an impossible fiducial order or a negative
   interval: such cells are `unmeasurable(fiducial_order_violation)` /
   `unmeasurable(negative_interval)` instead of failing the whole record.
@@ -43,7 +49,8 @@ First release of the redesigned library (previously the unpublished
 ### Deprecated
 - `ecgfeat.ECGFeatureExtractor` / `ecgfeat.api`, `ecgfeat.to_dict` and the
   `ecgfeat.export` entry points, top-level `interpret`, `plot_*`,
-  `load_wfdb_mat`, `parse_wfdb_header`, and the old private module paths.
+  `ecgfeat.visualize`, `load_wfdb_mat`, `parse_wfdb_header`, and the old
+  private module paths.
   They warn on use and are removed no earlier than 0.3.0; `ecgfeat.compat`
   is the explicit legacy contract meanwhile.
 

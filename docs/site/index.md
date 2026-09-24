@@ -10,12 +10,11 @@ Versioned ECG measurement records for research and engineering.
 
 | Distribution | Import | Version | Contents |
 |---|---|---|---|
-| `ecg-records` | `ecgfeat` | 0.1.0 | Measurement pipeline, ECG Record schema 1.0.0, read/query API, CLI |
+| `ecg-records` | `ecgfeat` | 0.1.0 | Measurement pipeline, ECG Record schema 1.0.0, read/query API, CLI, Matplotlib plots of `(signal, record)` in `ecgfeat.viz` (`viz` extra) |
 | `ecginterpret` | `ecginterpret` | 0.1.0 | Rule-based interpretation; Interpretation document 1.0.0 |
-| `ecg-records-viz` | `ecgrecords_viz` | 0.1.0 | Matplotlib plots of `(signal, record)` |
 
 ```bash
-pip install ecg-records            # core: NumPy + SciPy only
+pip install ecg-records            # NumPy + SciPy only; add [viz] for Matplotlib plotting
 pip install "ecg-records[viz,interpret,performance,wfdb]"
 ```
 
@@ -34,4 +33,4 @@ query_measurement(record, "qrs_duration_ms", lead="V1", beat=0)
   [legacy crosswalk](reference/legacy-crosswalk.md) ·
   [ecginterpret API](reference/api-ecginterpret.md) ·
   [Interpretation document 1.0](reference/interpretation-schema-1.0.md) ·
-  [ecg-records-viz API](reference/api-ecgrecords-viz.md)
+  [plotting API (`ecgfeat.viz`)](reference/api-ecgfeat-viz.md)

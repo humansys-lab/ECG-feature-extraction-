@@ -23,7 +23,7 @@ proprietary product.
 pip install ecg-records                  # measurements and ECG Records (NumPy, SciPy)
 pip install "ecg-records[performance]"   # optional Numba acceleration
 pip install "ecg-records[wfdb]"          # WFDB readers
-pip install "ecg-records[viz]"           # plotting (ecg-records-viz, Matplotlib)
+pip install "ecg-records[viz]"           # plotting with ecgfeat.viz (adds Matplotlib)
 pip install "ecg-records[interpret]"     # rule-based interpretation (ecginterpret)
 ```
 
@@ -69,6 +69,29 @@ Addresses follow `ecg-record:<record_id>@<schema_version>#<RFC 6901 pointer>`.
 The JSON Schema and the validation-evidence registry ship in the package
 (`ecgfeat/schemas/ecg-record/1.0/`).
 
+## Plot
+
+Plotting ships in this package as `ecgfeat.viz`; only Matplotlib is optional
+(`pip install "ecg-records[viz]"`). `import ecgfeat` never imports Matplotlib,
+and `pyplot` is never used.
+
+```python
+from ecgfeat.viz import plot_beat, plot_record
+
+fig, axes = plot_record(signal, record, leads=["II", "V1", "V5"],
+                        start_s=1.0, end_s=4.0, annotations="all")
+fig.savefig("record.png", dpi=150)
+fig, ax = plot_beat(signal, record, beat=3, lead="II")
+```
+
+`plot_beat_all_leads`, `plot_representative_beat` and `plot_quality_summary`
+work the same way. Every function takes `(signal, record)` and returns
+`(figure, axes)`. `signal` must be the exact array that produced the record:
+its SHA-256 is checked against `/artifacts/raw_signal/sha256`, and a mismatch
+raises `ecgfeat.viz.VisualizationInputError` (an `ECGInputError`). Pass
+`figure=` to draw into an existing `Figure` or `SubFigure`. Every added artist
+carries a `gid` starting with `ecgfeat.viz:`.
+
 ## Command line
 
 ```bash
@@ -92,7 +115,8 @@ never validated and is anti-correlated with ischemia).
 - The package version and the ECG Record schema version are independent. This
   release writes schema `1.0.0` and reads schema major `1`, tolerating
   additive fields from later minors.
-- Legacy APIs (`ECGFeatureExtractor`, `to_dict`, `interpret`, `plot_*`, the
-  legacy result dataclasses) remain for a compatibility window. Legacy
+- Legacy APIs (`ECGFeatureExtractor`, `to_dict`, `interpret`, `plot_*`,
+  `ecgfeat.visualize`, the legacy result dataclasses) remain for a
+  compatibility window. Legacy
   functions emit `ECGDeprecationWarning` on use; `ecgfeat.compat` provides the
   exact legacy contract without warnings. Removal is no earlier than 0.3.0.

@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import inspect
-from pathlib import Path
-
 import numpy as np
 import pytest
 from matplotlib.axes import Axes
 from matplotlib.collections import LineCollection, PathCollection
 from matplotlib.figure import Figure
 
-import ecgrecords_viz
-from ecgrecords_viz import (
+from ecgfeat import viz
+from ecgfeat.viz import (
     VisualizationInputError,
     plot_beat,
     plot_beat_all_leads,
@@ -21,7 +19,7 @@ from ecgrecords_viz import (
     plot_representative_beat,
 )
 
-PREFIX = "ecgrecords_viz:"
+PREFIX = "ecgfeat.viz:"
 LANDMARKS = ("p_onset", "p_offset", "qrs_onset", "r_peak", "qrs_offset", "j_point", "t_offset")
 FS = 500.0
 
@@ -89,21 +87,13 @@ def annotation_data(axes) -> dict:
 # -- public surface ---------------------------------------------------------------------
 
 
-def test_public_names_and_version():
-    assert set(ecgrecords_viz.__all__) == {
+def test_public_names():
+    assert set(viz.__all__) == {
         "plot_record", "plot_beat", "plot_beat_all_leads", "plot_representative_beat", "plot_quality_summary",
-        "VisualizationInputError", "__version__",
+        "VisualizationInputError",
     }
-    for name in ecgrecords_viz.__all__:
-        assert hasattr(ecgrecords_viz, name)
-    assert ecgrecords_viz.__version__ == "0.1.0"
-
-
-def test_version_matches_pyproject():
-    tomllib = pytest.importorskip("tomllib")
-    pyproject = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
-    assert pyproject["project"]["name"] == "ecg-records-viz"
-    assert pyproject["project"]["version"] == ecgrecords_viz.__version__
+    for name in viz.__all__:
+        assert hasattr(viz, name)
 
 
 def test_error_is_a_public_ecg_input_error_defined_in_the_viz_package():
@@ -111,7 +101,7 @@ def test_error_is_a_public_ecg_input_error_defined_in_the_viz_package():
 
     assert issubclass(VisualizationInputError, ecgfeat.errors.ECGInputError)
     assert issubclass(VisualizationInputError, ValueError)
-    assert VisualizationInputError.__module__ == "ecgrecords_viz.errors"
+    assert VisualizationInputError.__module__ == "ecgfeat.viz.errors"
     assert not hasattr(ecgfeat.errors, "VisualizationInputError")
     error = VisualizationInputError("boom", code="some_code", lead="II")
     assert error.to_dict() == {"code": "some_code", "message": "boom", "details": {"lead": "II"}}
@@ -235,7 +225,7 @@ def test_inline_reads_agree_with_query_measurement(signal, record, document):
 
     from ecgfeat.record import query_measurement
 
-    from ecgrecords_viz._inputs import SignalRecord
+    from ecgfeat.viz._inputs import SignalRecord
 
     pair = SignalRecord(signal, record)
     leads = document["axes"]["leads"]
