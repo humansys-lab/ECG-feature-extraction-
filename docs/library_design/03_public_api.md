@@ -1,9 +1,9 @@
 # Public API Design
 
-> Implementation status: this document includes target contracts, not completed
-> release claims. [Document 08](08_implementation_status.md) records the implemented
-> subset, reconciled decisions and outstanding gates. Document 02 is authoritative
-> for the JSON layout; Python carrier sketches must not create a second wire format.
+> Implementation status (2026-09-24): migration Phases 0–5 of this design are implemented and
+> gated; [document 08](08_implementation_status.md) records the results, deliberate deviations and
+> the maintainer decisions still needed before release. Document 02 is authoritative for the JSON
+> layout; Python carrier sketches must not create a second wire format.
 
 This document defines the public Python and command-line surface for the measurement package. The stable consumer boundary is the raw signal plus a versioned ECG Record JSON document. Interpretation is outside this package and has its own versioned document and distribution.
 

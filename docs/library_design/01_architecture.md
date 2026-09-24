@@ -1,8 +1,8 @@
 # 01 — Architecture
 
-Status: target architecture, not a description of completed migration. The current
-shadow Record API and remaining dependency violations are listed in
-[document 08](08_implementation_status.md).
+Status (2026-09-24): this architecture is implemented (staged pipeline, policies,
+private engine, separate interpretation and visualization distributions); layer
+rules are enforced by import-linter. See [document 08](08_implementation_status.md).
 Design date: 2026-09-22. This document inherits the decisions in
 `00_overview.md`: the published consumer boundary is a versioned **ECG Record**
 JSON document plus the raw signal, the standard-record budget is 24,000

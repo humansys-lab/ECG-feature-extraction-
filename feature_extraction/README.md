@@ -28,31 +28,36 @@
 pip install -e .
 ```
 
-## ECG Record 影子接口
+## 发行包与 ECG Record（ecg-records 0.1.0）
 
-新增版本化测量记录接口，现阶段仍复用既有数值引擎；八阶段拆分、解释分包和
-完整 NPZ 查询尚未完成。已实现范围及门禁见
-[实现审查与状态](../docs/library_design/08_implementation_status.md)。
+本目录是发行包 **`ecg-records`**（导入名 `ecgfeat`）。推荐接口是版本化的 ECG Record：
 
 ```python
 from ecgfeat import ecg_record, dumps_record, loads_record, query_measurement
 
 # signal: (n_leads, n_samples)，每行有明确名称；默认要求标准 12 导联。
 record = ecg_record(signal, sampling_rate=500, lead_names=lead_names)
-payload = dumps_record(record)  # 保留已有 profile，不隐式裁剪 all/debug
-restored = loads_record(payload)  # 默认严格校验
+payload = dumps_record(record)            # 规范 JSON；summary ≤ 24,000 字节（10 s/12 导联/10 搏）
+restored = loads_record(payload)          # 默认严格校验
 heart_rate = query_measurement(restored, "heart_rate_bpm")
 ```
 
-默认仅输出 summary；1–8 个通道需显式 `input_mode="limited"`。
-读写/查询 Record 无需加载提取或绘图库；绘图依赖使用 `pip install -e '.[viz]'`。
-输出属于研究/工程测量，字段验证状态不能当作临床诊断结论。
+- 1–8 个通道需显式 `input_mode="limited"`；读写/查询 Record 不加载数值、绘图或解释代码。
+- 解释规则在独立发行包 `ecginterpret`（`pip install "ecg-records[interpret]"`），
+  绘图在 `ecg-records-viz`（`pip install "ecg-records[viz]"`）。
+- 下文的 `ECGFeatureExtractor` / `to_dict` 为旧接口：使用时发出 `ECGDeprecationWarning`，
+  最早 0.3.0 移除；需要旧对象时请从 `ecgfeat.compat` 导入（不告警）。
+- 输出属于研究/工程测量；schema 1.0.0 中所有已发表字段均为 `unvalidated`，不能当作临床结论。
+- 迁移状态与门禁结果见 [实现状态](../docs/library_design/08_implementation_status.md)，
+  英文包说明见 [README.package.md](README.package.md)。
 
-## 最小示例
+## 最小示例（旧对象接口）
 
 ```python
 import numpy as np
-from ecgfeat import ECGFeatureExtractor, PatientMeta, to_dict
+from ecgfeat import PatientMeta
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor  # legacy object contract (no warning)
+from ecgfeat.compat.export_v0 import to_dict
 
 # ecg shape: [12, n_samples], unit: mV
 fs = 500

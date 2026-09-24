@@ -1,9 +1,9 @@
 # ECG Record JSON schema
 
-> Implementation status: this document includes target contracts, not completed
-> release claims. [Document 08](08_implementation_status.md) records the implemented
-> subset, reconciled decisions and outstanding gates. Document 02 is authoritative
-> for the JSON layout; Python carrier sketches must not create a second wire format.
+> Implementation status (2026-09-24): migration Phases 0–5 of this design are implemented and
+> gated; [document 08](08_implementation_status.md) records the results, deliberate deviations and
+> the maintainer decisions still needed before release. Document 02 is authoritative for the JSON
+> layout; Python carrier sketches must not create a second wire format.
 
 This document defines the published, versioned **ECG Record** boundary for measurement output. It deliberately excludes clinical interpretation: interpretation is a separate document with its own schema and distribution. The JSON record is designed for research and engineering use, not as a medical-device interchange format.
 

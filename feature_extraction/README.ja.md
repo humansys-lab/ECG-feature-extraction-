@@ -37,7 +37,9 @@ pip install -e .
 
 ```python
 import numpy as np
-from ecgfeat import ECGFeatureExtractor, PatientMeta, to_dict
+from ecgfeat import PatientMeta
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor  # legacy object contract (no warning)
+from ecgfeat.compat.export_v0 import to_dict
 
 # ecg shape: [12, n_samples], unit: mV
 fs = 500

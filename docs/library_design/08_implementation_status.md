@@ -1,142 +1,113 @@
-# 08 — 实现审查、已落地范围与剩余门禁
+# 08 — 实现状态、已通过门禁与剩余发布阻碍
 
-审查日期：2026-09-22。本文件区分**目标设计**与**已运行的实现**，不构成
-临床有效性、全量迁移完成或可发布的声明。00–07 中的阶段迁移、消费者拆分和
-发布门禁仍是目标；不能用旧算法测试通过来代替这些门禁。
+更新日期：2026-09-24（上一版：2026-09-22 审查）。本文件记录**已运行并验证**的实现，
+与 00–07 的目标设计区分。它不是临床有效性声明：所有已发表字段在 schema 1.0.0 中
+均为 `unvalidated`。
 
 ## 结论
 
-当前可用的是 **兼容既有数值引擎的 Record 影子接口**：
-`ecg_prepare → ecg_measure → ecg_emit`，以及单次入口 `ecg_record`。
-它提供经过校验的列式 JSON、原始采样坐标、单位、显式缺失原因、来源和查询。
-既有 `ECGFeatureExtractor` 仍返回 `ECGFeatures`；既有消费者没有被强制切换。
+迁移 Phase 0–5 已完成并通过各自门禁；Phase 6（退役兼容层）按定义只能在两个
+minor 版本的兼容窗口之后进行，不属于首次发布。三个发行包均可构建、通过产物检查
+与干净环境安装测试。**首次发布唯一未满足的阻碍是需要维护者决定的事项**：
+许可证、PyPI/TestPyPI 可信发布配置（或凭证）、GitHub 仓库/CI 启用，以及
+Validation Owner 与项目元数据确认（见文末）。
 
-之前文件结构中的 `_engine` 转发模块、八阶段载体和策略类不等于架构迁移完成。
-独立 stage 的 `run`、尚未迁移的 QT/pacing/lead-integrity 决策现在显式抛出
-`NotImplementedError`，不再无操作返回成功或用候选插入顺序伪造选择。
-主提取入口不调用这些未迁移入口，继续执行旧引擎原有逻辑。
-
-## 已解决的文档冲突
-
-| 项目 | 本轮统一的约定 |
-|---|---|
-| 默认采样率 | `fs_internal=None`，保留原生采样率；删除文档 03 中默认 500 Hz 的冲突 |
-| 工频 `None` | 保留旧引擎的 50/60 Hz 频谱推断；低采样率和功率相同时取 50，不表示关闭陷波 |
-| Schema 版本 | `MAJOR.MINOR.PATCH`，当前写入 `1.0.0`；`schemas/ecg-record/1.0/` 是版本族目录 |
-| Profile | `summary/all/debug`；`measurement` 是过渡别名，`all_measurements` 不支持 |
-| 默认序列化 | 保留已有 profile；显式降级可以丢字段，禁止从缺失数据“升级”到 all/debug |
-| Record 形状 | 文档 02 的分组列式布局为准；低层 builder 也使用 `/measurements/global`，不再输出第二种直接字段布局 |
-| Refinement | 使用真实的 18 个布尔开关，默认全关；不将设计草图中的名字映射到无关算法 |
-| 发表类别与验证 | `published_measurement` 是类别，不是准确性等级；验证状态及逐字段证据独立保存 |
-| 面积 | 已确认 `qrs_signed_area` 的单位是 mV × internal sample，换算乘 `1_000_000/internal_fs` |
-
-代码中的 `RefinementConfig.enabled` 和 `experimental_flags` 为计算属性。
-无参数 `experimental()` 保留既有“全部候选”的研究预设；这不是推荐默认。
-Record 层 P-wave 控制尚未接入，非默认设置会报配置错误。顶层
-`PWaveConfig` 保留旧引擎类型，不再被同名的新类型覆盖。
-
-## 实现中的数据正确性修复
-
-- 输入强制 channel-major，显式导联名、单位和频率；不自动猜测转置、不补成 12 导联。
-  准备阶段复制到只读样本缓冲区，不冻结或修改调用方数组。
-- 重采样后的逐搏位置及七个 fiducial 均按频率比映射回原始样本域，使用
-  round-half-to-even；合法的 R 样本 0 不再被 `or` 表达式替换。
-- limited 输入按旧引擎的 channel-to-slot 映射获取测量，保留用户原始通道名。
-  正式电轴和 QTc 为 `not_applicable`，原始逐导联 QT 间期仍可查询。
-- 修正 Q0/Q1 与较差质量等级的反向映射；缺失测量附带状态和原因。
-  不把结构损坏或 getter 异常静默变成生理缺失。
-- 默认运行标识包含信号及其校准、配置、患者元数据、方法、库和 schema 版本，
-  不包含 profile。原始信号 artifact 明确为 little-endian float64 C-order
-  字节的摘要和 URN，不把元数据指纹冒充 NPY 文件校验和，也不假称已写出文件。
-- 已发布 `st_80ms_uv` 仍来源于 legacy native `st_80ms_mv`。可选 ST source
-  影响 hybrid 候选；候选来源与已发布字段来源分开记录，不冒称已替换主 ST 测量。
-- Record 中保留 `intended_use` 和未知顶层扩展；模型递归脱离输入容器并拒绝
-  非 JSON 对象、非字符串键和非有限数值。debug 仅保留白名单测量元数据，
-  不将旧解释结果整包塞回 JSON。
-
-## 可运行的契约与工具
-
-Record 读取默认检查 acquisition、轴、字段类型/单位、矩阵形状、样本范围、
-缺失状态/坐标、来源引用和有限数值；重复 JSON 成员会报错。验证声明没有证据时
-报错，limited 正式输出的适用性也会检查。`validate="none"` 仅跳过契约校验，
-不允许 NaN、无效 JSON 或损坏的基础模型。
-
-JSON Schema 与标准库跨字段校验职责不同：Schema 描述结构，严格校验还检查
-矩阵长度、来源指针、坐标存在性等跨字段关系。仓库版与包内版 schema 的字节一致性
-由测试保证。文档 02 的完整 JSON 示例也纳入机器校验。
-
-`record`、查询接口及 CLI 的导入不加载 NumPy、SciPy、Matplotlib 或提取/解释引擎；
-只有指纹计算、NPZ 编码或真正的提取才加载相应数值依赖。分发包仍声明 NumPy/SciPy
-为运行依赖，这不等于已推出独立 record-only distribution。
-
-CLI 实现 `measure/validate/query/resolve/select/batch`，支持 Record stdin、
-结构化错误和文档 03 的退出码。批处理有界并发、按 manifest 顺序输出状态，
-单项失败默认继续、拒绝输出路径逃逸及重复目标。文件在验证成功后通过临时文件和
-原子替换写入。未知配置不再静默忽略。
-
-严格 WFDB `.hea/.mat` 适配器要求明确的采样率、命名通道和校准，使用每通道
-`(digital-baseline)/gain` 后按单位换算。未显式给 baseline 时使用 ADC zero；
-拒绝缺失 header、多段、skew、多采样频率以及文件/维度不一致等未支持布局。
-旧 `parse_wfdb_header(path)` / `load_wfdb_mat` 调用保留其兼容行为。
-格式依据：[WFDB header specification](https://physionet.org/physiotools/wag/header-5.htm)。
-JSON Pointer 的转义和数组索引依据 [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)。
-
-## 当前字段覆盖
-
-`summary`：文档 02 的 18 个逐搏/导联字段（7 fiducials、5 intervals、
-5 amplitudes、1 area）以及心率、额面 QRS 电轴。
-`all` 额外包含 `jt_interval_ms`、`u_amplitude_uv`、`qtc_bazett_ms` 和
-`qrs_wide_ms`。这并不意味着全部 88 个 legacy 候选已经完成发表审查。
-所有当前自动生成的字段保持 `unvalidated`，没有凭借仓库已有 benchmark 名称
-自动提高验证状态。
-
-`serialize_record(dense_arrays=...)` 可生成补充 NPZ artifact，但 JSON 数值仍内联。
-**尚未实现**将字段迁到 NPZ 后的透明查询、外部文件摘要验证和状态掩码协议。
-CLI `--sidecar` 因此明确报配置错误。不能把附件编码器称为完整 sidecar 后端。
-
-## 验证与证据边界
-
-可重跑的命令：
-
-```bash
-.venv/bin/pytest -q tests/test_library_design_review.py tests/test_ecg_record_contract.py \
-  tests/test_ecg_io.py tests/test_accuracy_refinements.py
-.venv/bin/pytest -q
-```
-
-定向回归覆盖坐标换算、面积、零样本、limited 映射、身份、配置、WFDB 校准、
-读写保真、错误记录拒绝、来源查询、CLI 批处理/原子写入及无重依赖导入。
-本轮最终结果：定向测试 **85 passed**；当前工作区全量测试
-**2232 passed、150 subtests passed、2 skipped、2 warnings**。
-两个跳过项都需要预先生成 JS00059 回归产物；两个 warning 来自旧 NumPy
-`trapz` 兼容性测试。它们没有被计作已经通过的验证。
-测试还构造 10 s / 500 Hz / 12 导联 / 10 搏的完整矩阵，检查 summary ≤24,000
-字节；这是**序列化契约测试**，不是文档 06 所要求的冻结波形及全流程 golden 门禁。
-
-本轮额外对本地 LUDB/1 和 pwave/100 做了真实提取及三种 profile 的无损回读：
-
-| 输入 | 配置 | 搏/导联 | summary / all / debug 字节数 |
+| 发行包 | 导入名 | 版本 | 内容 |
 |---|---|---|---|
-| LUDB/1 | 原始 500 Hz，内部 500 Hz | 7 / 12 | 14,654 / 16,308 / 17,946 |
-| pwave/100 前 10 s | limited，原始 360 Hz，内部 500 Hz | 12 / 2 | 10,317 / 12,084 / 13,764 |
+| `ecg-records` | `ecgfeat` | 0.1.0 | 八阶段流水线、四个策略对象、ECG Record schema 1.0.0、查询/CLI、NPZ sidecar |
+| `ecginterpret` | `ecginterpret` | 0.1.0 | 规则引擎（解释/临床/Glasgow/语句引擎/MI/儿科）+ Interpretation 文档 1.0.0 |
+| `ecg-records-viz` | `ecgrecords_viz` | 0.1.0 | `(signal, record)` 绘图 API + 旧 `ECGFeatures` 绘图（已弃用） |
 
-这是 smoke test，不是全 LUDB 等价验证，更不是跨数据库准确性验证。
-隔离构建的 wheel 已确认包含 `py.typed`、完整 schema，且脱离仓库源码可导入
-Record/CLI。Python 3.10 语法解析通过；实际运行测试环境为 Python 3.12，
-不冒称已跑完 3.10–3.13 / 各 NumPy 版本的平台矩阵。
+## 各阶段结果（均以冻结的 Phase 0 基线为准）
 
-## 未完成项及下一步顺序
+基线修订为 `52a339c`（迁移前工作树快照）。黄金语料：sentinel 156 例（96 标准 + 60
+个 limited/ST 源/逐一 refinement 开关）与 full 1,063 例，覆盖 LUDB、QTDB、EDB、
+PTB-XL、BUT-PDB、NSTDB、GUDB；选择规则 `ecg-records-golden-v1` 只看记录 ID 的哈希。
+两次独立运行未改代码时 156/156 字节一致，唯一非确定性字段是解释层的
+`generated_at` 时间戳（唯一允许的规范化）。
 
-| 迁移阶段 | 当前状态 / 必需证据 |
+| 阶段 | 内容 | 门禁结果 |
+|---|---|---|
+| 0 冻结基线 | `benchmarks/golden`（manifest、期望输出、`snapshot_regression.py` 四种模式）；`benchmarks/harness` 包装 9 个既有评估工具并按文档 06 容差冻结 | 双跑 156/156 一致；9 个评估工具双跑门控指标逐位一致 |
+| 1 `_engine` 迁移 | 31 个引擎模块移入 `ecgfeat/_engine`，旧路径为同一模块对象的别名并在导入时告警 | sentinel legacy-bytes+record-bytes 156/156；full 1,063/1,063 |
+| 2 Record 影子 | models→`_engine/foundation`、export→`compat/export_v0`（静默别名）；独立 record builder；crosswalk 数据 + 独立比较器；验证证据注册表；NPZ sidecar；字段默认缺失状态；黄金参考夹具；性质测试；性能预算；batch 输出模式 | record-crosswalk full 1,063/1,063（含迁移前记录构建失败的 44 例）；24 kB 参考摘要 18,061 字节 |
+| 3 拆分 `api.py` | 3,155 行编排拆为 8 个 stage + 4 个 policy；49 个私有 helper 归位；旧编排原样保留于 `compat/_api_v0_legacy_orchestration.py`（`ECGFEAT_LEGACY_ORCHESTRATION=1` 回滚） | full legacy-bytes 1,063/1,063；回滚路径 sentinel 156/156；full record-crosswalk 1,063/1,063；分阶段与回滚速度相同 |
+| 4 Record 为主接口 | 门面 `__all__` = 文档 03 列表 + 分组的旧名称；旧拼写使用时 `ECGDeprecationWarning`，`ecgfeat.compat` 为显式静默旧契约；仓库内消费者改用 compat；ecgagent 写出 record 并在证据边界解析带 schema 检查的地址 | sentinel legacy/crosswalk/interpretation 各 156/156；全量测试 2,586 通过 |
+| 5 解释分包 | 规则代码移入 `interpretation/src/ecginterpret`；引擎拥有自己的阈值与两个可用性谓词（与规则引擎等值测试）；record 路径不再依赖解释；核心仅经 `compat` 惰性访问 `ecginterpret` | full legacy-bytes 1,063/1,063（经 ecginterpret）；full record-crosswalk 1,063/1,063；full interpretation 1,063/1,063；屏蔽 ecginterpret 时参考记录字节一致 |
+| 评估工具 | 9 个工具对冻结基线 compare（Phase 5 树） | 0 回归、0 新失败、0 精确差异、0 缺失指标 |
+
+## 本轮发现并修复的真实缺陷
+
+- 迁移前 record 路径在 44/1,063 条真实记录（4.1%）上整条失败：单个倒置 QRS 或负区间
+  使整份记录校验失败。现改为该单元 `unmeasurable(fiducial_order_violation|negative_interval)`。
+- 真实 10 搏 LUDB 记录 summary 达 32,851 字节（逐单元重复缺失原因）。新增无损的字段
+  `default` 缺失状态后为 18,501；所有真实 12 导联 sentinel 记录（8–15 搏）≤23,347。
+- 性质测试发现 builder 与校验器对不完整 QRS 链的顺序判定不一致，已统一。
+- `feature_extraction.ecgfeat` 与 `ecgfeat` 曾加载两份模块；现为同一对象（别名 finder，
+  并恢复被 importlib 覆盖的 `__spec__`，否则 `importlib.resources` 失效）。
+- 性能探针在 Linux 上继承父进程 `ru_maxrss`；改用 `VmHWM`。
+- 干净安装矩阵暴露测试对 NumPy 2 / Matplotlib 3.8 API 的依赖，已改为可移植写法。
+
+## 已实现的契约与工具
+
+- **Record**：三种缺失状态 + 字段默认状态；发表的 fiducial 保证顺序、区间非负；验证状态
+  只来自注册表，严格读取拒绝高于上限的声明；`st_morphology` 上限 `known_problem`。
+- **Sidecar**：同目录相对 URI、字节 SHA-256、record id/schema 双向绑定、`uint8` 状态掩码
+  与 JSON 缺失编码逐单元一致、确定性 zip；严格加载即校验。
+- **层次约束**：import-linter 5 个契约（record 独立、引擎无上行、foundation 最底层、
+  pipeline 不触及旧导出/解释/绘图、仅 compat 可达 ecginterpret）；消费者 AST 检查 0 违规。
+- **门禁脚本**：`snapshot_regression.py`、`python -m benchmarks.harness`、
+  `tools/check_validation_registry.py`、`check_performance.py`、`check_artifacts.py`、
+  `check_changelog.py`、`build_docs.py --check`、`release_smoke.py`。
+- **CI**：`.github/workflows/test.yml`（矩阵、边界、注册表、性能、文档、viz 测试、自托管
+  sentinel）、`parity.yml`（自托管全量黄金 + 评估工具）、`release.yml`（构建→检查→
+  3.10/3.13 冒烟→TestPyPI 演练→人工批准→PyPI 可信发布→发布后验证→打 tag）。
+  这些工作流已通过 YAML 解析与本地等价命令验证，但尚未在 GitHub 上实际运行。
+- **文档站点**：`docs/site`（免责声明、概念、迁移指南、验证方法、局限、兼容策略）+
+  由已安装包与随包资源生成的参考页；`mkdocs build --strict` 通过。
+
+## 发布前验证（本地，2026-09-24）
+
+| 检查 | 结果 |
 |---|---|
-| Phase 0：冻结基线 | 未完成：冻结输入 hash、解析配置、数值结果、revision 和 CI golden；已有旧测试不能代替它 |
-| Phase 1：引擎迁移 | 未完成：`_engine` 仍主要转发旧模块，不符合最终单向依赖边界 |
-| Phase 2：Record 影子接口 | 已有可用子集及回归；其余字段清单、完整 sidecar、golden/性能门禁待完成 |
-| Phase 3：八阶段与策略 | 未完成：主流程仍在 `api.py`，不可独立运行占位 stages/policies |
-| Phase 4：主要结果切换 | 未完成：旧 API/消费者保持旧结果；不强行改变旧导出形状 |
-| Phase 5：解释拆分 | 未完成：旧引擎仍依赖/执行解释逻辑；仅 Record 读取边界与输出已隔离 |
-| Phase 6：退休兼容层 | 未开始：需要消费者迁移、弃用版本表和两次 minor 兼容窗口 |
-| 发布 | 未完成：许可证/分发名可用性、平台矩阵、真实性能预算和逐字段验证清单仍需独立门禁 |
+| 构建 3 个 sdist + 3 个 wheel | 成功；`twine check` 通过 |
+| `tools/check_artifacts.py` | 除 LICENSE 外全部通过（LICENSE 缺失 = 阻碍） |
+| Python 3.10 / NumPy 1.26.4 / SciPy 1.11.4 / Matplotlib 3.7.5，仅 wheel、无 Numba | 2,565 通过，23 跳过 |
+| Python 3.11 / NumPy 1.26.4 / SciPy 1.11.4 | 2,566 通过 |
+| Python 3.12 / NumPy 1.26.4 / SciPy 1.11.4 / Matplotlib 3.8.4 | 2,566 通过；冒烟通过 |
+| Python 3.12 / NumPy 2.2.6（开发环境） | 2,586 通过（含 interpretation/viz 测试） |
+| Python 3.13 / NumPy 2.5.3 / SciPy 1.18.1 | 通过（最终 wheel 复跑结果见提交记录） |
+| 由 sdist 重建的 wheel | 冒烟通过 |
+| 参考记录性能 | 首次 3.9 s、稳态中位 2.2 s、峰值 RSS 243 MB（预算 12 s / 6 s / 600 MB） |
 
-优先冻结基线，再逐阶段搬移并比较原始未舍入数值；不要将目录树齐全或测试总数
-作为阶段完成判据。消费者迁移、解释分包和发布不在本轮中偷偷推进。
+跳过项：Numba 专用测试（干净环境未装 Numba，证明核心无需 Numba）、依赖版本特有的模拟、
+需预先生成产物的 JS00059 测试。macOS/Windows 仅由 CI 覆盖，本地未运行。
+
+## 与设计文档的有意偏离（已记录理由）
+
+- 验证证据注册表用 JSON（`validation-evidence.json`）而非 TOML：Python 3.10 无标准库 TOML。
+- 核心发行包保持 `feature_extraction/ecgfeat` 扁平布局（解释与绘图包为 src 布局）：包位于
+  子目录，仓库根目录运行测试不会意外导入检出副本；CI 用已安装 wheel 运行测试，满足文档
+  07 的目的。
+- `ecgfeat.models` 的数据类不在构造时告警（保持类身份与 pickle）；弃用信号放在旧入口函数。
+- ecgagent 的诊断证据仍来自旧载荷：record 1.0 只发表紧凑子集，扩充需 schema minor；已提供
+  record 输出与带版本检查的地址解析，未改变模型可见的工具与提示。
+- `ecginterpret.interpret_record` 需要原始信号（record 1.0 不含全部规则输入），先校验信号
+  SHA-256 再用 record 自身配置重算。
+
+## 剩余发布阻碍（需维护者决定，不能由实现代替）
+
+1. **许可证**：仓库无 LICENSE；文档 07 建议 Apache-2.0，但需确认代码来源（含 upstream
+   `humansys-lab`）与权利人同意。`tools/check_artifacts.py` 在缺失时拒绝发布。
+2. **发布通道**：PyPI/TestPyPI 可信发布需在 PyPI 为三个项目名配置 publisher，并在 GitHub
+   仓库创建受保护环境 `testpypi`/`pypi`；或维护者提供 API token（文档 07 不推荐）。
+   2026-09-23 复查：`ecg-records`、`ecginterpret`、`ecg-records-viz` 在 PyPI 与 TestPyPI
+   均返回 404（不代表保留）。
+3. **元数据**：作者/维护者、项目与文档 URL（pyproject 中标记为 TODO）。
+4. **Validation Owner**：`.github/CODEOWNERS` 暂填 `@adsyhub`，需确认。
+5. **CI 实际运行**：工作流需推送到 GitHub 后执行一次；自托管数据集 runner 需另行配置。
+
+## 发布后（Phase 6）
+
+兼容窗口：0.1.0 首次告警，最早 0.3.0 移除；移除前一个版本改为抛出指向替代接口的
+`ImportError` 墓碑。需在此前完成仓库内测试与消费者从旧路径迁出，并以弃用即错误运行一次。

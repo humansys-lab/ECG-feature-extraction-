@@ -1,9 +1,9 @@
 # 07. Packaging and release
 
-> Implementation status: this document includes target contracts, not completed
-> release claims. [Document 08](08_implementation_status.md) records the implemented
-> subset, reconciled decisions and outstanding gates. Document 02 is authoritative
-> for the JSON layout; Python carrier sketches must not create a second wire format.
+> Implementation status (2026-09-24): migration Phases 0–5 of this design are implemented and
+> gated; [document 08](08_implementation_status.md) records the results, deliberate deviations and
+> the maintainer decisions still needed before release. Document 02 is authoritative for the JSON
+> layout; Python carrier sketches must not create a second wire format.
 
 ## Purpose
 

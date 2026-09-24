@@ -1,8 +1,7 @@
 # 00 — Overview
 
-Status: target design with a partial compatibility-backed implementation. See
-[implementation audit and remaining gates](08_implementation_status.md) before
-treating any target API, stage, sidecar or release claim as implemented.
+Status (2026-09-24): Phases 0–5 of this design are implemented and gated; see
+[implementation status and remaining release decisions](08_implementation_status.md).
 Design date: 2026-09-22. Companion documents: `01_architecture.md` and
 `02_record_json_schema.md`.
 
