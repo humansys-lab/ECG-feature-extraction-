@@ -33,8 +33,19 @@ for _ in range(int(sys.argv[2])):
     start = time.perf_counter()
     record = ecg_record(signal, sampling_rate=500, lead_names=leads)
     times.append(time.perf_counter() - start)
+def peak_rss_mb():
+    # ru_maxrss survives fork+exec on Linux (it would report the parent's
+    # high-water mark); VmHWM belongs to this process image only.
+    try:
+        with open("/proc/self/status") as status:
+            for line in status:
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1]) / 1024
+    except OSError:
+        pass
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / (1024 * 1024 if sys.platform == "darwin" else 1024)
 print(json.dumps({"import_s": import_s, "times": times, "summary_bytes": len(dumps_record(record)),
-                  "peak_rss_mb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024}))
+                  "peak_rss_mb": peak_rss_mb()}))
 """
 
 
