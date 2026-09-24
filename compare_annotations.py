@@ -45,7 +45,7 @@ import matplotlib.ticker as ticker
 import wfdb
 
 from demo_feature_extraction import generate_report
-from ecgfeat.api import ECGFeatureExtractor
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 from ecgfeat.delineate import (
     _apply_multilead_consensus,
     _beat_quality,
@@ -61,9 +61,9 @@ from ecgfeat.features import (
     compute_global_features,
     compute_group_features,
 )
-from ecgfeat.export import build_morphology_inputs, to_dict
+from ecgfeat.compat.export_v0 import build_morphology_inputs, to_dict
 from ecgfeat.grouping import build_beat_annotations
-from ecgfeat.interpret import interpret
+from ecginterpret.interpret import interpret
 from ecgfeat.models import (
     ECGFeatures,
     GlobalFeatures,

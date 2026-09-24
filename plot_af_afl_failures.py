@@ -49,7 +49,7 @@ def expert_labels(ecg_id: int) -> str:
 
 def analyse(ecg_id: int):
     import wfdb
-    from ecgfeat.api import ECGFeatureExtractor
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 
     rec = wfdb.rdrecord(str(rpath(ecg_id)))
     fs = int(round(float(rec.fs)))

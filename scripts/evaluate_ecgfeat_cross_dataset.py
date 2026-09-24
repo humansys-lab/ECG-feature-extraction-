@@ -142,7 +142,7 @@ def pipeline_events(features, first_slot):
 
 def evaluate(task):
     activate_source(task["source"])
-    from ecgfeat.api import ECGFeatureExtractor
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
     from ecgfeat.refinement import RefinementConfig
     from ecgfeat.validation import validate_ecg_input
     from ecgfeat.preprocess import resample_ecg, analysis_signal, lowpass_filter

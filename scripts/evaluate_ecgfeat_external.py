@@ -235,7 +235,7 @@ def result_events(features, dataset):
 def evaluate_task(payload):
     dataset, spec, variant, checkpoint, fingerprint = payload
     start = time.perf_counter()
-    from ecgfeat.api import ECGFeatureExtractor
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
     record = wfdb.rdrecord(spec["path"])
     fs, length = float(record.fs), record.sig_len
     gt, excluded = load_annotations(dataset, spec, fs, length)

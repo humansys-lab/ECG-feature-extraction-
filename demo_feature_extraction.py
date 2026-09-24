@@ -31,8 +31,8 @@ FEATURE_EXTRACTION_ROOT = PROJECT_ROOT / "feature_extraction"
 if str(FEATURE_EXTRACTION_ROOT) not in sys.path:
     sys.path.insert(0, str(FEATURE_EXTRACTION_ROOT))
 
-from ecgfeat.api import ECGFeatureExtractor
-from ecgfeat.export import clinical_fingerprint, prepare_json_export, to_dict
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor
+from ecgfeat.compat.export_v0 import clinical_fingerprint, prepare_json_export, to_dict
 from ecgfeat.io import load_wfdb_mat as load_ecg
 from ecgfeat.io import parse_wfdb_header as parse_hea
 from ecgfeat.models import PatientMeta, STANDARD_12_LEADS

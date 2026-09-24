@@ -1,4 +1,15 @@
-"""Public facade with lazy imports; record-only use needs no numerical engine."""
+"""ecgfeat: versioned ECG Record extraction and measurement (distribution ``ecg-records``).
+
+Research and engineering software; not a medical device.  The supported
+surface is ``__all__``: the ``ecg_*`` functions, the ECG Record read/query
+API, configuration types and the error hierarchy.  Imports are lazy, so
+record-only use loads no numerical engine, plotting or interpretation code.
+
+Legacy names (``ECGFeatureExtractor``, ``to_dict``, ``interpret``, ``plot_*``,
+WFDB helpers and the legacy result dataclasses) remain importable for the
+compatibility window: legacy *functions* warn on use, and the exact legacy
+contract is available without warnings from ``ecgfeat.compat``.
+"""
 
 from importlib import import_module
 
@@ -8,28 +19,20 @@ _install_interpretation_aliases()
 
 _EXPORTS = {
     "ECGFeatureExtractor": (".api", "ECGFeatureExtractor"),
-    "to_dict": (".export", "to_dict"),
-    "load_wfdb_mat": (".io", "load_wfdb_mat"),
-    "parse_wfdb_header": (".io", "parse_wfdb_header"),
-    "interpret": (".interpret", "interpret"),
-    "plot_beat": (".visualize", "plot_beat"),
-    "plot_beat_all_leads": (".visualize", "plot_beat_all_leads"),
-    "plot_rep_beat": (".visualize", "plot_rep_beat"),
-    "plot_quality_summary": (".visualize", "plot_quality_summary"),
-    "ECGFeatures": (".models", "ECGFeatures"),
-    "ECGInterpretation": (".models", "ECGInterpretation"),
-    "GlobalFeatures": (".models", "GlobalFeatures"),
-    "GroupFeatures": (".models", "GroupFeatures"),
-    "LeadBeatFeatures": (".models", "LeadBeatFeatures"),
-    "LeadQuality": (".models", "LeadQuality"),
-    "PWaveBeatAssessment": (".models", "PWaveBeatAssessment"),
-    "PWaveLeadBoundary": (".models", "PWaveLeadBoundary"),
+    "ECGFeatures": (".compat.models_v0", "ECGFeatures"),
+    "ECGInterpretation": (".compat.models_v0", "ECGInterpretation"),
+    "GlobalFeatures": (".compat.models_v0", "GlobalFeatures"),
+    "GroupFeatures": (".compat.models_v0", "GroupFeatures"),
+    "LeadBeatFeatures": (".compat.models_v0", "LeadBeatFeatures"),
+    "LeadQuality": (".compat.models_v0", "LeadQuality"),
+    "PWaveBeatAssessment": (".compat.models_v0", "PWaveBeatAssessment"),
+    "PWaveLeadBoundary": (".compat.models_v0", "PWaveLeadBoundary"),
     "PatientMeta": (".models", "PatientMeta"),
-    "QRSDetectorResult": (".models", "QRSDetectorResult"),
-    "QRSCandidateWindow": (".models", "QRSCandidateWindow"),
-    "RepresentativeLeadFeatures": (".models", "RepresentativeLeadFeatures"),
-    "STANDARD_12_LEADS": (".models", "STANDARD_12_LEADS"),
-    "WaveBounds": (".models", "WaveBounds"),
+    "QRSDetectorResult": (".compat.models_v0", "QRSDetectorResult"),
+    "QRSCandidateWindow": (".compat.models_v0", "QRSCandidateWindow"),
+    "RepresentativeLeadFeatures": (".compat.models_v0", "RepresentativeLeadFeatures"),
+    "STANDARD_12_LEADS": (".config", "STANDARD_12_LEADS"),
+    "WaveBounds": (".compat.models_v0", "WaveBounds"),
     "PWaveConfig": ("._engine.atrial.p_wave", "PWaveConfig"),
     "ECGInputError": (".errors", "ECGInputError"),
     "RefinementConfig": (".refinement", "RefinementConfig"),
@@ -113,19 +116,36 @@ _EXPORTS = {
     "RecordValidationError": (".errors", "RecordValidationError"),
     "SamplingRateError": (".errors", "SamplingRateError"),
     "SignalShapeError": (".errors", "SignalShapeError"),
+    "ECGWarning": (".errors", "ECGWarning"),
+    "ECGCompatibilityWarning": (".errors", "ECGCompatibilityWarning"),
+    "ECGDeprecationWarning": (".errors", "ECGDeprecationWarning"),
 }
 
-__all__ = list(_EXPORTS)
+#: Supported public surface (document 03, "Typing and public-surface policy").
+PUBLIC_API = ('ecg_record', 'ecg_prepare', 'ecg_measure', 'ecg_emit', 'ecg_dump', 'load_record', 'validate_record', 'record_to_dict', 'parse_address', 'resolve_address', 'query_measurement', 'query_many', 'select_measurements', 'dump_measurements', 'iter_leads', 'iter_beats', 'ECGRecord', 'ECGInput', 'ECGMeasurements', 'RecordAddress', 'AddressResolution', 'MeasurementQuery', 'MeasurementResult', 'MeasurementSelection', 'NullAbsence', 'UnmeasurableAbsence', 'NotApplicableAbsence', 'MeasurementProvenance', 'ValidationStatus', 'ECGConfig', 'RefinementConfig', 'PWaveConfig', 'PatientMeta', 'STANDARD_12_LEADS', 'ECGInputError', 'SignalShapeError', 'LeadNameError', 'SamplingRateError', 'AmplitudeUnitError', 'ConfigurationError', 'RecordValidationError', 'RecordIdentityError', 'AddressSyntaxError', 'AddressNotFoundError', 'MeasurementNotFoundError', 'MeasurementSelectorError', 'ComputationInvariantError', 'ECGWarning', 'ECGCompatibilityWarning', 'ECGDeprecationWarning', 'ECGRecordExtractor', 'dumps_record', 'loads_record', 'serialize_record', 'materialize_record', 'SidecarError')
+#: Deprecated legacy names kept for the compatibility window (removal no earlier than 0.3.0).
+LEGACY_API = ('ECGFeatureExtractor', 'to_dict', 'interpret', 'load_wfdb_mat', 'parse_wfdb_header', 'plot_beat', 'plot_beat_all_leads', 'plot_rep_beat', 'plot_quality_summary', 'ECGFeatures', 'ECGInterpretation', 'GlobalFeatures', 'GroupFeatures', 'LeadBeatFeatures', 'LeadQuality', 'PWaveBeatAssessment', 'PWaveLeadBoundary', 'QRSDetectorResult', 'QRSCandidateWindow', 'RepresentativeLeadFeatures', 'WaveBounds')
+
+__all__ = list(PUBLIC_API) + list(LEGACY_API)
+__version__ = "0.1.0"
 
 
 def __getattr__(name: str):
-    try:
-        module_name, symbol = _EXPORTS[name]
-    except KeyError:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
-    value = getattr(import_module(module_name, __name__), symbol)
+    if name in _LEGACY_FUNCTION_NAMES:
+        from ._deprecated import LEGACY_FUNCTIONS
+
+        value = LEGACY_FUNCTIONS[name]
+    else:
+        try:
+            module_name, symbol = _EXPORTS[name]
+        except KeyError:
+            raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+        value = getattr(import_module(module_name, __name__), symbol)
     globals()[name] = value
     return value
+
+
+_LEGACY_FUNCTION_NAMES = frozenset(('to_dict', 'interpret', 'load_wfdb_mat', 'parse_wfdb_header', 'plot_beat', 'plot_beat_all_leads', 'plot_rep_beat', 'plot_quality_summary'))
 
 
 def __dir__():

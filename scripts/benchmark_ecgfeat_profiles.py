@@ -12,7 +12,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from scripts.evaluate_ecgfeat_external import adapt_signal
 from scripts.evaluate_ecgfeat_candidates import variant_options
-from ecgfeat import ECGFeatureExtractor
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 import wfdb
 
 

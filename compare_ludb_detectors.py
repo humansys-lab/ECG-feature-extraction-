@@ -323,7 +323,7 @@ def detect_ecgfeat(
         )
 
     _ensure_feature_extraction_path()
-    from ecgfeat.api import ECGFeatureExtractor
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 
     started = time.perf_counter()
     features = ECGFeatureExtractor(

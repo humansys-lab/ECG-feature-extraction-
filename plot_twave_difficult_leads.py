@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from compare_annotations import get_gt_for_lead, load_record
-from feature_extraction.ecgfeat.api import ECGFeatureExtractor
+from feature_extraction.ecgfeat.compat.api_v0 import ECGFeatureExtractor
 from feature_extraction.ecgfeat.models import LeadBeatFeatures, STANDARD_12_LEADS
 from feature_extraction.ecgfeat.preprocess import analysis_signal, resample_ecg
 

@@ -28,7 +28,7 @@ PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT / "feature_extraction"))
 
 import wfdb
-from ecgfeat.api import ECGFeatureExtractor
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 from ecgfeat.models import STANDARD_12_LEADS
 
 # ── Constants ────────────────────────────────────────────────────────────────

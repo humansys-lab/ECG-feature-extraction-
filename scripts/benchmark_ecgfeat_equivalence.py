@@ -24,8 +24,9 @@ def child(args):
     import numpy as np
     import scipy
     import wfdb
-    from ecgfeat import ECGFeatureExtractor, RefinementConfig
-    from ecgfeat.export import to_dict, prepare_json_export
+    from ecgfeat import RefinementConfig
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
+    from ecgfeat.compat.export_v0 import to_dict, prepare_json_export
     import inspect
     signal, header = wfdb.rdsamp(str(ROOT / "data/lobachevsky-university-electrocardiography-database-1.0.1/data" / args.record))
     options = {} if args.variant == "default" else {"refinement": RefinementConfig(**{args.variant: True})}

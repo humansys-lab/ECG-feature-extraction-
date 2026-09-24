@@ -23,7 +23,7 @@ FEATURE_ROOT = PROJECT_ROOT / "feature_extraction"
 if str(FEATURE_ROOT) not in sys.path:
     sys.path.insert(0, str(FEATURE_ROOT))
 
-from ecgfeat.api import ECGFeatureExtractor
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 from ecgfeat.models import PatientMeta, STANDARD_12_LEADS
 from ecgfeat.preprocess import analysis_signal, resample_ecg
 from validate_dataset_st import _load_record

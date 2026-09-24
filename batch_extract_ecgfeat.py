@@ -62,8 +62,8 @@ def _ensure_feature_extraction_path() -> None:
 def _import_runtime_components():
     try:
         _ensure_feature_extraction_path()
-        from ecgfeat.api import ECGFeatureExtractor
-        from ecgfeat.export import prepare_json_export, to_dict
+        from ecgfeat.compat.api_v0 import ECGFeatureExtractor
+        from ecgfeat.compat.export_v0 import prepare_json_export, to_dict
         from ecgfeat.models import PatientMeta
         from demo_feature_extraction import generate_ecg_annotated_plot, generate_report
     except ModuleNotFoundError as exc:
