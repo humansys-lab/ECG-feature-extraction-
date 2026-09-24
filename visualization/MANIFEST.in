@@ -3,3 +3,4 @@ include LICENSE
 prune tests
 global-exclude *.py[cod]
 global-exclude __pycache__
+include NOTICE

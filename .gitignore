@@ -80,3 +80,4 @@ htmlcov/
 /benchmarks/_raw/
 /benchmarks/_*.log
 /build/
+/dist/

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75,<82", "wheel>=0.44,<1"]
+requires = ["setuptools>=77,<82", "wheel>=0.44,<1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "Versioned ECG Record extraction and measurement (research and engineering software; not a medical device)"
 readme = "README.package.md"
 requires-python = ">=3.10,<3.14"
-# TODO(release): license + authors + URLs pending maintainer decision
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+authors = [{ name = "humansys-lab" }]
+maintainers = [{ name = "humansys-lab" }]
 keywords = ["ecg", "electrocardiography", "signal-processing", "delineation", "physionet"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -25,6 +28,13 @@ dependencies = [
   "numpy>=1.26,<3",
   "scipy>=1.11,<2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/humansys-lab/ECG-feature-extraction-"
+Repository = "https://github.com/humansys-lab/ECG-feature-extraction-"
+Issues = "https://github.com/humansys-lab/ECG-feature-extraction-/issues"
+Documentation = "https://github.com/humansys-lab/ECG-feature-extraction-/tree/main/docs/site"
+Changelog = "https://github.com/humansys-lab/ECG-feature-extraction-/blob/main/feature_extraction/CHANGELOG.md"
 
 [project.scripts]
 ecg-record = "ecgfeat.cli:main"
