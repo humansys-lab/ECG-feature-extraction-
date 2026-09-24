@@ -7,7 +7,7 @@ name: test
 on:
   pull_request:
   push:
-    branches: [main, ecg-records]
+    branches: [main]
   workflow_dispatch:
 
 permissions:

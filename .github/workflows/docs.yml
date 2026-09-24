@@ -1,15 +1,13 @@
 # Build the documentation site and publish it to GitHub Pages.
-# One-time setup (repository admin):
-#   1. Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
-#   2. Settings -> Environments -> github-pages -> Deployment branches:
-#      allow the `ecg-records` branch (by default only the default branch may deploy).
-# The site is served at https://humansys-lab.github.io/ECG-feature-extraction-/
-# and is publicly readable even though the repository is private.
+# Repository setting (done): Settings -> Pages -> Build and deployment ->
+# Source: "GitHub Actions".  Deployments come from `main`, which the
+# github-pages environment allows.
+# The site is served at https://humansys-lab.github.io/ECG-feature-extraction-/.
 name: docs
 
 on:
   push:
-    branches: [ecg-records]
+    branches: [main]
     paths:
       - "docs/site/**"
       - "mkdocs.yml"

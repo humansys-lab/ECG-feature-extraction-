@@ -6,7 +6,7 @@ site_name: ecg-records
 site_url: https://humansys-lab.github.io/ECG-feature-extraction-/
 site_description: Versioned ECG Record extraction, measurement and plotting (research and engineering software; not a medical device)
 repo_url: https://github.com/humansys-lab/ECG-feature-extraction-
-edit_uri: blob/ecg-records/docs/site/
+edit_uri: blob/main/docs/site/
 docs_dir: docs/site
 site_dir: build/site
 markdown_extensions:

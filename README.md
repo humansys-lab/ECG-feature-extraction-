@@ -37,7 +37,7 @@ ecg-record measure ecg.npy --sampling-rate 500 \
 ## Documentation
 
 Online: **<https://humansys-lab.github.io/ECG-feature-extraction-/>**
-(published from this branch by `.github/workflows/docs.yml`).
+(published from `main` by `.github/workflows/docs.yml`).
 
 The sources live in [`docs/site/`](docs/site/index.md). Build locally with
 `mkdocs build` (output in `build/site/`) or preview with `mkdocs serve`:

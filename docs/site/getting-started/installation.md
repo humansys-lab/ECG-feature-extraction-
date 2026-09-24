@@ -57,7 +57,6 @@ Matplotlib until you use `ecgfeat.viz`.
 ```bash
 git clone https://github.com/humansys-lab/ECG-feature-extraction-.git
 cd ECG-feature-extraction-
-git switch ecg-records
 python -m pip install -e "./feature_extraction[viz]"
 ```
 
