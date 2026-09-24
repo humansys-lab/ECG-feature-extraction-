@@ -1,0 +1,67 @@
+# Build the documentation site and publish it to GitHub Pages.
+# One-time setup (repository admin):
+#   1. Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+#   2. Settings -> Environments -> github-pages -> Deployment branches:
+#      allow the `ecg-records` branch (by default only the default branch may deploy).
+# The site is served at https://humansys-lab.github.io/ECG-feature-extraction-/
+# and is publicly readable even though the repository is private.
+name: docs
+
+on:
+  push:
+    branches: [ecg-records]
+    paths:
+      - "docs/site/**"
+      - "mkdocs.yml"
+      - "feature_extraction/**"
+      - "schemas/**"
+      - "tools/build_docs.py"
+      - "tools/check_doc_examples.py"
+      - "tests/fixtures/golden/reference_10s_12lead/**"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install -r requirements-ci.txt "mkdocs>=1.6,<2"
+          python -m pip install -e ./feature_extraction --no-deps
+      - name: Reference pages match the package
+        run: python tools/build_docs.py --check
+      - name: Every Python example runs
+        run: python tools/check_doc_examples.py
+      - name: Build the site
+        run: mkdocs build --strict
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

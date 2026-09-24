@@ -79,6 +79,10 @@ The site lives in `docs/site/` and is built with MkDocs (`mkdocs.yml`).
   checker cannot provide is preceded by `<!-- doc-check: skip (...) -->`.
 - The full example record in `guide/record-format.md` is validated against the
   JSON Schema and the strict reader by `test_library_design_review.py`.
+- Preview locally with `mkdocs serve`. Every push to `ecg-records` that touches
+  the docs, the package or the schemas rebuilds the site with the same checks
+  and deploys it to GitHub Pages (`.github/workflows/docs.yml`), at
+  <https://humansys-lab.github.io/ECG-feature-extraction-/>.
 
 ## Style
 
