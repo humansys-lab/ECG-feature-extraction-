@@ -1,4 +1,4 @@
-# 08 — 实现状态、已通过门禁与剩余发布阻碍
+# 08 — 实现状态、已通过门禁与发布就绪状态
 
 更新日期：2026-09-24（上一版：2026-09-22 审查）。本文件记录**已运行并验证**的实现，
 与 00–07 的目标设计区分。它不是临床有效性声明：所有已发表字段在 schema 1.0.0 中
@@ -7,10 +7,11 @@
 ## 结论
 
 迁移 Phase 0–5 已完成并通过各自门禁；Phase 6（退役兼容层）按定义只能在两个
-minor 版本的兼容窗口之后进行，不属于首次发布。三个发行包均可构建、通过产物检查
-与干净环境安装测试。**首次发布唯一未满足的阻碍是需要维护者决定的事项**：
-许可证、PyPI/TestPyPI 可信发布配置（或凭证）、GitHub 仓库/CI 启用，以及
-Validation Owner 与项目元数据确认（见文末）。
+minor 版本的兼容窗口之后进行，不属于首次发布。维护者已于 2026-09-24 决定：
+**Apache-2.0** 许可证、作者/主页为 **humansys-lab**（`github.com/humansys-lab/ECG-feature-extraction-`）、
+**三个发行包一起发布**、**由维护者本人上传**。据此仓库已处于**可发布状态**：
+最终产物由干净检出的提交 `92f6bd2` 构建，全部产物检查（含 LICENSE）与
+`twine check --strict` 通过。上传步骤见仓库根目录 `RELEASING.md`；尚未上传任何包。
 
 | 发行包 | 导入名 | 版本 | 内容 |
 |---|---|---|---|
@@ -70,13 +71,13 @@ PTB-XL、BUT-PDB、NSTDB、GUDB；选择规则 `ecg-records-golden-v1` 只看记
 
 | 检查 | 结果 |
 |---|---|
-| 构建 3 个 sdist + 3 个 wheel | 成功；`twine check` 通过 |
-| `tools/check_artifacts.py` | 除 LICENSE 外全部通过（LICENSE 缺失 = 阻碍） |
+| 构建 3 个 sdist + 3 个 wheel（干净检出，提交 `92f6bd2`） | 成功；`twine check --strict` 通过 |
+| `tools/check_artifacts.py` | 全部通过（含 LICENSE/NOTICE、py.typed、schema、验证注册表、免责声明） |
 | Python 3.10 / NumPy 1.26.4 / SciPy 1.11.4 / Matplotlib 3.7.5，仅 wheel、无 Numba | 2,565 通过，23 跳过 |
 | Python 3.11 / NumPy 1.26.4 / SciPy 1.11.4 | 2,566 通过 |
 | Python 3.12 / NumPy 1.26.4 / SciPy 1.11.4 / Matplotlib 3.8.4 | 2,566 通过；冒烟通过 |
 | Python 3.12 / NumPy 2.2.6（开发环境） | 2,586 通过（含 interpretation/viz 测试） |
-| Python 3.13 / NumPy 2.5.3 / SciPy 1.18.1 | 通过（最终 wheel 复跑结果见提交记录） |
+| Python 3.13 / NumPy 2.5.3 / SciPy 1.18.1 | 2,565 通过，23 跳过 |
 | 由 sdist 重建的 wheel | 冒烟通过 |
 | 参考记录性能 | 首次 3.9 s、稳态中位 2.2 s、峰值 RSS 243 MB（预算 12 s / 6 s / 600 MB） |
 
@@ -95,17 +96,16 @@ PTB-XL、BUT-PDB、NSTDB、GUDB；选择规则 `ecg-records-golden-v1` 只看记
 - `ecginterpret.interpret_record` 需要原始信号（record 1.0 不含全部规则输入），先校验信号
   SHA-256 再用 record 自身配置重算。
 
-## 剩余发布阻碍（需维护者决定，不能由实现代替）
+## 发布阻碍的处理状态
 
-1. **许可证**：仓库无 LICENSE；文档 07 建议 Apache-2.0，但需确认代码来源（含 upstream
-   `humansys-lab`）与权利人同意。`tools/check_artifacts.py` 在缺失时拒绝发布。
-2. **发布通道**：PyPI/TestPyPI 可信发布需在 PyPI 为三个项目名配置 publisher，并在 GitHub
-   仓库创建受保护环境 `testpypi`/`pypi`；或维护者提供 API token（文档 07 不推荐）。
-   2026-09-23 复查：`ecg-records`、`ecginterpret`、`ecg-records-viz` 在 PyPI 与 TestPyPI
-   均返回 404（不代表保留）。
-3. **元数据**：作者/维护者、项目与文档 URL（pyproject 中标记为 TODO）。
-4. **Validation Owner**：`.github/CODEOWNERS` 暂填 `@adsyhub`，需确认。
-5. **CI 实际运行**：工作流需推送到 GitHub 后执行一次；自托管数据集 runner 需另行配置。
+1. **许可证**：已解决。Apache-2.0（维护者确认权利），LICENSE/NOTICE 位于仓库根目录与三个发行包，
+   元数据为 PEP 639 `License-Expression: Apache-2.0`。
+2. **元数据**：已解决。作者/维护者 `humansys-lab`，项目 URL 指向上游仓库（链接在代码合入该仓库
+   `main` 后生效）。
+3. **上传**：由维护者执行（`RELEASING.md` 方式 A：GitHub 可信发布；方式 B：本地 twine）。
+   2026-09-24 复查：三个项目名在 PyPI 与 TestPyPI 均返回 404（不代表保留）。
+4. **尚需确认（不阻塞上传）**：`.github/CODEOWNERS` 中的 Validation Owner 账号（暂为 `@adsyhub`）；
+   文档站点托管；CI 工作流在 GitHub 上的首次实际运行；自托管数据集 runner。
 
 ## 发布后（Phase 6）
 

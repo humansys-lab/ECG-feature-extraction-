@@ -59,6 +59,8 @@ def test_legacy_top_level_functions_warn_on_use_not_on_import(name):
             function()
         except TypeError:
             pass  # called without arguments; the warning precedes the call
+        except ImportError as exc:  # optional distribution (viz/interpret) not installed
+            assert "pip install" in str(exc)
 
 
 def test_legacy_extractor_spelling_warns_and_compat_is_silent():
