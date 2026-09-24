@@ -161,7 +161,7 @@ class EvidenceStore:
     @classmethod
     def from_features(cls, features: Any, record_id: str = "unknown") -> "EvidenceStore":
         """Build from an in-memory `ecgfeat.ECGFeatures` via its export contract."""
-        from ecgfeat.export import to_dict as features_to_dict
+        from ecgfeat.compat.export_v0 import to_dict as features_to_dict
 
         return cls.from_dict(features_to_dict(features), record_id=record_id)
 

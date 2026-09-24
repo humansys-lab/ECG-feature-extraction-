@@ -62,8 +62,8 @@ def main() -> int:
 
     import wfdb
 
-    from ecgfeat.api import ECGFeatureExtractor
-    from ecgfeat.export import prepare_json_export, to_dict
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
+    from ecgfeat.compat.export_v0 import prepare_json_export, to_dict
 
     record = _record_path(args.record)
     signal, fields = wfdb.rdsamp(str(record))

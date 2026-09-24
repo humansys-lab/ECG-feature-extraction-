@@ -10,22 +10,17 @@ from statistics import median, pstdev
 from types import SimpleNamespace
 from typing import Any, Callable
 
-from feature_extraction.ecgfeat.export import (
+from feature_extraction.ecgfeat.compat.export_v0 import (
     _PEDS_QRS_NORMAL_MS,
     _peds_lookup,
     _peds_qrs_width_class,
     _peds_qtc_limits,
 )
-from feature_extraction.ecgfeat.glasgow_rules.intervals import (
-    _pr_limits as _glasgow_pr_limits,
-)
-from feature_extraction.ecgfeat.glasgow_rules.models import GlasgowConfig
-from feature_extraction.ecgfeat.glasgow_rules.rate import (
-    bradycardia_limit,
-    tachycardia_limit,
-)
-from feature_extraction.ecgfeat.interpret import _peds_classify_qrs_axis
-from feature_extraction.ecgfeat.pediatric_rules import (
+from ecginterpret.glasgow_rules.intervals import _pr_limits as _glasgow_pr_limits
+from ecginterpret.glasgow_rules.models import GlasgowConfig
+from ecginterpret.glasgow_rules.rate import bradycardia_limit, tachycardia_limit
+from ecginterpret.interpret import _peds_classify_qrs_axis
+from ecginterpret.pediatric_rules import (
     build_pediatric_hypertrophy_evidence,
     pediatric_age_bin,
     pediatric_voltage_threshold,

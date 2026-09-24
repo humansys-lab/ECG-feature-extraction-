@@ -14,7 +14,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.evaluate_ecgfeat_external import windows, adapt_signal
-from ecgfeat.api import ECGFeatureExtractor
+from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 from ecgfeat.preprocess import resample_ecg, analysis_signal
 import wfdb
 

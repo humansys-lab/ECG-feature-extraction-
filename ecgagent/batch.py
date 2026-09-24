@@ -598,8 +598,8 @@ def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
     started = time.perf_counter()
     feature_path = _feature_path(output_dir, str(record["record"]))
     try:
-        from ecgfeat.api import ECGFeatureExtractor
-        from ecgfeat.export import prepare_json_export, to_dict
+        from ecgfeat.compat.api_v0 import ECGFeatureExtractor
+        from ecgfeat.compat.export_v0 import prepare_json_export, to_dict
         from ecgfeat.models import PatientMeta
         from .evidence.waveform_review import STANDARD_LEADS, build_waveform_review
 
@@ -629,12 +629,15 @@ def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
             raise RuntimeError("could not fingerprint the source WFDB record")
         payload[_EXTRACTION_PROVENANCE_KEY] = provenance
         _json_dump_atomic(feature_path, payload)
+        record_path, record_error = _write_ecg_record(output_dir, record, ecg, fs, fs_internal, features)
         return {
             "record": record["record"],
             "status": "ok",
             "runtime_seconds": time.perf_counter() - started,
             "feature_path": str(feature_path),
             "feature_bytes": feature_path.stat().st_size,
+            "record_path": record_path,
+            "record_error": record_error,
             "error": None,
         }
     except Exception as exc:
@@ -647,6 +650,37 @@ def _extract_one(task: tuple[dict[str, Any], str, int]) -> dict[str, Any]:
             "error": f"{type(exc).__name__}: {exc}",
             "traceback": traceback.format_exc(),
         }
+
+
+def _write_ecg_record(output_dir: Path, record: Mapping[str, Any], ecg: Any, fs: float, fs_internal: int,
+                      features: Any) -> tuple[str | None, str | None]:
+    """Write the versioned ECG Record built from the same engine result.
+
+    The diagnostic evidence still uses the legacy payload, so a record that
+    cannot be built is reported instead of failing the extraction.
+    """
+    from .evidence.record_boundary import record_path_for
+
+    target = record_path_for(output_dir, str(record["record"]))
+    try:
+        from ecgfeat import ECGConfig, ECGMeasurements, dumps_record, ecg_emit, ecg_prepare
+        from ecgfeat.config import config_provenance
+
+        from .evidence.waveform_review import STANDARD_LEADS
+
+        config = ECGConfig(fs_internal=fs_internal, mains_frequency_hz=50)
+        patient = {key: record[key] for key in ("age", "age_days", "sex") if record.get(key) is not None}
+        prepared = ecg_prepare(ecg, sampling_rate=fs, lead_names=STANDARD_LEADS, amplitude_unit="mV",
+                               patient=patient or None)
+        data = dumps_record(ecg_emit(ECGMeasurements(prepared, features, config, config_provenance(config)),
+                                     profile="all"))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix(".tmp")
+        temporary.write_bytes(data + b"\n")
+        temporary.replace(target)
+        return str(target), None
+    except Exception as exc:  # reported, never silently dropped
+        return None, f"{type(exc).__name__}: {exc}"
 
 
 def _valid_existing(path: Path, required_key: str) -> bool:

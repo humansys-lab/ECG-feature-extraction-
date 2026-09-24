@@ -174,36 +174,43 @@ def test_rollback_module_is_the_verbatim_pre_decomposition_api():
 # --------------------------------------------------------------------------- #
 
 def test_api_module_contains_no_orchestration():
+    # Phase 4: api.py is only the deprecated spelling; the legacy extractor
+    # lives in compat.api_v0 and delegates to the single routing point.
     source = Path(api.__file__).read_text()
     tree = ast.parse(source)
     top_level = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.ClassDef))]
     assert [n.name for n in top_level] == ["ECGFeatureExtractor"]
-    cls = top_level[0]
+    assert [n.name for n in top_level[0].body if isinstance(n, ast.FunctionDef)] == ["__init__"]
+    imported = {(n.module or "") for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
+    assert imported <= {"__future__", "typing", "warnings", "_moved", "compat.api_v0", "errors"}
+    assert len(source.splitlines()) < 60
+    from feature_extraction.ecgfeat.compat import api_v0
+
+    compat_tree = ast.parse(Path(api_v0.__file__).read_text())
+    cls = next(n for n in compat_tree.body if isinstance(n, ast.ClassDef) and n.name == "ECGFeatureExtractor")
     extract = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "extract")
     assert len(extract.body) <= 3
     calls = {n.func.id for n in ast.walk(extract) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
     assert calls == {"extract_legacy_features"}
-    imported = {
-        (n.module or "") for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)
-    }
-    assert imported <= {"__future__", "typing", "models", "refinement", "compat.api_v0"}
-    assert len(source.splitlines()) < 150
 
 
 def test_extractor_constructor_and_signature_are_unchanged():
     from feature_extraction.ecgfeat.compat import _api_v0_legacy_orchestration as rollback
-
-    assert inspect.signature(ECGFeatureExtractor.__init__) == inspect.signature(rollback.ECGFeatureExtractor.__init__)
-    assert inspect.signature(ECGFeatureExtractor.extract) == inspect.signature(rollback.ECGFeatureExtractor.extract)
-    new = ECGFeatureExtractor(fs_internal=500, mains_freq=60, input_mode="limited")
-    old = rollback.ECGFeatureExtractor(fs_internal=500, mains_freq=60, input_mode="limited")
-    assert vars(new) == vars(old)
-
-
-def test_compat_extractor_routes_through_the_same_class():
     from feature_extraction.ecgfeat.compat.api_v0 import ECGFeatureExtractor as CompatExtractor
 
-    assert issubclass(CompatExtractor, ECGFeatureExtractor)
+    for cls in (ECGFeatureExtractor, CompatExtractor):
+        assert inspect.signature(cls.__init__) == inspect.signature(rollback.ECGFeatureExtractor.__init__)
+        assert inspect.signature(cls.extract) == inspect.signature(rollback.ECGFeatureExtractor.extract)
+    with pytest.warns(FutureWarning):  # ECGDeprecationWarning is user-visible by design
+        new = ECGFeatureExtractor(fs_internal=500, mains_freq=60, input_mode="limited")
+    old = rollback.ECGFeatureExtractor(fs_internal=500, mains_freq=60, input_mode="limited")
+    assert vars(new) == vars(old) == vars(CompatExtractor(fs_internal=500, mains_freq=60, input_mode="limited"))
+
+
+def test_deprecated_spelling_is_the_compat_class():
+    from feature_extraction.ecgfeat.compat.api_v0 import ECGFeatureExtractor as CompatExtractor
+
+    assert issubclass(ECGFeatureExtractor, CompatExtractor)
 
 
 HELPER_DESTINATIONS = {

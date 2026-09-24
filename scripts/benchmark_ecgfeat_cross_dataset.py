@@ -27,7 +27,8 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     activate_source(args.source)
-    from ecgfeat import ECGFeatureExtractor, RefinementConfig
+    from ecgfeat import RefinementConfig
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
     from ecgfeat.validation import validate_ecg_input
     results, profiles = [], []
     for dataset in ('incartdb','svdb','pwave'):

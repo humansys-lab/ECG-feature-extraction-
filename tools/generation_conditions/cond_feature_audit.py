@@ -59,7 +59,7 @@ def rpath(i):
 def process(args):
     ecg_id, group = args
     import wfdb
-    from ecgfeat.api import ECGFeatureExtractor
+    from ecgfeat.compat.api_v0 import ECGFeatureExtractor
 
     try:
         rec = wfdb.rdrecord(str(rpath(ecg_id)))

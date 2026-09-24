@@ -350,8 +350,8 @@ def test_batch_loader_checks_and_normalizes_physical_units(monkeypatch):
 
 def test_batch_extraction_attaches_review_to_export_without_changing_extractor_config(tmp_path, monkeypatch):
     from ecgagent import batch
-    import ecgfeat.api
-    import ecgfeat.export
+    import ecgfeat.compat.api_v0
+    import ecgfeat.compat.export_v0
 
     raw, features = _synthetic()
     options = {}
@@ -363,8 +363,9 @@ def test_batch_extraction_attaches_review_to_export_without_changing_extractor_c
         def extract(self, *args, **kwargs):
             return features
 
-    monkeypatch.setattr(ecgfeat.api, "ECGFeatureExtractor", Extractor)
-    monkeypatch.setattr(ecgfeat.export, "to_dict", lambda f: copy.deepcopy(f))
+    # ecgagent reads the legacy object through the explicit compatibility contract.
+    monkeypatch.setattr(ecgfeat.compat.api_v0, "ECGFeatureExtractor", Extractor)
+    monkeypatch.setattr(ecgfeat.compat.export_v0, "to_dict", lambda f: copy.deepcopy(f))
     monkeypatch.setattr(batch, "_load_wfdb_record", lambda path: (np.repeat(raw, 12, axis=0), 500.))
     monkeypatch.setattr(batch, "_extraction_provenance", lambda *args: {"schema_version": "test"})
     result = batch._extract_one(({"record": "test", "record_path": "unused"}, str(tmp_path), 500))
