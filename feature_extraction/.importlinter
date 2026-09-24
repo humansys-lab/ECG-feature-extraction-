@@ -16,6 +16,7 @@ forbidden_modules =
     ecgfeat.export
     ecgfeat.compat
     ecgfeat.visualize
+    ecgfeat.viz
     ecgfeat.interpret
     ecgfeat.statement_engine
     ecgfeat.rhythm_rules
@@ -38,6 +39,7 @@ forbidden_modules =
     ecgfeat.api
     ecgfeat.export
     ecgfeat.visualize
+    ecgfeat.viz
     ecgfeat.interpret
     ecgfeat.statement_engine
     ecgfeat.rhythm_rules

@@ -17,7 +17,7 @@ dependencies = [
 ecg-record = "ecgfeat.cli:main"
 
 [project.optional-dependencies]
-viz = ["matplotlib>=3.7,<4"]
+viz = ["ecg-records-viz>=0.1,<1"]
 performance = ["numba>=0.59,<0.67"]
 wfdb = ["wfdb>=4.1,<5"]
 dev = [
