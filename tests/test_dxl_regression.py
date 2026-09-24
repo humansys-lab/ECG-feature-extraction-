@@ -67,6 +67,8 @@ def _real_wfdb_module():
     return module
 
 
+@unittest.skipUnless((LUDB_DIR / "104.hea").exists(),
+                     f"LUDB not available at {LUDB_DIR} (dataset runner only)")
 class DxlRegressionTest(unittest.TestCase):
     def test_high_risk_ludb_records_stay_within_interval_gates(self) -> None:
         records = ["13", "74", "75", "95"]

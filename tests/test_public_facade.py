@@ -75,6 +75,7 @@ def test_legacy_extractor_spelling_warns_and_compat_is_silent():
 
 
 def test_legacy_export_spelling_warns_on_use_and_matches_compat():
+    pytest.importorskip("ecginterpret")  # the legacy payload embeds the interpretation (interpret extra)
     from ecgfeat import export as legacy_export
     from ecgfeat.compat import export_v0
 
