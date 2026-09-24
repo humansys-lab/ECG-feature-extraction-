@@ -29,8 +29,10 @@ def _caller_stacklevel() -> int:
         filename = frame.f_code.co_filename
         internal = "importlib" in filename and "_bootstrap" in filename
         if not internal:
-            if frame.f_globals.get("alias_module") is not alias_module and not filename.endswith(
-                    ("importlib/__init__.py", "importlib\\__init__.py")):
+            shim = (frame.f_globals.get("alias_module") is alias_module
+                    or frame.f_globals.get("__name__") == "feature_extraction"  # repository alias loader
+                    or filename.endswith(("importlib/__init__.py", "importlib\\__init__.py")))
+            if not shim:
                 return level
             level += 1
         frame = frame.f_back
