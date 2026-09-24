@@ -58,6 +58,12 @@ def test_invalid_detection_leads_fail_explicitly(leads):
         detect_qrs_multilead_with_meta(np.zeros((12, 500)), 500, leads)
 
 
+# These simulate NumPy 1.x by hiding np.trapezoid; that needs np.trapz, which
+# NumPy >= 2.4 removed.  The real NumPy 1.26 path runs in the CI matrix cell.
+_needs_trapz = pytest.mark.skipif(not hasattr(np, "trapz"), reason="np.trapz removed in this NumPy release")
+
+
+@_needs_trapz
 def test_st_area_works_without_numpy_2_api(monkeypatch):
     signal = _st_signal()
     kwargs = dict(fs=500, r_index=400, qrs_onset=380, qrs_offset=450,
@@ -70,6 +76,7 @@ def test_st_area_works_without_numpy_2_api(monkeypatch):
     assert actual.j_mv == 0.18
 
 
+@_needs_trapz
 def test_t_wave_integral_works_without_numpy_2_api(monkeypatch):
     monkeypatch.delattr(np, "trapezoid", raising=False)
     assert _trapz(np.asarray([0.0, 1.0, 0.0])) == 1.0

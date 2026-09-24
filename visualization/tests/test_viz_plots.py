@@ -29,6 +29,18 @@ FS = 500.0
 # -- helpers -------------------------------------------------------------------
 
 
+
+def _suptitle(fig):
+    """Figure.get_suptitle() exists from Matplotlib 3.8; the package supports 3.7."""
+    if hasattr(fig, "get_suptitle"):
+        return fig.get_suptitle()
+    return fig._suptitle.get_text() if getattr(fig, "_suptitle", None) is not None else ""
+
+
+def _labels_bottom(ax):
+    """Whether bottom tick labels are shown (portable across Matplotlib 3.7+)."""
+    return any(tick.label1.get_visible() for tick in ax.xaxis.get_major_ticks())
+
 def fiducial_artists(ax: Axes) -> dict:
     tag = PREFIX + "fiducial:"
     found = {}
@@ -270,7 +282,7 @@ def test_plot_beat_all_leads_uses_the_standard_column_layout(signal, record, doc
         spec = ax.get_subplotspec()
         assert (spec.rowspan.start, spec.colspan.start) == (position % 3, position // 3)
         assert set(fiducial_artists(ax)) == set(beat_cells(document, 5, leads[position]))
-    assert fig.get_suptitle().startswith("Beat 5 (b0006)")
+    assert _suptitle(fig).startswith("Beat 5 (b0006)")
     limits = {ax.get_xlim() for ax in axes}
     assert len(limits) == 1  # one shared time axis
 
@@ -280,7 +292,7 @@ def test_plot_beat_all_leads_subset_removes_unused_cells(signal, record):
     assert [ax.get_title(loc="left") for ax in axes] == ["V1", "V2", "V3", "V4"]
     assert len(fig.axes) == 4
     # V3 ends column one and V4 is alone in column two: both show their time ticks.
-    assert axes[2].xaxis.get_tick_params()["labelbottom"] and axes[3].xaxis.get_tick_params()["labelbottom"]
+    assert _labels_bottom(axes[2]) and _labels_bottom(axes[3])
 
 
 def test_plot_representative_beat_is_the_median_of_r_aligned_beats(signal, record, document):
@@ -366,7 +378,7 @@ def test_supplied_figure_receives_the_axes(signal, record, name):
     assert result[0] is figure
     first = returned_axes(result)
     assert first and all(ax.figure is figure for ax in first) and set(figure.axes) == set(first)
-    assert figure.get_suptitle() == "" and figure.legends == []
+    assert _suptitle(figure) == "" and figure.legends == []
     again = CALLS[name](signal, record, figure=figure)
     assert again[0] is figure
     assert len(figure.axes) == 2 * len(first)

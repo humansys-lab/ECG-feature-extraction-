@@ -3,6 +3,8 @@ from __future__ import annotations
 from math import atan2, degrees
 
 import numpy as np
+
+_trapezoid = getattr(np, "trapezoid", None) or np.trapz  # NumPy 1.26 has only trapz
 import pytest
 
 from feature_extraction.ecgfeat.glasgow_measurements import measure_glasgow_profile
@@ -82,7 +84,7 @@ def test_profile_onsets_are_elapsed_ms_from_beat_window_start() -> None:
 
 def test_profile_qrs_area_has_explicit_uv_ms_and_matrix_scale() -> None:
     sig = _synthetic_signal()
-    expected = np.trapezoid(
+    expected = _trapezoid(
         np.abs(sig[200:251] - sig[200]),
         dx=1000.0 / 500.0,
     ) * 1000.0
@@ -94,7 +96,7 @@ def test_profile_qrs_area_has_explicit_uv_ms_and_matrix_scale() -> None:
 
 def test_profile_preserves_signed_qrs_area_for_polarity_rules() -> None:
     sig = _synthetic_signal()
-    expected = np.trapezoid(
+    expected = _trapezoid(
         sig[200:251] - sig[200],
         dx=1000.0 / 500.0,
     ) * 1000.0

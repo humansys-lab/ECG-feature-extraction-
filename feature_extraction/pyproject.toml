@@ -5,12 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ecg-records"
 version = "0.1.0"
-description = "Research and engineering ECG measurements; not a medical device"
-readme = "README.md"
+description = "Versioned ECG Record extraction and measurement (research and engineering software; not a medical device)"
+readme = "README.package.md"
 requires-python = ">=3.10,<3.14"
+# TODO(release): license + authors + URLs pending maintainer decision
+keywords = ["ecg", "electrocardiography", "signal-processing", "delineation", "physionet"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Medical Science Apps.",
+  "Typing :: Typed",
+]
 dependencies = [
-    "numpy>=1.26,<3",
-    "scipy>=1.11,<2",
+  "numpy>=1.26,<3",
+  "scipy>=1.11,<2",
 ]
 
 [project.scripts]
@@ -22,10 +35,12 @@ interpret = ["ecginterpret>=0.1,<1"]
 performance = ["numba>=0.59,<0.67"]
 wfdb = ["wfdb>=4.1,<5"]
 dev = [
-    "hypothesis>=6.100,<7",
-    "jsonschema>=4.22,<5",
-    "pytest>=8,<9",
-    "ruff>=0.6,<1",
+  "build>=1.2,<2",
+  "hypothesis>=6.100,<7",
+  "import-linter>=2,<3",
+  "jsonschema>=4.22,<5",
+  "pytest>=8,<10",
+  "twine>=5,<7",
 ]
 
 [tool.setuptools.packages.find]
@@ -34,7 +49,3 @@ include = ["ecgfeat*"]
 
 [tool.setuptools.package-data]
 ecgfeat = ["py.typed", "schemas/**/*.json"]
-
-[tool.pytest.ini_options]
-testpaths = ["../tests"]
-addopts = "-ra"

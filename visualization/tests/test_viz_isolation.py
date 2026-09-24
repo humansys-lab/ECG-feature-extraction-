@@ -110,7 +110,9 @@ def test_ecgfeat_viz_without_the_extra_explains_how_to_install(missing):
 
 def test_legacy_alias_warning_is_attributed_to_the_importer():
     result = run_python("import warnings; warnings.simplefilter('always'); import ecgfeat.visualize")
-    assert result.stderr.startswith("<string>:1: DeprecationWarning: ecgfeat.visualize is deprecated"), result.stderr
+    # Other libraries may print their own deprecations (e.g. pyparsing under Matplotlib 3.7).
+    ours = [line for line in result.stderr.splitlines() if "ecgfeat.visualize is deprecated" in line]
+    assert ours and ours[0].startswith("<string>:1: DeprecationWarning: ecgfeat.visualize is deprecated"), result.stderr
     assert "ecgrecords_viz.legacy" in result.stderr
     assert "no earlier than ecg-records 0.3.0" in result.stderr
 
