@@ -61,6 +61,7 @@ def _unescape(token: str) -> str:
 
 
 def parse_address(value: str) -> RecordAddress:
+    """Parse and validate one canonical ``ecg-record:<record_id>@<schema_version>#<pointer>`` address."""
     if not isinstance(value, str) or not value.startswith("ecg-record:"):
         raise AddressSyntaxError("address must start with 'ecg-record:'", code="invalid_record_address")
     body = value[len("ecg-record:"):]
@@ -118,6 +119,7 @@ def has_pointer(record: ECGRecord, pointer: str) -> bool:
 
 
 def resolve_address(record: ECGRecord, address: str | RecordAddress) -> AddressResolution:
+    """Resolve a canonical address against a loaded record after identity and version checks."""
     parsed = parse_address(address) if isinstance(address, str) else address
     if parsed.record_id != record.record_id or parsed.schema_version != record.schema_version:
         raise RecordIdentityError("address does not match the supplied record", code="record_identity_mismatch")
@@ -247,6 +249,7 @@ def _sparse_absence(field: Mapping[str, Any], coordinate: str) -> UnmeasurableAb
 
 
 def query_measurement(record: ECGRecord, name: str, *, lead: str | None = None, beat: int | None = None) -> MeasurementResult:
+    """Return one measurement cell with unit, absence state, provenance and validation status."""
     pointer, field = _field_location(record, name)
     axes = tuple(str(axis) for axis in field.get("axes", []))
     lead_index, beat_index = _axis_index(record, lead, beat, axes)
@@ -313,6 +316,7 @@ def query_measurement(record: ECGRecord, name: str, *, lead: str | None = None, 
 
 
 def query_many(record: ECGRecord, queries: Sequence[MeasurementQuery]) -> tuple[MeasurementResult, ...]:
+    """Evaluate measurement queries in input order."""
     return tuple(query_measurement(record, item.name, lead=item.lead, beat=item.beat) for item in queries)
 
 
@@ -324,6 +328,7 @@ class MeasurementSelection:
 
 
 def select_measurements(record: ECGRecord, queries: Sequence[MeasurementQuery]) -> MeasurementSelection:
+    """Create an immutable selection of measurement results for export."""
     return MeasurementSelection(record.record_id, record.schema_version, query_many(record, queries))
 
 
@@ -344,11 +349,13 @@ class BeatView:
 
 
 def iter_leads(record: ECGRecord) -> Iterator[LeadView]:
+    """Iterate named leads in the record's declared lead order."""
     for index, name in enumerate(record.as_dict().get("axes", {}).get("leads", [])):
         yield LeadView(str(name), index, record)
 
 
 def iter_beats(record: ECGRecord, *, lead: str | None = None) -> Iterator[BeatView]:
+    """Iterate beats (globally or for one lead) using stable beat indices."""
     document = record.as_dict()
     leads = list(document.get("axes", {}).get("leads", []))
     if lead is not None and lead not in leads:
@@ -361,6 +368,7 @@ def iter_beats(record: ECGRecord, *, lead: str | None = None) -> Iterator[BeatVi
 
 
 def dump_measurements(selection: MeasurementSelection, destination: str | Path | Any, *, format: Literal["json", "jsonl"] = "json") -> None:
+    """Serialize a measurement selection as JSON or JSON Lines, keeping units, absence and provenance."""
     if format not in {"json", "jsonl"}:
         raise ValueError("format must be 'json' or 'jsonl'")
     objects = [

@@ -1,0 +1,10 @@
+# Validation Owner (docs/library_design/06_testing_and_validation.md): approves
+# changes to validation tiers, evidence manifests and benchmark/golden baselines.
+# TODO(release): confirm the maintainer handle(s) before the first release.
+/schemas/ecg-record/                                  @adsyhub
+/feature_extraction/ecgfeat/schemas/                  @adsyhub
+/benchmarks/evidence/                                 @adsyhub
+/benchmarks/baselines/                                @adsyhub
+/benchmarks/golden/manifest.*.json                    @adsyhub
+/benchmarks/golden/baselines/                         @adsyhub
+/tests/fixtures/golden/                               @adsyhub

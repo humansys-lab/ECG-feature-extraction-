@@ -153,6 +153,7 @@ def ecg_prepare(
     patient: Any = None,
     input_mode: str = "standard_12",
 ) -> ECGInput:
+    """Validate and normalize signal, channel, unit and patient metadata into an immutable input."""
     array, fs, names, unit = _validate_prepare(ecg, sampling_rate, lead_names, amplitude_unit, input_mode)
     return ECGInput(array, fs, names, unit, _patient_meta(patient), input_mode)
 
@@ -282,6 +283,7 @@ def run_legacy_pipeline(
 
 
 def ecg_measure(prepared: ECGInput, *, method: str = "default", config: ECGConfig | None = None) -> ECGMeasurements:
+    """Run the measurement pipeline and return measurements plus provenance before profile projection."""
     if not isinstance(prepared, ECGInput):
         raise ConfigurationError("prepared must be an ECGInput from ecg_prepare")
     if method not in {"default", "legacy_dxl_inspired"}:
@@ -316,6 +318,7 @@ def _staged_legacy_features(settings: Any, prepared: ECGInput) -> Any:
 
 
 def ecg_emit(measurements: ECGMeasurements, *, profile: str = "summary") -> ECGRecord:
+    """Assemble and validate a versioned ECG Record for ``profile`` from measured quantities."""
     if profile == "measurement":
         profile = "all"
     if profile not in {"summary", "all", "debug"}:
@@ -342,6 +345,11 @@ def ecg_record(
     input_mode: str | None = None,
     record_id: str | None = None,
 ) -> ECGRecord:
+    """Measure an ECG and return one validated, versioned ECG Record.
+
+    ``ecg`` is channel-major ``(n_leads, n_samples)`` with one explicit name per row;
+    ``input_mode="limited"`` accepts 1-8 named channels. ``profile`` selects
+    ``summary`` (default), ``all`` or ``debug``."""
     if config is None:
         configured_mode = "standard_12"
     elif hasattr(config, "input_mode"):
@@ -387,6 +395,7 @@ class ECGRecordExtractor:
 
 
 def ecg_dump(record: ECGRecord, destination: Any, *, indent: int | None = None) -> None:
+    """Serialize an ECG Record as UTF-8 JSON without changing its content (compact unless ``indent``)."""
     payload = record.as_dict()
     data = json.dumps(payload, sort_keys=True, separators=(",", ":") if indent is None else None, indent=indent, ensure_ascii=False, allow_nan=False)
     if hasattr(destination, "write"):

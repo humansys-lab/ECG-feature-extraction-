@@ -79,3 +79,4 @@ htmlcov/
 /benchmarks/_reports/
 /benchmarks/_raw/
 /benchmarks/_*.log
+/build/

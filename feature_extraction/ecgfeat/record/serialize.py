@@ -121,6 +121,7 @@ def record_to_dict(record: ECGRecord) -> dict[str, Any]:
 
 
 def validate_record(record: ECGRecord | Mapping[str, Any], *, level: Literal["strict", "schema"] = "strict") -> ECGRecord:
+    """Validate a record (``strict`` adds cross-field checks) and return it as an ECGRecord."""
     if level not in {"strict", "schema"}:
         raise ValueError("validation level must be 'strict' or 'schema'")
     value = record if isinstance(record, ECGRecord) else record_from_document(record)
@@ -202,6 +203,7 @@ def materialize_record(record: ECGRecord) -> ECGRecord:
 
 
 def dumps_record(record: ECGRecord, *, profile: RecordProfile | None = None, indent: int | None = None) -> bytes:
+    """Canonical UTF-8 JSON bytes of a record: sorted keys, no NaN, compact unless ``indent``."""
     obj = to_json_obj(record, profile=profile)
     return json.dumps(
         obj,
@@ -223,6 +225,7 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def loads_record(data: bytes | str, *, validate: Literal["strict", "schema", "none"] = "strict") -> ECGRecord:
+    """Parse ECG Record JSON (duplicate members rejected) and validate at ``validate`` level."""
     try:
         value = json.loads(data.decode("utf-8") if isinstance(data, bytes) else data, object_pairs_hook=_unique_object)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:

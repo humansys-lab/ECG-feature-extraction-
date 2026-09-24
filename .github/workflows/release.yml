@@ -1,0 +1,136 @@
+# Release pipeline (docs/library_design/07_packaging_and_release.md, "Release process").
+# Build once, inspect, smoke-test clean installs, rehearse on TestPyPI, then a
+# maintainer approves promotion of the SAME artifact bytes to PyPI (protected
+# `pypi` environment).  Publishing uses PyPI trusted publishing (OIDC); no API
+# tokens.  Requires a committed LICENSE (tools/check_artifacts.py enforces it).
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version being released (must match all three pyproject files)
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install "build>=1.2,<2" "twine>=5,<7"
+      - name: Versions and changelogs agree
+        run: |
+          grep -q "^version = \"${{ inputs.version }}\"" feature_extraction/pyproject.toml
+          python tools/check_changelog.py
+      - name: Build sdists and wheels
+        run: for d in feature_extraction interpretation visualization; do python -m build --outdir dist "$d"; done
+      - name: Inspect artifacts
+        run: |
+          python tools/check_artifacts.py dist
+          twine check --strict dist/*
+          sha256sum dist/* | tee dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {python: "3.10", pins: "numpy==1.26.* scipy==1.11.* matplotlib==3.7.*"}
+          - {python: "3.13", pins: ""}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Clean install from the candidate wheels
+        run: python -m pip install ${{ matrix.pins }} dist/*.whl
+      - name: Smoke test (outside the checkout)
+        run: cd /tmp && python "$GITHUB_WORKSPACE/tools/release_smoke.py" --version "${{ inputs.version }}" --with-extras
+
+  testpypi:
+    needs: smoke
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - run: rm dist/SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  testpypi-verify:
+    needs: testpypi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the rehearsed release from TestPyPI (dependencies from PyPI)
+        run: |
+          for attempt in 1 2 3 4 5; do
+            python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ \
+              "ecg-records[viz,interpret]==${{ inputs.version }}" && break
+            sleep 30
+          done
+      - run: cd /tmp && python "$GITHUB_WORKSPACE/tools/release_smoke.py" --version "${{ inputs.version }}" --with-extras
+
+  pypi:
+    needs: testpypi-verify
+    runs-on: ubuntu-latest
+    environment: pypi   # protected: a maintainer approves the rehearsed artifact hashes
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - run: cat dist/SHA256SUMS && rm dist/SHA256SUMS
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  post-release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the released version from PyPI and verify
+        run: |
+          for attempt in 1 2 3 4 5; do
+            python -m pip install "ecg-records[viz,interpret]==${{ inputs.version }}" && break
+            sleep 30
+          done
+          cd /tmp && python "$GITHUB_WORKSPACE/tools/release_smoke.py" --version "${{ inputs.version }}" --with-extras
+      - name: Tag and release notes (only after a successful upload)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag "v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+          gh release create "v${{ inputs.version }}" --title "v${{ inputs.version }}" --notes-file feature_extraction/CHANGELOG.md
