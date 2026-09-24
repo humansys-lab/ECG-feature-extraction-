@@ -12,8 +12,9 @@ minor 版本的兼容窗口之后进行，不属于首次发布。维护者已�
 **绘图并入核心包**（`ecgfeat.viz`，Matplotlib 为 `viz` 可选依赖；原 `ecg-records-viz` 不再单独发布）、
 **`ecg-records` 与 `ecginterpret` 两个发行包一起发布**、**由维护者上传**。据此仓库已处于
 **可发布状态**：最终产物由干净检出的提交 `1cb2ccc` 构建，全部产物检查（含 LICENSE）与
-`twine check --strict` 通过。上传步骤见仓库根目录 `RELEASING.md`；尚未上传任何包
-（本机没有 PyPI 凭据）。
+`twine check --strict` 通过。**`ecg-records 0.1.0` 已于 2026-09-24 发布到 PyPI**（先经 TestPyPI 演练；
+上传文件的 SHA-256 与本地产物一致；从 PyPI 在 Python 3.10/3.12/3.13 全新环境安装后冒烟与绘图检查通过）。
+`ecginterpret 0.1.0` 尚未上传，在此之前 `ecg-records[interpret]` 不可安装。步骤见仓库根目录 `RELEASING.md`。
 
 | 发行包 | 导入名 | 版本 | 内容 |
 |---|---|---|---|
@@ -120,9 +121,8 @@ JS00059 测试。macOS/Windows 仅由 CI 覆盖，本地未运行。合并绘图
    元数据为 PEP 639 `License-Expression: Apache-2.0`。
 2. **元数据**：已解决。作者/维护者 `humansys-lab`，项目 URL 指向上游仓库（链接在代码合入该仓库
    `main` 后生效）。
-3. **上传**：由维护者执行（`RELEASING.md` 方式 A：GitHub 可信发布；方式 B：本地 twine）。
-   本机没有 PyPI/TestPyPI 凭据。2026-09-24 复查：`ecg-records`、`ecginterpret` 在 PyPI 与 TestPyPI
-   均返回 404（不代表保留）。
+3. **上传**：`ecg-records 0.1.0` 已经以本地 twine（方式 B）上传 TestPyPI 与 PyPI；`ecginterpret` 待上传。
+   2026-09-24：`ecginterpret` 在 PyPI 与 TestPyPI 仍返回 404（不代表保留）。
 4. **尚需确认（不阻塞上传）**：`.github/CODEOWNERS` 中的 Validation Owner 账号（暂为 `@adsyhub`）；
    文档站点托管；CI 工作流在 GitHub 上的首次实际运行；自托管数据集 runner。
 

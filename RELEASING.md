@@ -1,6 +1,9 @@
 # 发布手册：ecg-records 0.1.0 / ecginterpret 0.1.0
 
-本仓库已处于**可发布状态**，但尚未上传任何包（本机没有 PyPI 凭据；上传由维护者执行）。
+**发布状态（2026-09-24）**：`ecg-records 0.1.0` 已发布到 PyPI（https://pypi.org/project/ecg-records/0.1.0/ ），
+先经 TestPyPI 演练；两处上传的文件 SHA-256 均与下表一致，并已从 PyPI 在 Python 3.10/3.12/3.13 全新环境
+安装验证（核心与 `[viz]`）。本地 tag `ecg-records-v0.1.0` 指向构建提交 `1cb2ccc`（未推送）。
+`ecginterpret 0.1.0` **尚未上传**：在它上传之前，`pip install "ecg-records[interpret]"` 无法安装。
 上传到 PyPI/TestPyPI 后版本**不可撤回、不可覆盖**；发现问题只能发布新版本修复。
 
 发行包（2026-09-24 维护者决定：绘图并入核心包，解释保持独立）：
@@ -72,9 +75,9 @@ python3 -m venv /tmp/ecg-rc && /tmp/ecg-rc/bin/pip install \
 python3 -m venv /tmp/ecg-final && /tmp/ecg-final/bin/pip install "ecg-records[viz,interpret]==0.1.0"
 (cd /tmp && /tmp/ecg-final/bin/python "$OLDPWD/tools/release_smoke.py" --version 0.1.0 --with-extras)
 
-# 5) 上传成功后再打 tag（指向构建产物的提交）
-git tag -a v0.1.0 1cb2ccc -m "ecg-records 0.1.0, ecginterpret 0.1.0"
-git push origin v0.1.0
+# 5) 上传成功后再打 tag（指向构建产物的提交；按发行包命名）
+git tag -a ecginterpret-v0.1.0 1cb2ccc -m "ecginterpret 0.1.0"   # ecg-records-v0.1.0 已在本地创建
+git push origin ecg-records-v0.1.0 ecginterpret-v0.1.0
 ```
 
 ## 发布后
